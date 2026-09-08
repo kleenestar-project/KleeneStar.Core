@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebPermission;
+﻿using KleeneStar.Core.WebPermission;
 
 namespace KleeneStar.Core.Test.WebPermission
 {
@@ -21,6 +21,11 @@ namespace KleeneStar.Core.Test.WebPermission
         [InlineData("object_edit_policy", PermissionScope.Object, "Edit")]
         [InlineData("class_exporter_policy", PermissionScope.Class, "Exporter")]
         [InlineData("calendar_admin_policy", PermissionScope.Calendar, "Admin")]
+        // the class dialog also administers the objects of the class, and the two admin
+        // policies it then offers must not both read "Admin"
+        [InlineData("class_admin_policy", PermissionScope.Class, "Admin")]
+        [InlineData("object_admin_policy", PermissionScope.Class, "Object admin")]
+        [InlineData("object_view_policy", PermissionScope.Class, "Object view")]
         public void GetLabel_NamesTheRole(string policy, string scope, string expected)
         {
             Assert.Equal(expected, PolicyCatalog.GetLabel(policy, scope));

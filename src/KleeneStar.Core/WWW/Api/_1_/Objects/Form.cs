@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebControl;
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -83,23 +83,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
             yield return summary;
 
-            // a class that classifies its objects asks for the classification here, next to the
-            // title, because it is a property of the object rather than a configured field. A
-            // caller cleared for none of its levels gets the notice instead of the input
+            // the wizard collects the content of the record, not who may see it: a new object
+            // starts on the default level of its class and is reclassified afterwards through
+            // the dialog of the overflow menu. What the step does say is when the caller is
+            // cleared for none of the class's levels - the record they are about to file may
+            // then leave their own lists the moment it exists
             var notice = ObjectFormLayout.CreateSecurityLevelNotice(classId, identityId, null);
 
             if (notice is not null)
             {
                 yield return notice;
-            }
-
-            var securityLevel = ObjectFormLayout.CreateSecurityLevelInput(classId, identityId);
-
-            if (securityLevel is not null)
-            {
-                inputs.Add(securityLevel);
-
-                yield return securityLevel;
             }
 
             var structure = ObjectFormLayout.BuildItems(form, classId, inputs).ToList();

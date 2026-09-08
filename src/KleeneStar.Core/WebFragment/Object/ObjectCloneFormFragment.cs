@@ -103,8 +103,8 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             yield return Summary;
 
-            // a copy inherits the classification of its original, so the form says so and
-            // offers to change it - see the create wizard for the same pair of items
+            // a copy inherits the classification of its original, which the notice says out
+            // loud. Changing it is not this form's business - see the edit form
             var notice = @object is not null
                 ? ObjectFormLayout.CreateSecurityLevelNotice(@object.ClassId, identityId, @object.SecurityLevelId)
                 : null;
@@ -112,15 +112,6 @@ namespace KleeneStar.Core.WebFragment.Object
             if (notice is not null)
             {
                 yield return notice;
-            }
-
-            var securityLevel = @object is not null
-                ? ObjectFormLayout.CreateSecurityLevelInput(@object.ClassId, identityId)
-                : null;
-
-            if (securityLevel is not null)
-            {
-                yield return securityLevel;
             }
 
             var form = @object is not null ? ResolveStandardForm(@object.ClassId, FormType.Edit) : null;

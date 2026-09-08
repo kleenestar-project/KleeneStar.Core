@@ -426,6 +426,28 @@
     border-top: 1px solid var(--wx-border-color);
 }
 
+/* The figures that close a prose page off: how many liked it, how many commented. They sit on
+   the same rule the tags do, because they end the piece the same way - the last line of the
+   article rather than one more property of a record. The like is a framework control
+   (ControlLike) and brings its own look; the comment count is a readout beside it and is given
+   the same colour and size so the two read as one row. */
+.ks-object-metrics {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--wx-border-color);
+}
+
+.ks-object-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.8125rem;
+}
+
 /* ------------------------------------------------------------ collaboration */
 
 /* On the object detail the presence chips are drawn into the top right corner of the shared

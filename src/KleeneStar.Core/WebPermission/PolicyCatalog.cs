@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebCore.WebAttribute;
@@ -16,6 +16,13 @@ namespace KleeneStar.Core.WebPermission
     /// A policy belongs to the resource whose name it carries: the registered names follow
     /// <c>&lt;scope&gt;_&lt;role&gt;_policy</c>, so the dialog of a workspace offers the
     /// <c>workspace_…</c> policies rather than the whole catalog.
+    ///
+    /// <b>One resource administers a second one.</b> Objects carry no permissions of their own -
+    /// who may see an object is decided by its security level, not by a grant on the record - so
+    /// the <c>object_…</c> policies, which say who may read and change the objects of a data
+    /// structure, are offered on the dialog of the <i>class</i>. That is the level an
+    /// installation actually administers: a model in which every record had to be granted
+    /// individually would be unusable. <see cref="Administered"/> holds the arrangement.
     /// </remarks>
     public static class PolicyCatalog
     {
@@ -34,11 +41,45 @@ namespace KleeneStar.Core.WebPermission
                 return [];
             }
 
-            var prefix = scope + "_";
+            var prefixes = Prefixes(scope).ToList();
 
             return [.. GetRegisteredPolicies()
-                .Where(x => x.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Where(x => prefixes.Any(p => x.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <summary>
+        /// Names the resources whose policies a dialog administers besides its own.
+        /// </summary>
+        /// <remarks>
+        /// The class dialog administers the objects of the class. It is the only entry, and the
+        /// only one there should be: the arrangement exists because a resource can be too
+        /// numerous to grant individually, not as a general escape from the naming rule.
+        /// </remarks>
+        private static readonly IReadOnlyDictionary<string, string[]> Administered =
+            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                [PermissionScope.Class] = [PermissionScope.Object]
+            };
+
+        /// <summary>
+        /// Returns the registered-name prefixes a dialog of the supplied scope offers.
+        /// </summary>
+        /// <param name="scope">The kind of resource the dialog belongs to.</param>
+        /// <returns>The prefixes, the scope's own one first.</returns>
+        private static IEnumerable<string> Prefixes(string scope)
+        {
+            yield return scope + "_";
+
+            if (!Administered.TryGetValue(scope, out var others))
+            {
+                yield break;
+            }
+
+            foreach (var other in others)
+            {
+                yield return other + "_";
+            }
         }
 
         /// <summary>
@@ -65,6 +106,13 @@ namespace KleeneStar.Core.WebPermission
         /// The registered name is a key rather than prose, so the role it names is turned into
         /// something readable: <c>workspace_admin_policy</c> reads as <c>Admin</c>. The resource is
         /// left out because the dialog already belongs to one.
+        /// <para>
+        /// A policy of a resource the dialog only <i>administers</i> keeps its resource in the
+        /// label, because dropping it would make two different policies read the same: on the
+        /// class dialog, <c>class_admin_policy</c> is <c>Admin</c> and
+        /// <c>object_admin_policy</c> is <c>Object admin</c>. That falls out of stripping only
+        /// the dialog's own prefix.
+        /// </para>
         /// </remarks>
         /// <param name="policy">The registered policy name.</param>
         /// <param name="scope">The kind of resource.</param>

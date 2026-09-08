@@ -17,8 +17,17 @@ namespace KleeneStar.Core.WebPermission
         public const string Workspace = "workspace";
 
         /// <summary>
-        /// A single object, addressed by its object key.
+        /// The objects of a class. It is <b>not</b> a resource a grant is stored on: an
+        /// individual record carries no permissions, and who may see one is decided by its
+        /// security level rather than by a grant.
         /// </summary>
+        /// <remarks>
+        /// The name survives as the prefix the <c>object_…</c> policies carry - "who may read
+        /// and change the objects of this data structure" - which the dialog of the
+        /// <see cref="Class"/> offers and stores against the class. See
+        /// <c>PolicyCatalog.Administered</c> and
+        /// <c>KleeneStar.Core/docs/kleenestar.securitylevel.md</c>.
+        /// </remarks>
         public const string Object = "object";
 
         /// <summary>

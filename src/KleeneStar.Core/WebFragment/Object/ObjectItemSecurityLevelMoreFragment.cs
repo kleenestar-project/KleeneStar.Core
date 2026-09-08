@@ -1,4 +1,4 @@
-﻿using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -12,15 +12,20 @@ namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
     /// Represents a dropdown item in the object headline 'more' overflow menu that opens the
-    /// permission management dialog for the current object.
+    /// classification dialog for the current object.
     /// </summary>
+    /// <remarks>
+    /// The entry stands where the object's permission dialog used to. An object carries no
+    /// grants of its own any more: who may see it follows from its security level, so this is
+    /// the entry that answers "who sees this record".
+    /// </remarks>
     [Section<SectionHeadlineMorePreferences>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Cache]
-    public sealed class ObjectItemPermissionMoreFragment : FragmentControlDropdownItemLink
+    public sealed class ObjectItemSecurityLevelMoreFragment : FragmentControlDropdownItemLink
     {
         /// <summary>
         /// Initializes a new instance of the class.
@@ -29,17 +34,17 @@ namespace KleeneStar.Core.WebFragment.Object
         /// The context associated with the fragment, providing necessary data and services for its operation.
         /// Cannot be null.
         /// </param>
-        public ObjectItemPermissionMoreFragment(IFragmentContext fragmentContext)
+        public ObjectItemSecurityLevelMoreFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Text = _ => "kleenestar.core:object.permission.label";
-            Icon = _ => new IconUserShield();
+            Text = _ => "kleenestar.core:securitylevel.object.label";
+            Icon = _ => new IconShieldHalved();
             PrimaryAction = renderContext => new ActionModal
             (
                 "modal-form",
-                CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Permission>()
+                CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.SecurityLevel>()
                     .BindParameters(renderContext.Request),
-                TypeModalSize.ExtraLarge
+                TypeModalSize.Large
             );
         }
 

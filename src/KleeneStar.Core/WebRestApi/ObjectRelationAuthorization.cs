@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPermission;
 using KleeneStar.Core.WebPermissions;
 using System;
@@ -16,9 +16,11 @@ namespace KleeneStar.Core.WebRestApi
     /// edit them. Administering the relation <i>catalog</i> is a class-level concern instead,
     /// because a definition outlives every object that uses it.
     /// <para>
-    /// The chain a check is issued against always ends at the workspace. A permission model in
-    /// which every object had to be granted individually would be unusable, and the workspace is
-    /// the unit an installation actually administers.
+    /// The chain runs from the class of the object to its workspace, and <b>not</b> through the
+    /// object itself: an individual record carries no grants. Who may see a record is decided by
+    /// its security level; what may be done with the records of a data structure is granted on
+    /// the class. A model in which every object had to be granted individually would be
+    /// unusable, and the class and the workspace are the units an installation administers.
     /// </para>
     /// </remarks>
     internal static class ObjectRelationAuthorization
@@ -68,7 +70,8 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Evaluates a permission against an object and the workspace it is filed in.
+        /// Evaluates a permission against the class of an object and the workspace it is filed
+        /// in. The object itself is not a link in the chain - see the remarks on the type.
         /// </summary>
         /// <param name="object">The object, may be absent.</param>
         /// <param name="request">The incoming request.</param>
@@ -77,7 +80,9 @@ namespace KleeneStar.Core.WebRestApi
         private static bool Check(ObjectEntity @object, IRequest request, Type permission)
         {
             // an unresolvable object is not an authorization question - the endpoint answers it
-            // as not found, and refusing here would turn a wrong key into a permission error
+            // as not found, and refusing here would turn a wrong key into a permission error.
+            // An object the caller is not cleared for never reaches here either: the object
+            // manager did not answer it, so the endpoint saw no object at all
             if (@object is null)
             {
                 return true;
@@ -87,7 +92,6 @@ namespace KleeneStar.Core.WebRestApi
             (
                 CoreHub.SessionManager.GetCurrentIdentityId(request),
                 permission,
-                new PermissionResource(PermissionScope.Object, @object.Id.ToString()),
                 new PermissionResource(PermissionScope.Class, @object.ClassId.ToString()),
                 new PermissionResource(PermissionScope.Workspace, @object.WorkspaceId.ToString())
             );

@@ -10,6 +10,22 @@ its objects with. A class that defines none classifies nothing, and every object
 visible to everyone — which is what every installation looks like before somebody decides
 otherwise.
 
+**They replaced the permissions an individual object used to carry.** There is no per-object
+permission dialog any more, and no grant is stored against a record. The two halves of the
+access model now divide cleanly:
+
+| Question | Answered by | Administered on |
+| --- | --- | --- |
+| Who may see *this record*? | its security level | the record, in its classification dialog |
+| Who may read and change *the records of this data structure*? | the `object_…` policies | the **class** |
+| Who may change the data structure itself? | the `class_…` policies | the class |
+
+`PermissionScope.Object` survives only as the prefix those `object_…` policies carry;
+`PolicyCatalog.Administered` is what makes the class dialog offer them, and `GetLabel` keeps the
+word *Object* in their labels so `class_admin_policy` and `object_admin_policy` do not both read
+"Admin" on the same dialog. Nothing stores a grant with that scope, and the chain
+`ObjectRelationAuthorization` evaluates runs **class → workspace**, not through the object.
+
 ## The rule
 
 > An object without a level is visible to everyone.
@@ -95,20 +111,28 @@ by more people than its original would be a leak dressed up as a convenience.
 
 ## What the user sees
 
-**On the object form** (the last step of the creation wizard, the edit dialog and the clone
-dialog) the classification is offered next to the title, as a system property rather than a
-configured field. `ObjectFormLayout.CreateSecurityLevelInput` builds the selection, fed by
+**In its own dialog** — `WWW/Issue/{objectkey}/SecurityLevel`, opened from the entry in the
+overflow menu where the object's permission dialog used to sit. `ObjectSecurityLevelFormFragment`
+is a one-field edit form over the object CRUD endpoint (no endpoint of its own, the same
+arrangement `DocumentHomeFormFragment` uses for the workspace home page), and
+`ObjectFormLayout.CreateSecurityLevelInput` builds the selection, fed by
 `/api/1/securitylevels/{classid}/selection`, which offers only the levels the caller may assign
 plus an entry standing for *unclassified* (the empty guid, which the form binder reads as "clear
 this property").
 
-Beside it, `ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning** in exactly two
-situations — both ones the form would otherwise leave to be discovered by the record
-disappearing:
+**The classification is deliberately not a field on any object content form.** The create
+wizard, the edit dialog and the clone dialog write what a record *says*; who may see it is not
+part of that, and it is set where the permissions it replaced were set. A new object starts on
+the default level of its class and is reclassified afterwards.
 
-- The class classifies its objects but the caller is cleared for **none** of its levels. The
-  input is then absent altogether and the notice says why
-  (`securitylevel.object.unavailable`).
+Those forms do still *report* it: `ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning**
+on them, and on the classification dialog itself, in exactly two situations — both ones the form
+would otherwise leave to be discovered by the record disappearing:
+
+- The class classifies its objects but the caller is cleared for **none** of its levels. In the
+  dialog the input is then absent altogether, and the notice says why
+  (`securitylevel.object.unavailable`). On the create wizard it is the warning that the record
+  about to be filed may leave the filer's own lists the moment it exists.
 - The object **already carries** a level the caller cannot assign. Saving keeps the
   classification, and with it the chance that the record leaves their own view
   (`securitylevel.object.hint`).

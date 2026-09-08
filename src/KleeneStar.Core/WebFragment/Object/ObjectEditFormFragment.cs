@@ -114,10 +114,10 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             yield return Summary;
 
-            // the classification is a system property like the title, so it is offered here
-            // rather than through the configured form. The notice comes first: it explains why
-            // the input beneath it is missing, or what the classification already on the object
-            // will do once the edit is saved
+            // the classification is reported here but never edited here: it decides who sees
+            // the record, which is not part of the record's content. It is changed in the
+            // dialog behind the 'security level' entry of the overflow menu - the surface that
+            // replaced the object's permission dialog
             var notice = @object is not null
                 ? ObjectFormLayout.CreateSecurityLevelNotice(@object.ClassId, identityId, @object.SecurityLevelId)
                 : null;
@@ -125,15 +125,6 @@ namespace KleeneStar.Core.WebFragment.Object
             if (notice is not null)
             {
                 yield return notice;
-            }
-
-            var securityLevel = @object is not null
-                ? ObjectFormLayout.CreateSecurityLevelInput(@object.ClassId, identityId)
-                : null;
-
-            if (securityLevel is not null)
-            {
-                yield return securityLevel;
             }
 
             var form = @object is not null

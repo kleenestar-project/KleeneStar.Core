@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebData;
-using WebExpress.WebCore.Internationalization;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebPage;
 
@@ -154,15 +153,13 @@ namespace KleeneStar.Core.WebControl
                 return null;
             }
 
-            // the alert prints what it is handed, so the keys are resolved here rather than
-            // reaching the page raw
             return new ControlFormItemPanel
             (
                 null,
                 new ControlAlert()
                 {
-                    Head = ctx => I18N.Translate(ctx, "kleenestar.core:securitylevel.object.hint.title"),
-                    Text = ctx => I18N.Translate(ctx, message),
+                    Head = _ => "kleenestar.core:securitylevel.object.hint.title",
+                    Text = _ => message,
                     BackgroundColor = _ => new PropertyColorBackgroundAlert(TypeColorBackgroundAlert.Warning)
                 }
             );

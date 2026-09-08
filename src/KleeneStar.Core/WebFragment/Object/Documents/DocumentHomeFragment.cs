@@ -1,32 +1,46 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
+using System;
+using System.Linq;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
-using WebExpress.WebCore.WebIcon;
-using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
 
+using ObjectEntity = KleeneStar.Model.Entities.Object;
+
 namespace KleeneStar.Core.WebFragment.Object.Documents
 {
     /// <summary>
-    /// Main-panel content of the document overview: shows the workspace's home document with
-    /// its description and a link to the full document. The tree itself lives in the sidebar
-    /// (<see cref="DocumentSidebarTreeFragment"/>), so the page opens like a wiki space:
-    /// navigation on the left, the home page in the middle.
+    /// Main-panel content of the document overview: the workspace's home document, read as a
+    /// page. The tree itself lives in the sidebar (<see cref="DocumentSidebarTreeFragment"/>), so
+    /// the overview opens like a wiki space: navigation on the left, the home page in the middle.
     /// </summary>
     /// <remarks>
-    /// Which document that is belongs to <see cref="IWorkspaceManager.GetHome"/>: the one
-    /// chosen through the document's own more menu, and failing that the first root of the page
-    /// tree by summary — which is what this fragment used to decide on its own, and is an
-    /// accident of alphabetical order. It moved to the manager because the choice is now asked
-    /// about in two places, and a second implementation of "which one is it" would answer
-    /// differently the first time somebody renamed a page.
+    /// <para>
+    /// Which document that is belongs to <see cref="IWorkspaceManager.GetHome"/>: the one chosen
+    /// through the document's own more menu, and failing that the first root of the page tree by
+    /// summary.
+    /// </para>
+    /// <para>
+    /// <b>It is the page, not a card on it.</b> A card frames a preview of something that lives
+    /// elsewhere; the home document is what the reader came for, so it is laid out the way the
+    /// document's own detail view lays it out (<see cref="ObjectProseReadFragment"/>) - the same
+    /// <see cref="ControlContent"/>, the same reading measure. The body is handed to that control
+    /// rather than emitted as raw markup because what the WYSIWYG editor stores is its whole
+    /// working surface, and printing that verbatim shows the reader the scaffolding.
+    /// </para>
+    /// <para>
+    /// The title is repeated here even though the detail view leaves it to the page headline: the
+    /// headline of this page says "Documents", so without it the reader would not know which
+    /// document they are looking at.
+    /// </para>
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
@@ -82,22 +96,92 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 return empty.Render(renderContext, visualTree);
             }
 
-            var card = new ControlPanelCard("document-home-card")
+            var id = home.Id.ToString("N");
+
+            // the same shell the document's own reading view uses, so the home page and the page
+            // it links to are laid out identically
+            var body = new ControlPanel("document-home-" + id)
             {
-                Header = _ => home.Summary
+                Classes = ["wx-kleenestar-object-prose"]
             };
 
-            // opening the page is a headline button beside the more menu
-            // (DocumentHomeOpenButtonFragment), not a link in the body of the card: it is the
-            // one thing a reader of this preview wants next, and an action buried in a card is
-            // found late
-            card.Add(new ControlText("document-home-description")
+            body.Add(new ControlText("document-home-title-" + id)
             {
-                Text = _ => home.Description,
-                Format = _ => TypeFormatText.Paragraph
+                Text = _ => home.Summary,
+                Format = _ => TypeFormatText.H2
             });
 
-            return card.Render(renderContext, visualTree);
+            body.Add(new ControlContent("document-home-body-" + id)
+            {
+                Content = _ => home.Description,
+                Format = _ => TypeFormatContent.RichText,
+
+                // an empty document says so in its own body rather than through a separate
+                // empty-state panel, so the page keeps the shape it will have once it is written
+                Placeholder = _ => "kleenestar.core:object.kind.document.read.empty",
+
+                // the reading measure and the height the body claims are laid out in
+                // kleenestar.css; the control only carries the hook
+                Classes = ["ks-prose-content"]
+            });
+
+            body.Add(BuildMetrics(renderContext, home, id));
+
+            return body.Render(renderContext, visualTree);
+        }
+
+        /// <summary>
+        /// Builds the figures that close the page off: how many liked the document, and how many
+        /// commented on it.
+        /// </summary>
+        /// <remarks>
+        /// The like carries an address, so the reader can join it from here rather than only read
+        /// the number - see <see cref="ControlLike"/> for why a reader who is not signed in gets
+        /// the figure without one. The comment count is a readout and stays one: commenting
+        /// happens on the document itself, where the thread is.
+        /// </remarks>
+        /// <param name="renderContext">The render context.</param>
+        /// <param name="home">The home document.</param>
+        /// <param name="id">The document id, already formatted for use in element ids.</param>
+        /// <returns>The row of figures.</returns>
+        private static IControl BuildMetrics(IRenderControlContext renderContext, ObjectEntity home, string id)
+        {
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext?.Request);
+
+            var like = new ControlLike("document-home-likes-" + id)
+            {
+                Value = _ => CoreHub.ObjectManager.GetLikeCount(home.Id),
+                Active = _ => CoreHub.ObjectManager.IsLiked(identityId, home.Id),
+                Label = _ => "kleenestar.core:object.kind.documents.metric.likes",
+
+                // no address for a reader who is not signed in: a like belongs to somebody, and
+                // offering the click only to answer 401 is worse than not offering it
+                Uri = _ => identityId == Guid.Empty
+                    ? null
+                    : CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Like>(),
+                Payload = _ => System.Text.Json.JsonSerializer.Serialize(new { @object = home.Key })
+            };
+
+            var comments = new ControlPanelFlex
+            (
+                "document-home-comments-" + id,
+                new ControlText
+                {
+                    Text = _ => CoreHub.CommentManager.GetComments(home.Id).Count().ToString()
+                },
+                new ControlIcon
+                {
+                    Icon = _ => new IconComment()
+                }
+            )
+            {
+                Classes = ["ks-object-metric"]
+            };
+
+            return new ControlPanelFlex("document-home-metrics-" + id, like, comments)
+            {
+                Classes = ["ks-object-metrics"]
+            };
         }
     }
 }
