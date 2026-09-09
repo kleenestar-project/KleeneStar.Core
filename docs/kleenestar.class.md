@@ -9,6 +9,7 @@ Classes bundle:
 - Linking rules to other classes with cardinality and consistency constraints.
 - Validation and business rules for cross-field consistency.
 - Schema versions including declarative migration paths for compatible and incompatible changes.
+- The presentation of their objects, in two orthogonal parts: the object kind (`Class.Kind`) decides in which overview the objects appear, and the [renderer](kleenestar.renderer.md) (`Class.Renderer`) decides how a single one of them is read and written — as prose in the WYSIWYG editor, or through the structured input mask the class's forms describe.
 
 ## Lifecycle and States
 

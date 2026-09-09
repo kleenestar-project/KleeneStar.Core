@@ -422,7 +422,21 @@ namespace KleeneStar.Core
             return notificationManager.AddNotification
             (
                 applicationContext: application,
-                icon: ApplicationContext?.Icon?.ToUri()?.ToString(),
+
+                // the icon of the record the notification is about, the same one the entry in
+                // the notification center carries. It is what makes a toast recognizable at a
+                // glance - and, for a toast that is global anyway (see the note below),
+                // recognizable as being about something the reader knows. The application icon
+                // is the fallback for the records that carry none, and it used to be the only
+                // thing shown: a class whose avatar had just been changed reported the change
+                // under the product logo.
+                icon: subjectIcon ?? ApplicationContext?.Icon?.ToUri()?.ToString(),
+
+                // the page of the record, so the reader can go straight to what changed. It is
+                // the same address the notification center entry links to, and it is null for
+                // the records that have no page of their own - the toast is then plain text,
+                // as it was before.
+                link: targetUri,
                 heading: I18N.Translate(header),
                 // the toast names what it is about. It has to: the notification API this goes
                 // through has no per-session store reachable from here, so every toast is a

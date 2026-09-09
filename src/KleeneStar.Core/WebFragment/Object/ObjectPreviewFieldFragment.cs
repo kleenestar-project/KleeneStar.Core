@@ -1,12 +1,11 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using WebExpress.WebApp.WebSection;
-using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -18,11 +17,6 @@ using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
-    // The entity type name collides with the KleeneStar.Core.WWW.Field namespace segment of
-    // the same name; alias it inside the namespace block so Field resolves to the model
-    // entity here (see also the Calendar namespace-collision note).
-    using Field = KleeneStar.Model.Entities.Field;
-
     /// <summary>
     /// The field values of the reduced object view: the fields of the view form configured on
     /// the object's class, rendered as read-only name/value attributes.
@@ -193,7 +187,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 {
                     Icon = _ => new IconAngleRight(),
                     Key = _ => field.Name,
-                    Value = ctx => Format(ctx, field, data)
+                    Value = ctx => ObjectValueFormat.Format(ctx, field, data)
                 };
             }
         }
@@ -235,41 +229,6 @@ namespace KleeneStar.Core.WebFragment.Object
                         yield return inner;
                     }
                 }
-            }
-        }
-
-        /// <summary>
-        /// Formats a persisted value for reading: booleans as yes/no, dates in the visitor's
-        /// culture, tag lists as a comma-separated line, everything else as it is stored.
-        /// </summary>
-        /// <param name="renderContext">The render context, carrying the culture.</param>
-        /// <param name="field">The field being formatted.</param>
-        /// <param name="data">The persisted payload. Never null or blank - a field without a
-        /// value is left out rather than formatted.</param>
-        /// <returns>The display text.</returns>
-        private static string Format(IRenderControlContext renderContext, Field field, string data)
-        {
-            var culture = renderContext?.Request?.Culture ?? CultureInfo.InvariantCulture;
-
-            switch (field.FieldType)
-            {
-                case FieldType.Boolean:
-                    return I18N.Translate(renderContext, bool.TryParse(data, out var flag) && flag
-                        ? "kleenestar.core:object.property.yes"
-                        : "kleenestar.core:object.property.no");
-
-                case FieldType.Date:
-                    // the value is stored round-trippable; it is read in the visitor's language,
-                    // so it is written in the visitor's culture as well
-                    return DateTime.TryParse(data, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)
-                        ? date.ToString("g", culture)
-                        : data;
-
-                case FieldType.Tag:
-                    return string.Join(", ", data.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-
-                default:
-                    return data;
             }
         }
     }

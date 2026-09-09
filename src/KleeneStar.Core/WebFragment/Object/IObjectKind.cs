@@ -44,6 +44,21 @@ namespace KleeneStar.Core.WebFragment.Object
         int Order { get; }
 
         /// <summary>
+        /// Gets the renderer key a class of this kind uses when it names none of its own -
+        /// the answer to what this kind has always looked like.
+        /// </summary>
+        /// <remarks>
+        /// A kind and a renderer are two different questions: the kind decides where the
+        /// objects of a class appear, the renderer how one of them is read and written.
+        /// The default is the structured mask, because that needs nothing of a kind beyond
+        /// its classes having fields - the two kinds that have a body to write override it
+        /// with <see cref="Model.Entities.ObjectRenderer.Prose"/>. The default
+        /// implementation keeps add-on kinds compiling and gives them a working pair of
+        /// views without any work of their own.
+        /// </remarks>
+        string DefaultRenderer => Model.Entities.ObjectRenderer.Form;
+
+        /// <summary>
         /// Gets the unbound route of the kind's overview page. The route carries the
         /// workspace-key segment, so callers bind the current request (or an explicit
         /// workspace-key parameter) before navigating.

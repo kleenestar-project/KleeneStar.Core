@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
@@ -252,7 +253,7 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
                 // frozen so the sidebar's request re-bind cannot repoint every entry at the
                 // currently displayed post (see ResolveDetailUriFrozen)
                 Uri = _ => ObjectKindCatalog.ResolveDetailUriFrozen(post),
-                Icon = _ => (IIcon)post.Icon ?? new IconBlog(),
+                Icon = _ => ObjectIcon.Resolve(post, new IconBlog()),
                 Active = _ => string.Equals(post.Key, currentKey, StringComparison.OrdinalIgnoreCase)
                     ? TypeActive.Active
                     : TypeActive.None

@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using System.Collections.Generic;
 using System.Linq;
@@ -101,7 +102,7 @@ namespace KleeneStar.Core.WebRestApi
             {
                 Id = @object.Id,
                 Text = @object.Summary,
-                Image = @object.Icon?.Uri?.ToString(),
+                Image = ObjectIcon.Uri(@object),
                 Uri = GetUri(@object, request)?.ToString()
             };
         }

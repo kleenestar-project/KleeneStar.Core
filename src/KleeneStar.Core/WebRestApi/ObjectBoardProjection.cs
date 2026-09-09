@@ -410,6 +410,24 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
+        /// Returns the address of the identity's own picture, or <see langword="null"/> when
+        /// it carries none.
+        /// </summary>
+        /// <remarks>
+        /// The initials beside this are the fallback, not the design: a board that answers a
+        /// picture gets one, and only a person who has not set one is shown as two letters on
+        /// a generated hue. The boards used to send the initials alone, so an identity with a
+        /// portrait was still lettered on every card and backlog row while the same person
+        /// appeared correctly everywhere else in the application.
+        /// </remarks>
+        /// <param name="identity">The identity. May be null.</param>
+        /// <returns>The picture address, or <see langword="null"/>.</returns>
+        public static string AvatarImage(Identity identity)
+        {
+            return identity?.Avatar?.Uri?.ToString();
+        }
+
+        /// <summary>
         /// Normalizes a name for comparison: keeps letters and digits only, lower-cased.
         /// </summary>
         /// <param name="value">The value to normalize.</param>

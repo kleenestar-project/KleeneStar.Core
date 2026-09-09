@@ -1,5 +1,5 @@
 ﻿using WebExpress.WebApp.WebApiControl;
-using WebExpress.WebApp.WebData;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
@@ -39,7 +39,13 @@ namespace KleeneStar.Core.WebControl
         public WorkspaceDropdownControl(string id)
             : base(id)
         {
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Dropdown>().ToString());
+            // the typed declaration rather than a hand-written descriptor, because it also
+            // derives the domain the endpoint serves (Workspace) off the endpoint type. The
+            // domain is what puts the menu on the live update channel: a workspace created
+            // from the dialog this very dropdown offers announces itself there, and without
+            // the domain the menu would go on showing the list it loaded when the page was
+            // built - the new workspace missing from the one place its creator looks for it
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Dropdown>();
 
             Add(AddWorkspace);
             Add(ManageWorkspace);

@@ -457,3 +457,124 @@
     padding-top: 1.75rem;
 }
 
+
+/* ----------------------------------------------------- form reading view */
+
+/* The unchangeable view of a form-rendered object is a filled-in form, not a list of
+   properties: the same sheet the mask writes, with the answers printed into it. Everything
+   below is what makes it read as a sheet rather than as a table - a boxed page, captioned
+   bands for the sections, numbered lines, and a ruled box per answer that is there whether or
+   not somebody filled it in. An empty box is information: it is the question nobody answered,
+   and a view that dropped it would quietly shorten the record. */
+.ks-form-sheet {
+    max-width: 62rem;
+    margin: 0 0 1.5rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 6px;
+    background: var(--wx-body-bg);
+    overflow: hidden;
+}
+
+/* the section band: the caption of a block of lines, set apart the way a printed form sets
+   its parts apart - a filled strip with a rule under it, not a heading floating in space */
+.ks-form-section + .ks-form-section {
+    border-top: 1px solid var(--wx-border-color);
+}
+
+.ks-form-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--wx-border-color);
+    background: var(--wx-tertiary-bg);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--wx-secondary-color);
+}
+
+/* the lines themselves. Two columns where the answers are short, one where they are not: a
+   rich-text answer is a paragraph and reads badly in half a page */
+.ks-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 0.85rem 1.1rem;
+    padding: 1rem;
+}
+
+.ks-form-field--wide {
+    grid-column: 1 / -1;
+}
+
+/* a group inside a tab is a sub-caption spanning the grid, so the lines under it stay in the
+   same columns as the ones above rather than starting a second, narrower layout */
+.ks-form-group-label {
+    grid-column: 1 / -1;
+    margin: 0.4rem 0 -0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--wx-secondary-color);
+}
+
+/* the caption of one line: the number first, the way a form refers to its own lines when it
+   explains them elsewhere, then what is being asked */
+.ks-form-field-cap {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-form-field-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 3px;
+    background: var(--wx-tertiary-bg);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-form-field-name {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* the box the answer is written in. It keeps its height when it is empty, which is what makes
+   an unanswered line visible as one */
+.ks-form-field-box {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 4px;
+    background: var(--wx-tertiary-bg);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.ks-form-field-box--empty {
+    background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 6px,
+        var(--wx-border-color) 6px,
+        var(--wx-border-color) 7px
+    );
+    opacity: 0.35;
+}
+
+/* a rich-text answer is laid out by the content control; the box only holds it, and gives it
+   the room a paragraph needs instead of the height of one line */
+.ks-form-field-box--prose {
+    min-height: 6rem;
+    background: var(--wx-body-bg);
+}

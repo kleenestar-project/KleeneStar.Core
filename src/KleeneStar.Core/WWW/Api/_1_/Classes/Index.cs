@@ -3,7 +3,9 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -102,7 +104,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 InheritedId = data.InheritedId,
                 ParentId = data.ParentId,
                 AccessModifier = data.AccessModifier,
-                Kind = data.Kind
+                Kind = data.Kind,
+                Renderer = data.Renderer
             };
 
             return RetrieveForClone(request, newItem);
@@ -174,7 +177,87 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Class existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            var result = base.Validate(existingItem, payload, request);
+
+            var (submitted, rendererSent) = ReadField(payload, nameof(Model.Entities.Class.Renderer));
+            var renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(submitted);
+
+            if (rendererSent)
+            {
+                // the kind may be changing in the same payload; a field it does not carry is
+                // unchanged, so the persisted one is what the renderer has to fit
+                var (kind, kindSent) = ReadField(payload, nameof(Model.Entities.Class.Kind));
+                var effective = kindSent ? kind : existingItem?.Kind;
+
+                ValidateRenderer(result, effective, renderer, request);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Checks the submitted renderer against the object type it would apply to. An unset
+        /// renderer is always accepted - it is the class saying "follow the object type" -
+        /// and so is one the type offers; anything else is refused, naming what the type does
+        /// offer, because a renderer no fragment is gated on would leave the object with no
+        /// reading view at all.
+        /// </summary>
+        /// <param name="result">The result the errors are collected in.</param>
+        /// <param name="kind">The object-kind key the class will carry.</param>
+        /// <param name="renderer">The submitted renderer key.</param>
+        /// <param name="request">The request, for the culture the message is written in.</param>
+        private static void ValidateRenderer(IRestApiValidationResult result, string kind, string renderer, IRequest request)
+        {
+            if (WebFragment.Object.ObjectRendererCatalog.IsOffered(kind, renderer))
+            {
+                return;
+            }
+
+            var offered = string.Join
+            (
+                ", ",
+                WebFragment.Object.ObjectRendererCatalog.GetRenderers(kind)
+                    .Select(x => Translate(request, x.Label))
+            );
+
+            result.Add
+            (
+                string.Format(Translate(request, "kleenestar.core:class.renderer.validation.unsupported"), offered),
+                nameof(Model.Entities.Class.Renderer)
+            );
+        }
+
+        /// <summary>
+        /// Reads a field from the payload, answering both its value and whether the payload
+        /// carried it at all - "absent" and "sent empty" mean different things on an update.
+        /// </summary>
+        /// <param name="payload">The payload to read from.</param>
+        /// <param name="field">The name of the field.</param>
+        /// <returns>The value and whether it was sent.</returns>
+        private static (string Value, bool Sent) ReadField(RestApiCrudFormData payload, string field)
+        {
+            if (payload is null)
+            {
+                return (null, false);
+            }
+
+            if (payload.TryGetValue(field.ToLowerInvariant(), out var lower))
+            {
+                return (lower?.ToString(), true);
+            }
+
+            return payload.TryGetValue(field, out var exact) ? (exact?.ToString(), true) : (null, false);
+        }
+
+        /// <summary>
+        /// Translates a key in the language of the request.
+        /// </summary>
+        /// <param name="request">The request carrying the culture, or null.</param>
+        /// <param name="key">The internationalization key.</param>
+        /// <returns>The translated text.</returns>
+        private static string Translate(IRequest request, string key)
+        {
+            return request is null ? I18N.Translate(key) : I18N.Translate(request, key);
         }
 
         /// <summary>
@@ -206,6 +289,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
             };
 
             fieldMap.BindTo(newItem);
+
+            // the picker's 'follow the object type' entry travels as a token because an option
+            // cannot carry an empty value; it becomes the unset state here, before persistence
+            newItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(newItem.Renderer);
 
             CoreHub.ClassManager.Add(newItem);
 
@@ -248,6 +335,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
 
             fieldMap.BindTo(newItem);
 
+            newItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(newItem.Renderer);
+
             CoreHub.ClassManager.Add(newItem);
 
             // automatically create the standard form for the cloned class
@@ -270,7 +359,26 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Class existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // the avatar dialog posts its picture inline as a data url, which the binder would
+            // hand to RestValueConverterImageIcon and collapse to the URI "http:///" - while the
+            // request still answers 200. So it is taken out of the payload before the binder sees
+            // it, decoded, and written to the icons directory. See RestApiCrudFormDataAvatarExtensions.
+            var avatarSent = payload.Detach(nameof(Model.Entities.Class.Icon), out var avatar);
+
             var res = base.Update(existingItem, payload, request);
+
+            existingItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(existingItem.Renderer);
+
+            if (avatarSent)
+            {
+                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                (
+                    existingItem.Id,
+                    avatar,
+                    existingItem.Icon,
+                    () => CoreHub.GenerateIcon(existingItem.Id)
+                );
+            }
 
             CoreHub.ClassManager.Update(existingItem);
 

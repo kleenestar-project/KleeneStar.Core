@@ -38,6 +38,20 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         public string Kind { get; init; } = ObjectKind.Issue;
 
         /// <summary>
+        /// Gets the renderer the objects of the class are read and written through - prose in
+        /// the WYSIWYG editor, or the structured input mask of the class's forms. Left
+        /// <see langword="null"/> the class follows the default of its <see cref="Kind"/>,
+        /// which is what a template that does not care should leave it at.
+        /// </summary>
+        /// <remarks>
+        /// It is separate from <see cref="Kind"/> because the two decide different things: the
+        /// kind decides in which overview the objects appear, the renderer how one of them
+        /// opens. A template may therefore ship a document class whose pages are filled in
+        /// rather than written, standing in the same page tree as the prose ones.
+        /// </remarks>
+        public string Renderer { get; init; }
+
+        /// <summary>
         /// Gets whether objects of this class are offered in the customer portal.
         /// </summary>
         public bool PortalVisible { get; init; }

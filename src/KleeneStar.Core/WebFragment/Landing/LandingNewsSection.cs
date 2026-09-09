@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebManager;
 using System.Collections.Generic;
@@ -105,7 +106,7 @@ namespace KleeneStar.Core.WebFragment.Landing
             {
                 Text = _ => post.Summary,
                 Tooltip = _ => post.Key,
-                Icon = _ => (IIcon)post.Icon ?? new IconNewspaper(),
+                Icon = _ => ObjectIcon.Resolve(post, new IconNewspaper()),
                 Uri = _ => ObjectKindCatalog.ResolveDetailUri(post)
             });
 

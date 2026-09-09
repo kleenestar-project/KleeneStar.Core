@@ -101,7 +101,7 @@ namespace KleeneStar.Core.WebRestApi
             {
                 Id = entity.Id.ToString(),
                 Text = entity.Summary,
-                Image = entity.Icon?.Uri?.ToString(),
+                Image = ObjectIcon.Uri(entity),
                 // the selection is handed to the master-detail composite rather than
                 // written into the frame, so it stays the single owner of the selection.
                 // the pane is fed the reduced view rather than the full reading view: the

@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using System;
@@ -122,7 +123,7 @@ namespace KleeneStar.Core.WebFragment.Object
                     // frozen so the sidebar's request re-bind cannot repoint every entry at
                     // the currently displayed object (see ResolveDetailUriFrozen)
                     Uri = _ => ObjectKindCatalog.ResolveDetailUriFrozen(entry),
-                    Icon = _ => (IIcon)entry.Icon ?? new IconObject(),
+                    Icon = _ => ObjectIcon.Resolve(entry, new IconObject()),
                     Active = _ => string.Equals(entry.Key, currentKey, StringComparison.OrdinalIgnoreCase)
                         ? TypeActive.Active
                         : TypeActive.None

@@ -37,10 +37,16 @@ namespace KleeneStar.Core.WebFragment.Object
     /// the headline, and what it opens is the draft, not necessarily what is shown here - an
     /// unpublished draft deliberately does not reach this view.
     /// </para>
+    /// <para>
+    /// It is the reading view of <em>one renderer</em>, not of the two kinds:
+    /// <see cref="ProseRendererCondition"/> gates it, so a document or a post whose class
+    /// renders as a form gets <see cref="ObjectFormReadFragment"/> on the same route instead.
+    /// </para>
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
+    [Condition<ProseRendererCondition>]
     [Cache]
     public sealed class ObjectProseReadFragment : FragmentControlPanel
     {

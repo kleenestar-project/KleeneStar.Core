@@ -459,6 +459,7 @@ namespace KleeneStar.Core.WebRestApi
                 AssigneeName = assignee?.Name,
                 AssigneeInitials = assignee is null ? null : ObjectBoardProjection.Initials(assignee.Name),
                 AssigneeColor = assignee is null ? null : ObjectBoardProjection.AvatarColor(assignee.Id),
+                AssigneeImage = ObjectBoardProjection.AvatarImage(assignee),
                 Footer = BuildFooter(entity, classContext).ToList()
             };
 

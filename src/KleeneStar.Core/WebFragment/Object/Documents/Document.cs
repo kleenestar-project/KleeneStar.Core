@@ -33,6 +33,14 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
         public int Order => 1;
 
         /// <summary>
+        /// Gets the renderer a document uses when its class names none: prose, written in
+        /// the WYSIWYG editor. A class of this kind may name
+        /// <see cref="Model.Entities.ObjectRenderer.Form"/> instead, and its documents then
+        /// stand in the same tree but open as an input mask.
+        /// </summary>
+        public string DefaultRenderer => Model.Entities.ObjectRenderer.Prose;
+
+        /// <summary>
         /// Gets the unbound route of the document overview page (the document tree).
         /// </summary>
         public IUri OverviewUri => CoreHub.GetUri<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>();

@@ -1,5 +1,6 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using System.Collections.Generic;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -71,50 +72,29 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         {
             // the icon is taken out of the payload and stored separately: the icon control submits
             // it inline as a data url, which the binder would hand to RestValueConverterImageIcon
-            // and end up as the URI "http:///". See StoreIcon.
-            var submitted = payload.Remove(nameof(Model.Entities.Branding.Icon).ToLowerInvariant(), out var icon);
+            // and end up as the URI "http:///". See RestApiCrudFormDataAvatarExtensions.
+            var avatarSent = payload.Detach(nameof(Model.Entities.Branding.Icon), out var avatar);
 
             var res = base.Update(existingItem, payload, request);
 
-            if (submitted)
+            if (avatarSent)
             {
-                StoreIcon(existingItem, icon as string);
+                // an empty value is how the form reports that the icon was removed; the
+                // application then falls back to the icon it declared through its [Icon]
+                // attribute, which is what the field's help text promises - so there is no
+                // generated icon to fall back to here, unlike everywhere else
+                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                (
+                    Model.Entities.Branding.SingletonId,
+                    avatar,
+                    existingItem.Icon,
+                    null
+                );
             }
 
             CoreHub.BrandingManager.Update(existingItem);
 
             return res;
-        }
-
-        /// <summary>
-        /// Applies the icon submitted by the settings form to the branding.
-        /// </summary>
-        /// <remarks>
-        /// An empty value is how the form reports that the icon was removed. The application then
-        /// falls back to the icon it declared through its <c>[Icon]</c> attribute, which is what
-        /// the field's help text promises.
-        /// </remarks>
-        /// <param name="branding">The branding being saved.</param>
-        /// <param name="payload">The submitted value, or <see langword="null"/> / empty when the
-        /// icon was removed.</param>
-        private static void StoreIcon(Model.Entities.Branding branding, string payload)
-        {
-            if (string.IsNullOrWhiteSpace(payload))
-            {
-                CoreHub.RemoveStoredIcons(Model.Entities.Branding.SingletonId);
-                branding.Icon = null;
-
-                return;
-            }
-
-            var stored = CoreHub.StoreIcon(Model.Entities.Branding.SingletonId, payload);
-
-            // a payload that carries no usable image leaves the current icon alone rather than
-            // clearing it - the administrator asked to change the icon, not to lose it
-            if (stored is not null)
-            {
-                branding.Icon = stored;
-            }
         }
     }
 }

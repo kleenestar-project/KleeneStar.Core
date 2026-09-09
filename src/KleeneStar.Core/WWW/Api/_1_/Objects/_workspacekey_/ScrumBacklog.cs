@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
@@ -384,6 +385,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         /// the workflow status category ("todo", "doing", "waiting", "done"); objects
         /// outside a sprint read as "backlog".
         /// </summary>
+        /// <remarks>
+        /// The picture goes through <see cref="ObjectIcon"/> like every other surface that
+        /// stands a row for a record, rather than being read off the class captured in
+        /// <see cref="ObjectBoardClassContext"/>: that context is rebuilt on a five-second
+        /// timer, while <see cref="ObjectIcon"/> drops its entry the moment the class is
+        /// edited, so a newly saved class avatar is on the board with the next render.
+        /// </remarks>
         /// <param name="item">The object entity.</param>
         /// <returns>The REST item DTO.</returns>
         public static RestApiScrumItem ToRestItem(Model.Entities.Object item)
@@ -408,6 +416,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
             {
                 Id = item.Id.ToString(),
                 Type = classContext?.Class?.Name,
+                Icon = ObjectIcon.Uri(item),
                 Key = item.Key,
                 Title = string.IsNullOrWhiteSpace(item.Summary) ? item.Key : item.Summary,
                 Priority = ObjectBoardProjection.ResolvePriorityCode(item.Id, classContext),
@@ -418,7 +427,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                 AssigneeId = assignee?.Id.ToString(),
                 AssigneeName = assignee?.Name,
                 AssigneeInitials = assignee is null ? null : ObjectBoardProjection.Initials(assignee.Name),
-                AssigneeColor = assignee is null ? null : ObjectBoardProjection.AvatarColor(assignee.Id)
+                AssigneeColor = assignee is null ? null : ObjectBoardProjection.AvatarColor(assignee.Id),
+                AssigneeImage = ObjectBoardProjection.AvatarImage(assignee)
             };
         }
 

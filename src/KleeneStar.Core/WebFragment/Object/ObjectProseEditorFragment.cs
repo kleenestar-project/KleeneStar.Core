@@ -16,6 +16,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionBodySecondary>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
+    [Condition<ProseRendererCondition>]
     [Cache]
     public sealed class ObjectProseEditorFragment : ObjectProseEditorFragmentBase
     {

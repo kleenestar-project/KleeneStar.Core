@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
@@ -243,7 +244,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
             {
                 Text = _ => $"{obj.Key}  {obj.Summary}",
                 Tooltip = _ => obj.Summary,
-                Icon = _ => (IIcon)obj.Icon ?? new IconObject(),
+                Icon = _ => ObjectIcon.Resolve(obj, new IconObject()),
                 Expand = _ => depth == 0
             };
         }

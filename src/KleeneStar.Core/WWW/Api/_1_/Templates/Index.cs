@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebRestApi;
+﻿using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -290,7 +290,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Template existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // the avatar dialog posts its picture inline as a data url, which the binder would
+            // hand to RestValueConverterImageIcon and collapse to the URI "http:///" - while the
+            // request still answers 200. So it is taken out of the payload before the binder sees
+            // it, decoded, and written to the icons directory. See RestApiCrudFormDataAvatarExtensions.
+            var avatarSent = payload.Detach(nameof(Model.Entities.Template.Icon), out var avatar);
+
             var res = base.Update(existingItem, payload, request);
+
+            if (avatarSent)
+            {
+                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                (
+                    existingItem.Id,
+                    avatar,
+                    existingItem.Icon,
+                    () => CoreHub.GenerateIcon(existingItem.Id)
+                );
+            }
 
             CoreHub.TemplateManager.UpdateTemplate(existingItem);
 

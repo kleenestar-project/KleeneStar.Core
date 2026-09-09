@@ -136,6 +136,7 @@ namespace KleeneStar.Core.WebManager
             ArgumentNullException.ThrowIfNull(classEntity);
 
             classEntity.Kind = Model.Entities.ObjectKind.Normalize(classEntity.Kind);
+            classEntity.Renderer = Model.Entities.ObjectRenderer.Normalize(classEntity.Renderer);
 
             ModelHub.Add(classEntity);
 
@@ -157,6 +158,10 @@ namespace KleeneStar.Core.WebManager
             ArgumentNullException.ThrowIfNull(classEntity);
 
             classEntity.Kind = Model.Entities.ObjectKind.Normalize(classEntity.Kind);
+
+            // an empty renderer is the state 'follow the kind' rather than a key, so it is
+            // normalized to null instead of to a default - unlike the kind beside it
+            classEntity.Renderer = Model.Entities.ObjectRenderer.Normalize(classEntity.Renderer);
 
             ModelHub.Update(classEntity);
 

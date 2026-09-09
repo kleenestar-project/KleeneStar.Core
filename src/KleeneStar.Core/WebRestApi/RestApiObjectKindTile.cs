@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
@@ -54,7 +55,7 @@ namespace KleeneStar.Core.WebRestApi
                     Id = x.Id.ToString(),
                     Title = x.Summary,
                     Text = x.Description,
-                    Image = x.Icon?.Uri?.ToString(),
+                    Image = ObjectIcon.Uri(x),
                     PrimaryAction = GetPrimaryAction(x, request)?.ToJson()
                 });
         }

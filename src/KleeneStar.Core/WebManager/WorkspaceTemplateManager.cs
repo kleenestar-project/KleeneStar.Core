@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebWorkspaceTemplate;
+﻿using KleeneStar.Core.WebWorkspaceTemplate;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Concurrent;
@@ -351,6 +351,7 @@ namespace KleeneStar.Core.WebManager
                     descriptor.Description,
                     descriptor.Icon,
                     descriptor.Kind,
+                    descriptor.Renderer,
                     descriptor.PortalVisible,
                     descriptor.Sealed,
                     descriptor.AccessModifier
@@ -369,6 +370,8 @@ namespace KleeneStar.Core.WebManager
         /// internationalization key when a template wrote it.</param>
         /// <param name="icon">The path of the icon, or null.</param>
         /// <param name="kind">The kind of object the class holds.</param>
+        /// <param name="renderer">The renderer the objects are read and written through, or null
+        /// to follow the default of the kind.</param>
         /// <param name="portalVisible">Whether customers may file objects of it.</param>
         /// <param name="sealed">Whether the class may be specialized further.</param>
         /// <param name="accessModifier">Who may see it.</param>
@@ -380,6 +383,7 @@ namespace KleeneStar.Core.WebManager
             string description,
             string icon,
             string kind,
+            string renderer = null,
             bool portalVisible = false,
             bool @sealed = false,
             AccessModifier accessModifier = AccessModifier.Public
@@ -391,6 +395,7 @@ namespace KleeneStar.Core.WebManager
                 Description = description,
                 Icon = string.IsNullOrWhiteSpace(icon) ? null : ImageIcon.FromString(icon),
                 Kind = kind,
+                Renderer = renderer,
                 PortalVisible = portalVisible,
                 Sealed = @sealed,
                 AccessModifier = accessModifier,

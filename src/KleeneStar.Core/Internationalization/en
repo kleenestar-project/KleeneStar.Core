@@ -198,6 +198,11 @@ class.property.no=no
 class.property.none=None
 class.property.yes=yes
 class.quickfilter.all.label=All Classes
+class.renderer.automatic=Follow the object type
+class.renderer.help=Decides how a single object of this class is read and written: as prose in the WYSIWYG editor, or through the structured input mask of the class's forms. Choose 'Follow the object type' to leave it to the default of the object type. Only the renderers the chosen object type offers are accepted.
+class.renderer.label=Renderer
+class.renderer.placeholder=Follow the object type.
+class.renderer.validation.unsupported=The chosen object type does not offer this renderer. Available: {0}.
 class.sealed.help=Indicates whether the class is sealed and cannot be inherited from.
 class.sealed.label=Sealed
 class.state.help=The state determines the availability of the class. Only active classes can be assigned and used.
@@ -596,6 +601,15 @@ object.kind.blog.edit.title=Edit post
 object.kind.blog.read.empty=This post has no content yet.
 object.kind.document.edit.title=Edit document
 object.kind.document.read.empty=This document has no content yet.
+
+# renderers (how a single object is read and written - see ObjectRendererCatalog)
+object.renderer.form.description=The object is filed through the structured input mask of its class and read as a fixed record.
+object.renderer.form.edit.title=Edit entry
+object.renderer.form.field.empty=Not filled in.
+object.renderer.form.label=Form
+object.renderer.form.read.empty=No form is configured for this class yet, so there is nothing to show here.
+object.renderer.prose.description=The object is written in the WYSIWYG editor and read as a page of prose.
+object.renderer.prose.label=Prose
 object.prose.edit.label=Edit
 object.prose.api.title=Publish Prose
 

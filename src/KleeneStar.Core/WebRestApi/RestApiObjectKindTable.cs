@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebQuickfilter;
@@ -505,7 +506,7 @@ namespace KleeneStar.Core.WebRestApi
                 // a starred object is marked rather than given a column of its own; the star
                 // sits beside the object icon in the row's leading cell
                 Icon = starred ? "fas fa-star" : null,
-                Image = entity.Icon?.Uri?.ToString(),
+                Image = ObjectIcon.Uri(entity),
                 // the nested rows are ordered by the same column the roots are, so one sort
                 // governs the whole table rather than only its top level
                 Children = nested.Count == 0

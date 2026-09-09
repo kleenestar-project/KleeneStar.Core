@@ -1,7 +1,8 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -154,8 +155,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
 
             // the picture is taken out of the payload and stored separately: the avatar control
             // submits it inline as a data url, which the binder would hand to
-            // RestValueConverterImageIcon and end up as the URI "http:///". See StoreAvatar.
-            editable.Remove(nameof(Model.Entities.Identity.Avatar).ToLowerInvariant(), out var avatar);
+            // RestValueConverterImageIcon and end up as the URI "http:///" - while the request
+            // still answers 200. See RestApiCrudFormDataAvatarExtensions.
+            var avatarSent = editable.Detach(nameof(Model.Entities.Identity.Avatar), out var avatar);
 
             // the item handed in came through Sanitize, which blanked the password hash on its
             // way to the client. Saving that copy would write the blank back, so the edits are
@@ -164,9 +166,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
 
             var res = base.Update(persisted, editable, request);
 
-            if (payload.ContainsKey(nameof(Model.Entities.Identity.Avatar).ToLowerInvariant()))
+            if (avatarSent)
             {
-                StoreAvatar(persisted, avatar as string);
+                persisted.Avatar = RestApiCrudFormDataAvatarExtensions.Resolve
+                (
+                    persisted.Id,
+                    avatar,
+                    persisted.Avatar,
+                    () => CoreHub.GenerateIcon(persisted.Id)
+                );
             }
 
             // an identity must not stand in for itself — the deputy would be the very account
@@ -179,47 +187,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
             CoreHub.IdentityManager.Update(persisted);
 
             return res;
-        }
-
-        /// <summary>
-        /// Applies the picture submitted by the profile form to the identity.
-        /// </summary>
-        /// <remarks>
-        /// The avatar control has no upload endpoint of its own; it posts the picture inline as
-        /// <c>file:&lt;name&gt;;data:&lt;mime&gt;;base64,&lt;payload&gt;</c>. The property behind
-        /// it is an <see cref="WebExpress.WebUI.WebIcon.ImageIcon"/>, which holds a URI, and the
-        /// converter in between passes the whole string to <c>ImageIcon.FromString</c> — the
-        /// data url is parsed as a URI and collapses to <c>http:///</c>, which is why an
-        /// uploaded picture used to vanish while the request still answered 200. So the payload
-        /// is decoded and written to the icons directory here, and the identity is pointed at
-        /// the file.
-        ///
-        /// An empty value is how the form reports that the picture was removed. The identity
-        /// then falls back to the generated initials icon, matching what the field's help text
-        /// promises.
-        /// </remarks>
-        /// <param name="identity">The identity being saved.</param>
-        /// <param name="payload">
-        /// The submitted value, or <see langword="null"/> / empty when the picture was removed.
-        /// </param>
-        private static void StoreAvatar(Model.Entities.Identity identity, string payload)
-        {
-            if (string.IsNullOrWhiteSpace(payload))
-            {
-                CoreHub.RemoveStoredIcons(identity.Id);
-                identity.Avatar = CoreHub.GenerateIcon(identity.Id);
-
-                return;
-            }
-
-            var stored = CoreHub.StoreIcon(identity.Id, payload);
-
-            // a payload that carries no usable image leaves the current picture alone rather
-            // than clearing it — the user asked to change the avatar, not to lose it
-            if (stored is not null)
-            {
-                identity.Avatar = stored;
-            }
         }
 
         /// <summary>

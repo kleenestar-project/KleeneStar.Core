@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
@@ -403,8 +404,37 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             CoreHub.WorkspaceManager.Add(newItem);
 
             ApplyTemplate(fieldMap, newItem, request);
+            RecordCreationAsVisit(newItem, request);
 
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Records the creation as the creator's most recent visit to the workspace.
+        /// </summary>
+        /// <remarks>
+        /// The workspace dropdown is a list of recently visited workspaces, and a visit is
+        /// stamped by the workspace pages when they are opened. A workspace that was just
+        /// created has been opened by nobody, so without this it is the one workspace missing
+        /// from the menu of the person who made it - and it stays missing until they navigate
+        /// to it, which is what the menu was to be used for.
+        /// <para>
+        /// Creating a workspace is treated as the first visit rather than as a special case in
+        /// the dropdown, because the reading is the honest one - the creator was just there,
+        /// in the wizard - and because it holds for every caller that creates a workspace, not
+        /// only for the wizard the menu offers.
+        /// </para>
+        /// </remarks>
+        /// <param name="workspace">The workspace that was just created.</param>
+        /// <param name="request">The request naming the identity that created it.</param>
+        private static void RecordCreationAsVisit(Workspace workspace, IRequest request)
+        {
+            var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            if (ownerId != Guid.Empty && workspace is not null)
+            {
+                CoreHub.WorkspaceManager.RecordVisit(ownerId, workspace.Id);
+            }
         }
 
         /// <summary>
@@ -511,7 +541,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Workspace existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // the avatar dialog posts its picture inline as a data url, which the binder would
+            // hand to RestValueConverterImageIcon and collapse to the URI "http:///" - while the
+            // request still answers 200. So it is taken out of the payload before the binder sees
+            // it, decoded, and written to the icons directory. See RestApiCrudFormDataAvatarExtensions.
+            var avatarSent = payload.Detach(nameof(Workspace.Icon), out var avatar);
+
             var res = base.Update(existingItem, payload, request);
+
+            if (avatarSent)
+            {
+                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                (
+                    existingItem.Id,
+                    avatar,
+                    existingItem.Icon,
+                    () => CoreHub.GenerateIcon(existingItem.Id)
+                );
+            }
 
             CoreHub.WorkspaceManager.Update(existingItem);
 

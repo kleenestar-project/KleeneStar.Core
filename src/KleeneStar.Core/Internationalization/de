@@ -199,6 +199,11 @@ class.property.no=nein
 class.property.none=Keine
 class.property.yes=ja
 class.quickfilter.all.label=Alle Klassen
+class.renderer.automatic=Dem Objekttyp folgen
+class.renderer.help=Bestimmt, wie ein einzelnes Objekt dieser Klasse gelesen und geschrieben wird: als Fließtext im WYSIWYG-Editor oder über die strukturierte Eingabemaske der Formulare der Klasse. Mit „Dem Objekttyp folgen“ bleibt es beim Standard des Objekttyps. Es werden nur Renderer akzeptiert, die der gewählte Objekttyp anbietet.
+class.renderer.label=Renderer
+class.renderer.placeholder=Dem Objekttyp folgen.
+class.renderer.validation.unsupported=Der gewählte Objekttyp bietet diesen Renderer nicht an. Verfügbar: {0}.
 class.sealed.help=Gibt an, ob die Klasse versiegelt ist und nicht vererbt werden kann.
 class.sealed.label=Versiegelt
 class.state.help=Der Status bestimmt, ob die Klasse aktiv oder archiviert ist.
@@ -597,6 +602,15 @@ object.kind.blog.edit.title=Beitrag bearbeiten
 object.kind.blog.read.empty=Dieser Beitrag hat noch keinen Inhalt.
 object.kind.document.edit.title=Dokument bearbeiten
 object.kind.document.read.empty=Dieses Dokument hat noch keinen Inhalt.
+
+# Renderer (wie ein einzelnes Objekt gelesen und geschrieben wird - siehe ObjectRendererCatalog)
+object.renderer.form.description=Das Objekt wird über die strukturierte Eingabemaske seiner Klasse erfasst und als feste Aufzeichnung gelesen.
+object.renderer.form.edit.title=Eintrag bearbeiten
+object.renderer.form.field.empty=Nicht ausgefüllt.
+object.renderer.form.label=Formular
+object.renderer.form.read.empty=Für diese Klasse ist noch kein Formular konfiguriert, daher gibt es hier nichts anzuzeigen.
+object.renderer.prose.description=Das Objekt wird im WYSIWYG-Editor geschrieben und als Fließtext gelesen.
+object.renderer.prose.label=Fließtext
 object.prose.edit.label=Bearbeiten
 object.prose.api.title=Text veröffentlichen
 

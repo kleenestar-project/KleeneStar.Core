@@ -32,6 +32,12 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
         public int Order => 2;
 
         /// <summary>
+        /// Gets the renderer a post uses when its class names none: prose, written in the
+        /// WYSIWYG editor.
+        /// </summary>
+        public string DefaultRenderer => Model.Entities.ObjectRenderer.Prose;
+
+        /// <summary>
         /// Gets the unbound route of the blog overview page (the blog timeline).
         /// </summary>
         public IUri OverviewUri => CoreHub.GetUri<global::KleeneStar.Core.WWW.Blogs._workspacekey_.Index>();
