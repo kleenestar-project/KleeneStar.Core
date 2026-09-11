@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebPolicies;
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
@@ -21,7 +22,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Permissions>]
     [Policy<WorkspaceAdminPolicy>]
     [Cache]
-    public sealed class WorkspacePermissionFragment : PermissionFragment
+    public sealed class WorkspacePermissionFragment : FragmentControlDataPermission
     {
         /// <summary>
         /// Initializes a new instance of the class.
