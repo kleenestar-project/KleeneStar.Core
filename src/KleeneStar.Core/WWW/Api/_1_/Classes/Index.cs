@@ -179,32 +179,44 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         {
             var result = base.Validate(existingItem, payload, request);
 
-            var (submitted, rendererSent) = ReadField(payload, nameof(Model.Entities.Class.Renderer));
-            var renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(submitted);
+            var (submitted, rendererSent) = payload.TryRead(nameof(Model.Entities.Class.Renderer));
+            var (kind, kindSent) = payload.TryRead(nameof(Model.Entities.Class.Kind));
 
-            if (rendererSent)
+            // a field the payload does not carry is unchanged, so each side of the pairing is
+            // taken from the payload where it is there and from the persisted class where it
+            // is not. Both are checked, not just a submitted renderer: moving a class to a
+            // kind that does not offer the renderer it already names produces exactly the
+            // pairing the gate exists to keep out, and the dialogs send both fields anyway
+            if (rendererSent || kindSent)
             {
-                // the kind may be changing in the same payload; a field it does not carry is
-                // unchanged, so the persisted one is what the renderer has to fit
-                var (kind, kindSent) = ReadField(payload, nameof(Model.Entities.Class.Kind));
-                var effective = kindSent ? kind : existingItem?.Kind;
-
-                ValidateRenderer(result, effective, renderer, request);
+                ValidateRenderer
+                (
+                    result,
+                    kindSent ? kind : existingItem?.Kind,
+                    WebFragment.Object.ObjectRendererCatalog.Unwrap(rendererSent ? submitted : existingItem?.Renderer),
+                    request
+                );
             }
 
             return result;
         }
 
         /// <summary>
-        /// Checks the submitted renderer against the object type it would apply to. An unset
-        /// renderer is always accepted - it is the class saying "follow the object type" -
-        /// and so is one the type offers; anything else is refused, naming what the type does
-        /// offer, because a renderer no fragment is gated on would leave the object with no
-        /// reading view at all.
+        /// Checks the renderer the class will carry against the object type it will carry. An
+        /// unset renderer is always accepted - it is the class saying "follow the object
+        /// type" - and so is one the type offers; anything else is refused, naming what the
+        /// type does offer, because a renderer no fragment is gated on would leave the object
+        /// with no reading view at all.
         /// </summary>
+        /// <remarks>
+        /// Either half may be the reason a pairing is refused, because either half may be the
+        /// one moving: naming the mask on a class of the blog type is the same fault as moving
+        /// a form-rendered class to the blog type, and both are answered with the renderers
+        /// that type does offer.
+        /// </remarks>
         /// <param name="result">The result the errors are collected in.</param>
         /// <param name="kind">The object-kind key the class will carry.</param>
-        /// <param name="renderer">The submitted renderer key.</param>
+        /// <param name="renderer">The renderer key the class will carry.</param>
         /// <param name="request">The request, for the culture the message is written in.</param>
         private static void ValidateRenderer(IRestApiValidationResult result, string kind, string renderer, IRequest request)
         {
@@ -225,28 +237,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 string.Format(Translate(request, "kleenestar.core:class.renderer.validation.unsupported"), offered),
                 nameof(Model.Entities.Class.Renderer)
             );
-        }
-
-        /// <summary>
-        /// Reads a field from the payload, answering both its value and whether the payload
-        /// carried it at all - "absent" and "sent empty" mean different things on an update.
-        /// </summary>
-        /// <param name="payload">The payload to read from.</param>
-        /// <param name="field">The name of the field.</param>
-        /// <returns>The value and whether it was sent.</returns>
-        private static (string Value, bool Sent) ReadField(RestApiCrudFormData payload, string field)
-        {
-            if (payload is null)
-            {
-                return (null, false);
-            }
-
-            if (payload.TryGetValue(field.ToLowerInvariant(), out var lower))
-            {
-                return (lower?.ToString(), true);
-            }
-
-            return payload.TryGetValue(field, out var exact) ? (exact?.ToString(), true) : (null, false);
         }
 
         /// <summary>

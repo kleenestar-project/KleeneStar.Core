@@ -44,6 +44,23 @@ namespace KleeneStar.Core.WebManager
         Identity GetIdentity(IdentityIdParameter identityId);
 
         /// <summary>
+        /// Returns the identity that signs in under the supplied name: the account whose user
+        /// name or e-mail address it is, compared case-insensitively.
+        /// </summary>
+        /// <remarks>
+        /// This is the one lookup a login goes through, and the one the session resolver goes
+        /// through for an identity that names itself rather than carrying our id - a person
+        /// types the same string into the login form either way, and both paths have to agree
+        /// on which account it means. An account that is not
+        /// <see cref="Model.Entities.IdentityState.Active"/> is not answered: a locked or
+        /// retired account may not sign in, and may not be attributed with anything either.
+        /// </remarks>
+        /// <param name="name">The user name or e-mail address. May be null.</param>
+        /// <returns>The identity, or <see langword="null"/> when no active account carries
+        /// that name.</returns>
+        Identity GetIdentityByLogin(string name);
+
+        /// <summary>
         /// Returns the identity the given request is served for — the account whose profile
         /// settings the profile pages read and write.
         /// </summary>

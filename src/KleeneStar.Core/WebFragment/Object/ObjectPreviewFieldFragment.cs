@@ -47,31 +47,33 @@ namespace KleeneStar.Core.WebFragment.Object
     {
         private readonly IObjectManager _objectManager;
         private readonly IFieldManager _fieldManager;
-        private readonly IFormManager _formManager;
         private readonly IValueManager _valueManager;
 
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
+        /// <remarks>
+        /// The view form is not read through an injected manager: which form is the class's is
+        /// a decision <see cref="ObjectFormLayout.ResolveStandardForm"/> owns for every surface
+        /// that presents a form, and a second copy of it here is how the pane and the sheet
+        /// would come to answer differently.
+        /// </remarks>
         /// <param name="fragmentContext">The fragment context.</param>
         /// <param name="objectManager">The object manager used to resolve the current object
         /// from the URL-bound object key.</param>
         /// <param name="fieldManager">The field manager used to enumerate the class fields.</param>
-        /// <param name="formManager">The form manager the view form is read from.</param>
         /// <param name="valueManager">The value manager used to read the object's field values.</param>
         public ObjectPreviewFieldFragment
         (
             IFragmentContext fragmentContext,
             IObjectManager objectManager,
             IFieldManager fieldManager,
-            IFormManager formManager,
             IValueManager valueManager
         )
             : base(fragmentContext)
         {
             _objectManager = objectManager;
             _fieldManager = fieldManager;
-            _formManager = formManager;
             _valueManager = valueManager;
         }
 
@@ -130,7 +132,10 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <returns>The attributes; empty when the class has no active view form.</returns>
         private IEnumerable<IControl> BuildAttributes(Model.Entities.Object @object)
         {
-            var form = ResolveViewForm(@object.ClassId);
+            // the same resolution the sheet of a form-rendered object performs, through the
+            // one helper both go by - which view form is the class's, and loaded with its
+            // structure - so the pane and the sheet cannot come to disagree about it
+            var form = ObjectFormLayout.ResolveStandardForm(@object.ClassId, FormType.View);
 
             if (form?.Tabs is null || form.Tabs.Count == 0)
             {
@@ -190,21 +195,6 @@ namespace KleeneStar.Core.WebFragment.Object
                     Value = ctx => ObjectValueFormat.Format(ctx, field, data)
                 };
             }
-        }
-
-        /// <summary>
-        /// Resolves the active view form of the supplied class, loaded with its structure so
-        /// its tabs and their elements are available.
-        /// </summary>
-        /// <param name="classId">The class whose view form is resolved.</param>
-        /// <returns>The form, or <c>null</c> when the class has no active view form.</returns>
-        private Model.Entities.Form ResolveViewForm(Guid classId)
-        {
-            var form = _formManager
-                .GetForms(new ClassIdParameter(classId))
-                .FirstOrDefault(x => x.FormType == FormType.View && x.State == FormState.Active);
-
-            return form is null ? null : _formManager.GetFormWithStructure(form.Id);
         }
 
         /// <summary>

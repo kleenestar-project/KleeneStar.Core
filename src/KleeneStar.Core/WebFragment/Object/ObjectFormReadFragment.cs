@@ -23,6 +23,13 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// <para>
+    /// On the blog route it never wins as the core ships: the blog kind names prose as the
+    /// only renderer it accepts, so a post is prose whatever its class stored. The scope is
+    /// kept rather than dropped because it says where this fragment <em>could</em> draw, and
+    /// whether it does is the kind's business - a plugin that re-registers the blog kind with
+    /// the mask among its renderers gets the sheet without touching anything here.
+    /// </para>
+    /// <para>
     /// It is deliberately drawn as a <em>form</em> rather than as a property list: a boxed
     /// sheet, a captioned band per tab of the class's <see cref="FormType.View"/> form, and
     /// one numbered, ruled line per field with the answer printed into it. The reader should
@@ -110,23 +117,15 @@ namespace KleeneStar.Core.WebFragment.Object
                 Classes = ["wx-kleenestar-object-form-view"]
             };
 
-            var sheet = BuildSheet(@object, id);
+            // a class whose view form was never built - which is every class created through
+            // the dialogs, because CreateStandardForm files one form of no type at all - still
+            // has a record to show. The mask on the writing side answers this the same way
+            // (ObjectStructuredEditFormFragmentBase falls back to the system fields when the
+            // class declares no structure), so the sheet must too: a page that reported only
+            // "not configured" would hide the summary and the text the author had just typed
+            var sheet = BuildSheet(@object, id) ?? BuildSystemSheet(@object, id);
 
-            if (sheet is null)
-            {
-                // a class whose view form was deleted or emptied still has a reading view; it
-                // says so rather than rendering an empty page the reader cannot interpret
-                body.Add(new ControlText("object-form-view-empty-" + id)
-                {
-                    Text = _ => "kleenestar.core:object.renderer.form.read.empty",
-                    Format = _ => TypeFormatText.Italic,
-                    TextColor = _ => new PropertyColorText(TypeColorText.Muted)
-                });
-            }
-            else
-            {
-                body.Add(sheet);
-            }
+            body.Add(sheet);
 
             var tags = BuildTagRow(@object, id);
 
@@ -191,30 +190,106 @@ namespace KleeneStar.Core.WebFragment.Object
                 };
 
                 grid.Add(lines);
-
-                var head = new ControlPanel("object-form-head-" + tab.Id.ToString("N"))
-                {
-                    Classes = ["ks-form-section-head"]
-                };
-
-                head.Add(new ControlText("object-form-head-text-" + tab.Id.ToString("N"))
-                {
-                    Text = _ => tab.Name,
-                    Format = _ => TypeFormatText.Span
-                });
-
-                var section = new ControlPanel("object-form-section-" + tab.Id.ToString("N"))
-                {
-                    Classes = ["ks-form-section"]
-                };
-
-                section.Add(head, grid);
-                sheet.Add(section);
+                sheet.Add(BuildSection("object-form-section-" + tab.Id.ToString("N"), tab.Name, grid));
 
                 sections++;
             }
 
             return sections == 0 ? null : sheet;
+        }
+
+        /// <summary>
+        /// Builds the sheet a class without a view form gets: the two attributes every object
+        /// carries whatever its class models, on one section.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Model.Entities.FormType.View"/> forms are seeded per class, but
+        /// <c>FormManager.CreateStandardForm</c> - what <c>/api/1/classes</c> calls on create
+        /// and on clone - files a single form and leaves its type at
+        /// <see cref="Model.Entities.FormType.Default"/>, so a class an administrator makes
+        /// has no view form to resolve. The writing side already answers this by falling back
+        /// to the summary and the description; this is the same fallback, read.
+        /// <para>
+        /// The two lines are described by unsaved <see cref="Model.Entities.Field"/> instances
+        /// named after the properties they stand for, so <see cref="ResolveAnswer"/> aliases
+        /// them onto the object exactly as it does for a modelled field of the same name.
+        /// </para>
+        /// </remarks>
+        /// <param name="object">The object whose values are shown.</param>
+        /// <param name="id">The object id, already formatted for use in element ids.</param>
+        /// <returns>The sheet.</returns>
+        private static IControl BuildSystemSheet(Model.Entities.Object @object, string id)
+        {
+            var summary = new Model.Entities.Field
+            {
+                Name = nameof(Model.Entities.Object.Summary),
+                FieldType = FieldType.Text,
+                Required = true
+            };
+
+            var description = new Model.Entities.Field
+            {
+                Name = nameof(Model.Entities.Object.Description),
+                FieldType = FieldType.RichText
+            };
+
+            var values = new Dictionary<Guid, Value>();
+
+            var grid = new ControlPanel("object-form-grid-system-" + id)
+            {
+                Classes = ["ks-form-grid"]
+            };
+
+            grid.Add(BuildLine(@object, summary, values, 1, "kleenestar.core:object.summary.label"));
+            grid.Add(BuildLine(@object, description, values, 2, "kleenestar.core:object.description.label"));
+
+            var sheet = new ControlPanel("object-form-sheet-" + id)
+            {
+                Classes = ["ks-form-sheet"]
+            };
+
+            sheet.Add(BuildSection
+            (
+                "object-form-section-system-" + id,
+                "kleenestar.core:object.renderer.form.read.system",
+                grid
+            ));
+
+            return sheet;
+        }
+
+        /// <summary>
+        /// Wraps a block of lines in the section the rest of the application uses for a
+        /// captioned block of content.
+        /// </summary>
+        /// <remarks>
+        /// The parts of the sheet are <see cref="ControlSection"/>s - the same control, and
+        /// therefore the same caption, rule and folding, as every other captioned block on an
+        /// object page. They used to be hand-built bands inside a bordered, rounded panel, which
+        /// made the reading view the one card on a page that carries none: the prose renderer
+        /// beside it puts the body straight onto the page, and the sections of the issue detail
+        /// are ruled captions rather than boxes. A frame of its own made the record look like a
+        /// widget about the object instead of the object.
+        /// <para>
+        /// <see cref="TypeLayoutSection.Rule"/> is what the object fragments use throughout, and
+        /// it indents its body, so a part of the form lines up with the sections around it.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">The element id of the section.</param>
+        /// <param name="header">The caption - the tab name, or an i18n key.</param>
+        /// <param name="body">The lines the section holds.</param>
+        /// <returns>The section.</returns>
+        private static IControl BuildSection(string id, string header, IControl body)
+        {
+            var section = new ControlSection(id)
+            {
+                Header = _ => header,
+                Layout = _ => TypeLayoutSection.Rule
+            };
+
+            section.Add(body);
+
+            return section;
         }
 
         /// <summary>
@@ -285,16 +360,25 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <param name="field">The field the line asks about.</param>
         /// <param name="values">The object's values, by field id.</param>
         /// <param name="line">The line number.</param>
+        /// <param name="label">
+        /// What the line is captioned with, when that is not the field's own name - the system
+        /// lines are named after the properties they alias so they resolve, and captioned from
+        /// the internationalization the rest of the application titles them with.
+        /// </param>
         /// <returns>The control.</returns>
         private static IControl BuildLine
         (
             Model.Entities.Object @object,
             Model.Entities.Field field,
             IDictionary<Guid, Value> values,
-            int line
+            int line,
+            string label = null
         )
         {
-            var id = field.Id.ToString("N");
+            // the line number, not the field, is what makes an element id unique here: nothing
+            // stops a form from referencing the same field on two tabs, and the sheet prints a
+            // line for each occurrence - keyed by the field alone the two would share their ids
+            var id = line.ToString() + "-" + field.Id.ToString("N");
             var (data, prose) = ResolveAnswer(@object, field, values);
             var empty = string.IsNullOrWhiteSpace(data);
 
@@ -312,7 +396,10 @@ namespace KleeneStar.Core.WebFragment.Object
 
             caption.Add(new ControlText("object-form-name-" + id)
             {
-                Text = _ => field.Name + (field.Required ? " *" : string.Empty),
+                // the caption is handed over on its own: the control translates whatever it is
+                // given, and a name that is an internationalization key stops resolving the
+                // moment anything is concatenated onto it
+                Text = _ => label ?? field.Name,
                 Format = _ => TypeFormatText.Span,
                 Classes = ["ks-form-field-name"],
 
@@ -320,6 +407,18 @@ namespace KleeneStar.Core.WebFragment.Object
                 // margin; here it is the tooltip of the line it belongs to
                 Title = _ => string.IsNullOrWhiteSpace(field.Description) ? null : field.Description
             });
+
+            if (field.Required)
+            {
+                // the mark a form puts beside the lines that have to be filled in, in its own
+                // node so it cannot become part of the name above
+                caption.Add(new ControlText("object-form-req-" + id)
+                {
+                    Text = _ => "*",
+                    Format = _ => TypeFormatText.Span,
+                    Classes = ["ks-form-field-required"]
+                });
+            }
 
             var box = new ControlPanel("object-form-box-" + id)
             {

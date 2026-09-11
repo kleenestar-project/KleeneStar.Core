@@ -461,47 +461,26 @@
 /* ----------------------------------------------------- form reading view */
 
 /* The unchangeable view of a form-rendered object is a filled-in form, not a list of
-   properties: the same sheet the mask writes, with the answers printed into it. Everything
-   below is what makes it read as a sheet rather than as a table - a boxed page, captioned
-   bands for the sections, numbered lines, and a ruled box per answer that is there whether or
-   not somebody filled it in. An empty box is information: it is the question nobody answered,
-   and a view that dropped it would quietly shorten the record. */
+   properties: the same sheet the mask writes, with the answers printed into it. What makes it
+   read as a sheet is below - numbered lines and a ruled box per answer that is there whether
+   or not somebody filled it in. An empty box is information: it is the question nobody
+   answered, and a view that dropped it would quietly shorten the record.
+
+   The parts of the sheet are not styled here at all: they are ControlSections, so their
+   caption, rule and folding are the framework's and match every other captioned block on an
+   object page. The sheet itself carries no frame for the same reason the prose renderer beside
+   it carries none - the record is the page, not a card on it. */
 .ks-form-sheet {
-    max-width: 62rem;
     margin: 0 0 1.5rem;
-    border: 1px solid var(--wx-border-color);
-    border-radius: 6px;
-    background: var(--wx-body-bg);
-    overflow: hidden;
-}
-
-/* the section band: the caption of a block of lines, set apart the way a printed form sets
-   its parts apart - a filled strip with a rule under it, not a heading floating in space */
-.ks-form-section + .ks-form-section {
-    border-top: 1px solid var(--wx-border-color);
-}
-
-.ks-form-section-head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--wx-border-color);
-    background: var(--wx-tertiary-bg);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--wx-secondary-color);
 }
 
 /* the lines themselves. Two columns where the answers are short, one where they are not: a
-   rich-text answer is a paragraph and reads badly in half a page */
+   rich-text answer is a paragraph and reads badly in half a page. The section around it
+   supplies the indent and the spacing, so the grid adds none of its own */
 .ks-form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
     gap: 0.85rem 1.1rem;
-    padding: 1rem;
 }
 
 .ks-form-field--wide {
@@ -549,6 +528,15 @@
     letter-spacing: 0.01em;
 }
 
+/* the mark beside a line that has to be filled in. It is its own node rather than part of the
+   caption, because the caption is translated and a key stops resolving once anything is
+   concatenated onto it */
+.ks-form-field-required {
+    margin-left: -0.2rem;
+    color: var(--wx-danger, #dc3545);
+    font-weight: 700;
+}
+
 /* the box the answer is written in. It keeps its height when it is empty, which is what makes
    an unanswered line visible as one */
 .ks-form-field-box {
@@ -577,4 +565,56 @@
 .ks-form-field-box--prose {
     min-height: 6rem;
     background: var(--wx-body-bg);
+}
+
+
+/* ------------------------------------------------- form edit mask, on a page */
+
+/* The mask titles itself with the record's summary, which it renders onto the form's header
+   (ObjectStructuredEditFormFragmentBase). Opened as a dialog - the issue and asset edit
+   dialogs - the framework lifts that header onto the title bar and styles the input as the
+   title; served as a page, the header stays where it is and there is no title bar to inherit
+   from. The field would then be an unlabelled box repeating the headline above it, so it is
+   drawn as the heading line it stands for: the name of the record, editable in place.
+
+   The selector matches the header only while it is still a child of the form, so it stops
+   applying by itself once a dialog has lifted it into its title bar. It says form rather than
+   .wx-webapp-restform on purpose: that class is the one the client controller is registered
+   for, and the registry strips it from the element at mount - nothing can be styled through
+   it. */
+form > header:has(> .wx-modal-title-input) {
+    margin-bottom: 0.75rem;
+}
+
+form > header > .wx-modal-title-input.form-control {
+    padding: 0.15rem 0.5rem;
+    margin-left: -0.5rem;
+    width: calc(100% + 0.5rem);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: inherit;
+    text-overflow: ellipsis;
+}
+
+/* offered by the pointer, taken by the caret - a field that looks like a heading has to say
+   that it is one when it is reached, by mouse or by keyboard */
+form > header > .wx-modal-title-input.form-control:hover {
+    border-color: var(--wx-border-color);
+    background: var(--wx-body-bg);
+    cursor: text;
+}
+
+form > header > .wx-modal-title-input.form-control:focus {
+    border-color: var(--wx-primary);
+    background: var(--wx-body-bg);
+    box-shadow: 0 0 0 0.2rem rgba(var(--wx-primary-rgb, 13, 110, 253), 0.25);
+}
+
+form > header > .wx-modal-title-input.form-control::placeholder {
+    color: inherit;
+    opacity: 0.5;
 }

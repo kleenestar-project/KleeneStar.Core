@@ -169,7 +169,7 @@ The first two are enforced by `WorkflowManager.ExecuteTransition`, which asks th
 
 **`ClosesItem` is a post function**, run after the change completed. Every object that declares itself closed with the one that just closed follows it — how a duplicate is settled by its original. A follower is moved along a transition *its own* workflow declares, never by writing a state its state machine forbids; a workflow offering no reachable closing state simply keeps its object where it is. A follower that cannot be moved is not an error of the transition that triggered it, and the cascade is bounded by a visited set, because two objects can be each other's duplicate.
 
-**`AggregatesProgress` is a read-side projection**, not a transition rule: it says how a parent *reports* the state of its children, and there is nothing about it for a transition to refuse or perform.
+**`AggregatesProgress` is a read-side projection**, not a transition rule: it says how a parent *reports* the state of its children, and there is nothing about it for a transition to refuse or perform. What it computes is described under [Progress aggregation](#progress-aggregation).
 
 > **Which end an effect constrains.** WebExpress ships two descriptions that do not agree. The XML comment on `RelationEffect.BlocksCompletion` says the *source* cannot close while the target is open; the description of its own shipped `blocks` relation — the sentence an administrator reads when picking the effect — says *"the target cannot be completed while this item is open"*. The type descriptions are self-consistent across all three effects and match the labels (`blocks` / `is blocked by`), so they are what is implemented: **the source blocks, the target is blocked**. Implementing the enum comment instead would make the shipped catalog mean the opposite of what its own labels say.
 >
@@ -357,7 +357,7 @@ Ticking **symmetric** disables the counterpart field and mirrors the label into 
 
 The relation surface sits in the content column of every object detail page, grouped by what the relation says, with a **List** and a **Graph** reading of the same data. Every row starts with the icon of its relation, so a relation stays recognisable by what it says even when the group heading has scrolled out of sight. Picking a row opens the detail dialog of that relation; clicking the key itself follows it, because that is what a relation is for.
 
-The graph is derived from the relations already loaded rather than from a second endpoint, so switching the presentation costs no round trip and the two readings can never disagree.
+The graph is derived from the relations already loaded rather than from a second endpoint, so switching the presentation costs no round trip and the two readings can never disagree. Both readings show **one hop**, which is what the surface is: the relations *this* object holds. What a change to it reaches further out is a different question, and it has a page of its own — see *Impact analysis* below.
 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
@@ -452,6 +452,85 @@ The object page searches the target in a combo box that opens on focus, walks wi
 
 `validate` returning a message keeps the dialog open, so an incomplete draft — no relation picked, no target chosen, an address that is not `http(s)` — never reaches the server. The framework submit is synchronous and closes the dialog, so a rejection only the server can see (a duplicate that appeared meanwhile, an exhausted cardinality) arrives after the dialog is gone and is reported as a popup notification carrying the server's code.
 
+## Impact Analysis
+
+The relation surface answers *what is this connected to*. The question a change raises is a different one — *what does changing this touch* — and it is not answered one hop away: an incident blocks a change, the change blocks a release, and the person closing the incident sees only the first of those three. **Impact analysis** is that question, answered by walking the relation graph transitively.
+
+It is not a walk of *every* relation. The model already says which relations have consequences and in which direction they run — that is what `Effect` is for, and the workflow guard has always read it. The analysis asks the same question of the whole neighbourhood instead of of one object: **the guard answers "may I close this", the analysis answers "what happens if I do"**. Reading them out of one place is deliberate; an analysis that predicted a consequence the guard then refuses to have would be worse than none.
+
+|Effect                |The consequence runs |Read as
+|----------------------|---------------------|--------------------------------------------------
+|`BlocksCompletion`    |source → target      |while the blocker is open, what it blocks cannot be finished
+|`ClosesItem`          |target → source      |closing the original settles the duplicate
+|`AggregatesProgress`  |target → source      |moving a child moves what the parent reports
+|`None`                |nowhere              |informational: two records have something to do with each other, not one governing the other
+
+Note that the direction is **not** the direction the relation was stored in. A duplicate is stored from the follower and carries its consequence backwards along that arrow; the analysis draws the edge the way the consequence runs, which is why an edge is labelled with what the relation *does* (`blocks`, `closes`, `rolls up into`) rather than with the label the relation surface shows.
+
+The walk is bounded four ways, because a relation graph has no natural end: by the **depth** the reader asks for, by a **visited set** (two objects can be each other's duplicate — a mistake somebody made, not a case to refuse), by a **node budget** the result reports as `Truncated` (a truncated analysis that looked complete would be read as "nothing else is affected"), and by **clearance**: an object the caller may not see is not in the answer, and neither is anything reachable only through it — a chain learned through a record one may not open is that record, spelled differently. An obsolete relation carries nothing, and an external address ends a path rather than continuing it: it has no state a change could touch.
+
+`IObjectImpactManager.Analyze(objectId, depth)` is the whole of it; the walk is breadth-first, so an object appears once, at the shortest distance it was reached on, and the distance is part of the answer.
+
+```
+╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
+║ GDPR Audit 2025                                          [ 1 | 2 |(3)| 5 | 10 ]      ║
+║┌──────────────────────────────────────────────────────────────────────────────────┐  ║
+║│                                                                                  │  ║
+║│      ┌ CMDB-1002 ─── Done ┐                                                      │  ║
+║│      │ SOC2 Type II       │                                                      │  ║
+║│      └────────────────────┘                                                      │  ║
+║│                 ▲                                                                │  ║
+║│               blocks                                                             │  ║
+║│                 │                                                                │  ║
+║│      ┌ CMDB-1001 ── In Progress ┐        ┏ CMDB-1000 ── To Do ┓                  │  ║
+║│      │ ISO 27001 Check          │ ◄─────┫ GDPR Audit 2025      ┃  ← the origin    │  ║
+║│      └──────────────────────────┘blocks  ┗━━━━━━━━━━━━━━━━━━━━┛     in accent    │  ║
+║│                                                                                  │  ║
+║└──────────────────────────────────────────────────────────────────────────────────┘  ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+Every node carries the three things a reader needs to judge a consequence without opening the record: the **key** names it, the **summary** says what it is, the **state** says whether the connection still matters. The origin is painted in the accent, the way the relation graph paints its subject.
+
+**The depth lives in the address** (`?depth=`), not in a stored preference, so a reading can be handed on — "three steps out from this incident" — and the page needs no state of its own. The chooser offers 1, 2, 3, 5 and 10; the last is the manager's own ceiling, so it cannot promise a walk the analysis would clamp.
+
+**It is a page rather than a third tab of the relation surface.** The list and the graph there show the relations of one object; a consequence three steps out belongs to none of them, and putting the two in one switcher would let a reader take the second for a longer version of the first. The way in is a button on the relation page.
+
+## Progress Aggregation
+
+`AggregatesProgress` says that one object reports the progress of others. Until it was computed, a parent showed the progress of its *own* state — which for a container is nearly meaningless, because a container is never itself *in progress*, only the things under it are.
+
+`IObjectProgressManager.GetProgress(objectId)` answers the question, and the rule is one sentence: **an object that aggregates nothing reports the progress of its own workflow state; an object that aggregates reports the average of what it aggregates.** The first half is the reading the plan views have always used (`ObjectBoardProjection.CategoryProgress`: to do 0, in progress and waiting 50, done 100), and it stays that reading on purpose — a parent bar and a child bar in the same chart may not measure differently.
+
+|What is counted            |Answer
+|---------------------------|--------------------------------------------------------------
+|Which objects              |the **targets** of the relations this object is the *source* of, whose type declares the effect — "the progress of the targets is aggregated into the source"
+|Which relations            |active and confirmed ones; an **obsolete** relation counts nothing, so removing a child stops moving the parent's bar
+|How each child counts      |at **its own** rolled-up percentage, so a tree is summarised from the bottom up
+|How they are weighted      |**equally** — see below
+|A child the caller may not see |not at all, and its state does not leak through an average
+
+**Every child counts once and equally.** Weighting by estimate, story points or remaining effort is the obvious alternative and was rejected: it needs a number the model does not require any class to carry, and a rollup that silently ignored the classes without it would report a different figure for the same tree depending on how it was modelled. An unweighted average is the honest reading of what is actually known — *this many of these are done* — which is also why the surface states the count beside the percentage.
+
+**Nothing is stored.** The percentage is a statement about the children as they are now; a copy on the parent would be wrong from the next transition onwards without anything saying so, and the parent's own commit chain would fill with changes nobody made. The recursion is bounded by a visited set (two objects may aggregate each other — a mistake somebody made, not a case to refuse) and by a depth, past which a child counts with its own state.
+
+**The rollup overrides the parent's own state, deliberately.** A parent closed while two of its children are still open reports what the children say, not 100 %. The status card beside it still shows *Closed*, so the reader sees both — and the disagreement between them is information, not a glitch.
+
+Two surfaces read it: the **progress card** in the property column of an object that aggregates (a bar, the percentage, and *3 of 5 finished*), which renders on no other object, and the **plan**, where a parent bar reports its subtree instead of its own state.
+
+```
+╔ Property column ═════════════════════╗
+║ ▤ STATUS                             ║
+║   Status  [ ✓ Closed          ▾ ]    ║
+║                                      ║
+║   Fortschritt                        ║
+║   ┌────────────────────────────────┐ ║
+║   │▓▓▓▓▓▓▓▓ 25 %                   │ ║
+║   └────────────────────────────────┘ ║
+║   0 von 2 abgeschlossen              ║
+╚══════════════════════════════════════╝
+```
+
 ## Sitemap
 
 The sitemap defines navigation paths and visibility logic within the application. The relation surfaces add one page of their own; the reading surfaces are contributed to pages that already exist, so they carry no route.
@@ -463,6 +542,8 @@ The sitemap defines navigation paths and visibility logic within the application
 |`/document/{objectKey}`     |Document Detail View     |Hosts the relation surface of the object (contributed fragment).
 |`/blog/{objectKey}`         |Blog Detail View         |Hosts the relation surface of the object (contributed fragment).
 |`/asset/{objectKey}`        |Asset Detail View        |Hosts the relation surface of the object (contributed fragment).
+|`/issue/{objectKey}/relations`|Relation Page          |The relation surface as a page, and the way to the impact analysis.
+|`/issue/{objectKey}/impact` |Impact Analysis          |What changing the object touches, as a graph. Reads `?depth=`.
 |`/issue/{objectKey}/preview`|Object Preview           |Hosts the read-only relation surface of the object.
 
 ## API Interfaces (REST Endpoints)
@@ -479,6 +560,7 @@ The instances are managed via the following endpoints:
 |`/api/1/relations/{objectKey}/{id}`       |DELETE      |Removes a relation.
 |`/api/1/relations/systems`                |GET         |Registered link systems and the relations each offers. Supports `kind` and `enabled`.
 |`/api/1/relations/targets`                |GET         |Candidates for the target of a relation. Supports `q`, `type`, `system`, `source` and `l`.
+|`/api/1/impact/{objectKey}`               |GET         |The impact analysis of the object as a graph of nodes and edges. Supports `depth`.
 
 The definitions are managed via the following endpoints:
 
@@ -569,8 +651,8 @@ A refused request is answered as **403 Forbidden**. An unresolvable *route* is n
 
 The document "KleeneStar Relation Management" outlines the conceptual framework for connecting objects within and beyond the installation. It settles the field-versus-entity question in favour of a hybrid in which the entity carries all meaning and fields remain navigational conveniences, and it establishes that the vocabulary of relations is data rather than code: an administrator defines what may exist, and the application interprets that structure without knowing any relation by name.
 
-The model is enforced rather than merely described: a relation that declares `BlocksCompletion` refuses the move it says it refuses, a relation that declares `ClosesItem` settles what follows it, and the endpoints evaluate `object_relation` and `class_update` against the resource chain before they read or write anything.
+The model is enforced rather than merely described: a relation that declares `BlocksCompletion` refuses the move it says it refuses, a relation that declares `ClosesItem` settles what follows it, the impact analysis walks them transitively to say what a change reaches, a relation that declares `AggregatesProgress` is what a parent's progress is computed from, and the endpoints evaluate `object_relation` and `class_update` against the resource chain before they read or write anything.
 
-As a high-level specification, the document still leaves certain aspects open, named explicitly rather than implied: **impact analysis** — walking the relation graph transitively to answer "what does changing this touch" — is supported by the data shape but not implemented, the graph view rendering one hop; **`AggregatesProgress`** is modelled and reported but nothing yet rolls a parent's progress up from its children; and the **customer portal** does not yet project the relations of an issue. Contributed **link systems** are a seam the framework already serves end to end, but **KleeneStar** itself contributes none beyond the two native ones.
+As a high-level specification, the document still leaves one aspect open, named explicitly rather than implied: the **customer portal** does not yet project the relations of an issue. Contributed **link systems** are a seam the framework already serves end to end, but **KleeneStar** itself contributes none beyond the two native ones.
 
 The focus lies on structural clarity, semantic depth and contributor empowerment. The proposed model supports typed and directed connections, lifecycle rather than deletion, validation against both ends, and graph visualisation, while remaining open to the extensions above.

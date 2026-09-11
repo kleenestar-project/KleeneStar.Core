@@ -25,6 +25,13 @@ namespace KleeneStar.Core.WebFragment.Object
     /// no draft here and no publish button - a draft is the prose editor's answer to writing
     /// a long text over several sittings, while a field is saved when it is filled in.
     /// </para>
+    /// <para>
+    /// Of those two routes only the document one reaches this fragment as the core ships: the
+    /// blog kind names prose as the only renderer it accepts, so a post is edited in the
+    /// WYSIWYG editor whatever its class stored. The blog scope is kept for the same reason
+    /// <see cref="ObjectFormReadFragment"/> keeps its own - it says where the mask could
+    /// stand, and the kind decides whether it does.
+    /// </para>
     /// </remarks>
     [Title("kleenestar.core:object.renderer.form.edit.title")]
     [Section<SectionContentPrimary>]

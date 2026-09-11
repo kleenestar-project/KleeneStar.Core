@@ -42,7 +42,7 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             _objectManager = objectManager;
 
-            Text = _ => "kleenestar.core:object.prose.edit.label";
+            Text = _ => "kleenestar.core:object.renderer.form.edit.label";
             Icon = _ => new IconPen();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
             BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);

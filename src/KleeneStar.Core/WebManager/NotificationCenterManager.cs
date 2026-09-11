@@ -52,9 +52,11 @@ namespace KleeneStar.Core.WebManager
         /// <remarks>
         /// Called from <see cref="CoreHub.AddNotification"/>, which the managers reach without
         /// a request in hand, so the addressee comes from
-        /// <see cref="ISessionManager.GetCurrentIdentityId"/> with a null request. That
-        /// resolves to the seeded admin identity until WebExpress exposes the authenticated
-        /// user on the request — the same fallback the rest of the per-identity features use.
+        /// <see cref="ISessionManager.GetCurrentIdentityId"/> with a null request: the
+        /// signed-in user of the request that started this call chain. An act nobody is signed
+        /// in for is not announced to anybody — the notification is dropped rather than
+        /// delivered to a person who did not cause it, which is what the seeded-admin fallback
+        /// used to do.
         /// </remarks>
         /// <param name="titleKey">The translation key of the heading.</param>
         /// <param name="messageKey">The translation key of the message.</param>
@@ -81,11 +83,11 @@ namespace KleeneStar.Core.WebManager
             var notification = new UserNotification
             {
                 OwnerId = ownerId,
-                // who caused the event. Until WebExpress exposes the authenticated user on the
-                // request this resolves to the same identity the notification is addressed to,
-                // because both come from the same fallback — the column is nonetheless filled
-                // from the acting identity rather than copied from the owner, so it starts
-                // telling the two apart the moment the identity flow does.
+                // who caused the event. It is the same identity the notification is addressed
+                // to, because a manager announces what the caller just did back to the caller;
+                // the column is filled from the acting identity rather than copied from the
+                // owner, so it keeps telling the two apart once something addresses a
+                // notification to somebody other than its cause.
                 ActorId = ownerId,
                 TitleKey = titleKey,
                 MessageKey = messageKey,

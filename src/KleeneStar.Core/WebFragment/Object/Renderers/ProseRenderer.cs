@@ -14,7 +14,9 @@ namespace KleeneStar.Core.WebFragment.Object.Renderers
     /// and <see cref="ObjectProseEditorFragmentBase"/>'s two subclasses on the reading and
     /// the edit route; each is gated on <see cref="ProseRendererCondition"/>. It serves the
     /// document and blog kinds only: an issue has no body a WYSIWYG editor could be the
-    /// whole of.
+    /// whole of. On the blog kind it is not merely the default but the only renderer on
+    /// offer - see <see cref="Blogs.Blog.Renderers"/>, which is the kind declining the mask
+    /// rather than this renderer claiming exclusivity.
     /// </remarks>
     public sealed class ProseRenderer : IObjectRenderer
     {

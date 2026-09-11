@@ -1,4 +1,4 @@
-using KleeneStar.Core.Test;
+﻿using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 using System;
 using System.Linq;
@@ -14,17 +14,20 @@ namespace KleeneStar.Core.Test.WebManager
     public class UnitTestNotificationCenterManager
     {
         /// <summary>
-        /// The identity every notification is addressed to. The session manager attributes
-        /// requests to the seeded admin until WebExpress exposes the authenticated user, so
-        /// this is the id the manager records against.
+        /// The identity the notifications are addressed to. The manager records against the
+        /// signed-in user of the request that reached it; these tests reach it without a
+        /// request, so they say who is acting through
+        /// <see cref="KleeneStar.Core.WebManager.ISessionManager.BeginIdentity"/>.
         /// </summary>
         private static readonly Guid OwnerId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
 
         /// <summary>
-        /// Seeds the in-memory database with the identity the notifications belong to.
+        /// Seeds the in-memory database with the identity the notifications belong to and
+        /// begins acting as it, the way a request would.
         /// </summary>
         /// <param name="connectionString">The per-test in-memory database name.</param>
-        private static void Seed(string connectionString)
+        /// <returns>The acting scope; closing it stops acting as that identity.</returns>
+        private static IDisposable Seed(string connectionString)
         {
             CoreHubFixture.Initialize(connectionString);
 
@@ -42,6 +45,8 @@ namespace KleeneStar.Core.Test.WebManager
             }
 
             db.SaveChanges();
+
+            return CoreHub.SessionManager.BeginIdentity(OwnerId);
         }
 
         /// <summary>
@@ -52,7 +57,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void Record_IsReturnedUnread()
         {
             var connectionString = $"NotificationRecord_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             CoreHub.NotificationCenterManager.Record
             (
@@ -87,7 +92,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void Record_WithoutText_IsRejected(string titleKey, string messageKey)
         {
             var connectionString = $"NotificationReject_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             Assert.Null(CoreHub.NotificationCenterManager.Record(titleKey, messageKey));
             Assert.Empty(CoreHub.NotificationCenterManager.GetNotifications(null));
@@ -101,7 +106,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void GetNotifications_NewestFirst()
         {
             var connectionString = $"NotificationOrder_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.created", "first", "A");
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.updated", "second", "B");
@@ -123,7 +128,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void GetNotifications_HonoursTheLimit()
         {
             var connectionString = $"NotificationLimit_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             for (var i = 0; i < 15; i++)
             {
@@ -151,7 +156,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void MarkRead_AffectsOnlyTheAddressedEntry()
         {
             var connectionString = $"NotificationMarkRead_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             var first = CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.created", "first", "A");
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.updated", "second", "B");
@@ -173,7 +178,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void MarkRead_ForeignEntry_IsIgnored()
         {
             var connectionString = $"NotificationForeign_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             var foreignOwner = Guid.Parse("BBF45E5D-AA35-4382-9B84-6055193CE544");
 
@@ -213,7 +218,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void MarkAllRead_KeepsTheEntries()
         {
             var connectionString = $"NotificationMarkAll_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.created", "first", "A");
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.updated", "second", "B");
@@ -231,7 +236,7 @@ namespace KleeneStar.Core.Test.WebManager
         public void Clear_RemovesEverything()
         {
             var connectionString = $"NotificationClear_{Guid.NewGuid()}";
-            Seed(connectionString);
+            using var acting = Seed(connectionString);
 
             CoreHub.NotificationCenterManager.Record("kleenestar.core:notification.title.created", "first", "A");
 

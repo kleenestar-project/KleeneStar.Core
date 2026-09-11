@@ -13,6 +13,21 @@ namespace KleeneStar.Core.WWW.Api._1_
     /// <summary>
     /// Represents a session that manages authentication and credential validation for REST API requests.
     /// </summary>
+    /// <remarks>
+    /// <b>The password is not verified yet.</b> A name that belongs to an active account signs
+    /// that account in, whatever password is offered with it. The check is missing rather than
+    /// weak: <see cref="Model.Entities.Identity.PasswordHash"/> is seeded with opaque
+    /// <c>$seed$</c> placeholders that no password produces, and nothing in the application can
+    /// set a real one - so a verification added today would lock every account out for good,
+    /// with no way back in. What belongs here is a hash scheme plus the surfaces that set and
+    /// reset a password; until then the sign-in identifies, and does not authenticate.
+    /// <para>
+    /// It does now identify the <em>stored</em> account rather than a fabricated one, which is
+    /// what everything per-user reads back off the session
+    /// (<see cref="WebManager.ISessionManager.GetCurrentIdentityId"/>): the author of a comment,
+    /// the owner of a like, the addressee of a notification, the actor of an audit event.
+    /// </para>
+    /// </remarks>
     [Cache]
     public sealed class Session : RestApiSession
     {
@@ -37,18 +52,14 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// <returns>The authenticated identity if valid; otherwise, null.</returns>
         protected override IIdentity ValidateCredentials(string username, string password)
         {
-            var group = new Group()
-            {
-                GroupPolicies = [new GroupPolicy() { Policy = "kleenestar.core.webpolicies.workspaceviewpolicy" }]
-            };
+            // the stored account is what is answered, because it is what the session then
+            // carries: everything per-user in the application reads the signed-in identity back
+            // off the session, so a fabricated one would sign every comment, like and
+            // preference of the session with a person who does not exist. An unknown name is
+            // refused, which is also what makes the framework's lockout counting mean anything.
+            var identity = Resolve(username);
 
-            var identity = new Identity()
-            {
-                Name = "Test-User",
-                GroupMemberships = [new IdentityGroupMembership() { Group = group }]
-            };
-
-            RecordSignIn(username, identity is not null);
+            RecordSignIn(username, identity);
 
             return identity;
         }
@@ -93,10 +104,11 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// attack to its victim.
         /// </remarks>
         /// <param name="username">The username the attempt was made with.</param>
-        /// <param name="succeeded">Whether the credential was accepted.</param>
-        private static void RecordSignIn(string username, bool succeeded)
+        /// <param name="identity">The account the name resolved to, or <see langword="null"/>
+        /// when it named none - which is what makes the attempt a failed one.</param>
+        private static void RecordSignIn(string username, Identity identity)
         {
-            var identity = succeeded ? Resolve(username) : null;
+            var succeeded = identity is not null;
 
             using var activity = CoreHub.AuditManager.BeginActivity
             (
@@ -124,17 +136,9 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// <returns>The identity, or <see langword="null"/> when none carries that name.</returns>
         private static Identity Resolve(string username)
         {
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                return null;
-            }
-
             try
             {
-                return CoreHub.IdentityManager
-                    .GetIdentities(new Query<Identity>())
-                    .FirstOrDefault(x => string.Equals(x.UserName, username, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(x.Email, username, StringComparison.OrdinalIgnoreCase));
+                return CoreHub.IdentityManager?.GetIdentityByLogin(username);
             }
             catch (Exception)
             {

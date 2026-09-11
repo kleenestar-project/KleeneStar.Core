@@ -84,13 +84,42 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the identity that signs in under the supplied name: the account whose user
+        /// name or e-mail address it is, compared case-insensitively.
+        /// </summary>
+        /// <remarks>
+        /// Only an <see cref="IdentityState.Active"/> account is answered, so a locked or
+        /// retired one can neither sign in nor be attributed with anything. The comparison is
+        /// made in memory rather than in the query, because the two candidate columns are read
+        /// with the same string and the identity table is small enough that one pass over it
+        /// costs less than the two indexed queries it would take to say the same thing.
+        /// </remarks>
+        /// <param name="name">The user name or e-mail address. May be null.</param>
+        /// <returns>The identity, or <see langword="null"/>.</returns>
+        public Identity GetIdentityByLogin(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return null;
+            }
+
+            var trimmed = name.Trim();
+
+            return GetIdentities(new Query<Identity>())
+                .FirstOrDefault(x => x.State == IdentityState.Active
+                    && (string.Equals(x.UserName, trimmed, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(x.Email, trimmed, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        /// <summary>
         /// Returns the identity the given request is served for — the account whose profile
         /// settings the profile pages read and write.
         /// </summary>
         /// <remarks>
         /// Which identity that is comes from <see cref="ISessionManager.GetCurrentIdentityId"/>,
-        /// so the profile pages follow the authenticated user as soon as WebExpress exposes it
-        /// on the request.
+        /// which reads the signed-in user off the request's session - so the profile pages show
+        /// the account of whoever is looking at them, and nothing at all to a caller who is not
+        /// signed in.
         /// </remarks>
         /// <param name="request">The current HTTP request.</param>
         /// <returns>

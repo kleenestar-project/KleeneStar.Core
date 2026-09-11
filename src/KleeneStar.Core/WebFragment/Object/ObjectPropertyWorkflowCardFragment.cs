@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System.Collections.Generic;
@@ -263,7 +263,12 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <param name="current">The state the object is in, or <c>null</c>.</param>
         private void AddTargetItems(ControlSplitButton split, Model.Entities.Object @object, Field field, Workflow workflow, Status current)
         {
-            var targets = _workflowManager.GetTargetStatuses(workflow, current).ToList();
+            // what this person may move this object to, not what the state machine allows: a
+            // transition whose guards refuse is not offered, so the refusal never arrives after
+            // the click
+            var targets = _workflowManager
+                .GetOfferedStatuses(workflow, current, @object, field, CoreHub.SessionManager.GetCurrentIdentityId(null))
+                .ToList();
 
             if (targets.Count == 0)
             {

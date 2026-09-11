@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebManager;
 using System;
 using System.Collections.Concurrent;
 using WebExpress.WebCore.WebIcon;
@@ -38,7 +39,15 @@ namespace KleeneStar.Core.WebControl
         private static readonly ConcurrentDictionary<Guid, ImageIcon> _icons = new();
 
         private static readonly object _sync = new();
-        private static bool _connected;
+
+        /// <summary>
+        /// The class manager the cache is currently subscribed to, or null while nothing is
+        /// subscribed. It is the manager instance rather than a flag so a rebuilt component
+        /// graph - a plugin reload, a second fixture in one test assembly - is noticed: the
+        /// events of the old manager reach nobody, and a cache still answering from it would
+        /// go stale with no way to clear it.
+        /// </summary>
+        private static volatile IClassManager _connected;
 
         /// <summary>
         /// Returns the icon that stands for the object: the icon of its class, or the one the
@@ -74,48 +83,61 @@ namespace KleeneStar.Core.WebControl
                 return null;
             }
 
-            Connect();
+            var manager = Connect();
 
-            return _icons.GetOrAdd(@object.ClassId, id => CoreHub.ClassManager?.GetClass(id)?.Icon);
+            // nothing is cached while the manager is not up: an entry written now could never
+            // be invalidated, because the subscription that would drop it does not exist yet.
+            // A list rendered during startup would otherwise poison the cache with nulls for
+            // the lifetime of the process, and every object of those classes would go on
+            // showing the stale picture it carries - the exact failure this type exists to end
+            if (manager is null)
+            {
+                return null;
+            }
+
+            return _icons.GetOrAdd(@object.ClassId, id => manager.GetClass(id)?.Icon);
         }
 
         /// <summary>
-        /// Subscribes to the class manager once, so a changed or deleted class drops its
-        /// cached icon.
+        /// Subscribes to the class manager, so a changed or deleted class drops its cached
+        /// icon, and answers the manager the lookup may use.
         /// </summary>
         /// <remarks>
         /// Without this the cache would be the third place in a row where a newly saved avatar
         /// did not appear until a restart. The subscription is made on first use rather than at
         /// startup because this is a static helper with no place in the component graph; until
-        /// the manager exists the lookup simply is not cached.
+        /// the manager exists the lookup simply is not cached. A manager that is not the one
+        /// subscribed to is a rebuilt component graph: the cache is dropped and the events are
+        /// taken up on the new one.
         /// </remarks>
-        private static void Connect()
+        /// <returns>The subscribed manager, or <see langword="null"/> when there is none.</returns>
+        private static IClassManager Connect()
         {
-            if (_connected)
+            var manager = CoreHub.ClassManager;
+
+            if (manager is null || ReferenceEquals(_connected, manager))
             {
-                return;
+                return manager;
             }
 
             lock (_sync)
             {
-                if (_connected)
+                if (ReferenceEquals(_connected, manager))
                 {
-                    return;
+                    return manager;
                 }
 
-                var manager = CoreHub.ClassManager;
-
-                if (manager is null)
-                {
-                    return;
-                }
+                // whatever the previous manager answered belongs to a graph that is gone
+                _icons.Clear();
 
                 manager.ClassUpdated += (_, @class) => Forget(@class);
                 manager.ClassRemoved += (_, @class) => Forget(@class);
                 manager.ClassAdded += (_, @class) => Forget(@class);
 
-                _connected = true;
+                _connected = manager;
             }
+
+            return manager;
         }
 
         /// <summary>

@@ -60,6 +60,24 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
+        /// Resolves the impact page of the addressed object - what changing it touches.
+        /// </summary>
+        /// <remarks>
+        /// Resolved here beside the relation page because the two belong together: the relations
+        /// are what an object holds, the impact is what those relations do when something
+        /// changes, and every surface that offers the first should be able to offer the second.
+        /// </remarks>
+        /// <param name="renderContext">The render context carrying the object key.</param>
+        /// <returns>The bound route, or <see langword="null"/> when no object is addressed.</returns>
+        public static IUri ResolveImpactUri(IRenderControlContext renderContext)
+        {
+            return ResolveObject(renderContext) is null
+                ? null
+                : CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Impact>()?
+                    .BindParameters(renderContext.Request);
+        }
+
+        /// <summary>
         /// Builds the label of an entry: the caption, followed by the number of entries the page
         /// holds when it holds any.
         /// </summary>

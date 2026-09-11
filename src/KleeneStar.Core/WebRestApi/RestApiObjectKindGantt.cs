@@ -117,7 +117,10 @@ namespace KleeneStar.Core.WebRestApi
                     // a span of one day is a bar, a span of none is a milestone — the client
                     // reads the zero duration and draws the diamond
                     Duration = (int)(end.Date - start.Date).TotalDays,
-                    Progress = ObjectBoardProjection.CategoryProgress(category),
+                    // an object that aggregates others reports what they have come to rather
+                    // than what its own state says: a container is never itself "in progress",
+                    // and a bar over a plan is where that difference is read
+                    Progress = CoreHub.ObjectProgressManager.GetProgress(entity.Id).Percent,
                     Resources = assignee is null ? null : [assignee.Name],
 
                     // the model's own hierarchy wins where both ends are on the plan; the class

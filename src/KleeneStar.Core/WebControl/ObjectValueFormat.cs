@@ -76,9 +76,43 @@ namespace KleeneStar.Core.WebControl
                     // that the field is filled is the whole of what it says here
                     return new string('•', 8);
 
+                case FieldType.Workflow:
+                    // a workflow value is the state key the transition wrote ("in_progress"),
+                    // not something anybody typed. The reduced pane never had to translate one
+                    // because it drops workflow fields - the status sits in its headline - but
+                    // the sheet of a form-rendered object prints every line the form asks for,
+                    // and an internal key on it reads as a defect
+                    return ResolveStatusName(field, data) ?? data;
+
                 default:
                     return data;
             }
+        }
+
+        /// <summary>
+        /// Resolves the display name of the workflow state a value names.
+        /// </summary>
+        /// <remarks>
+        /// The same resolution the status badge does
+        /// (<c>ObjectMetadataStatusFragment.BuildStatusBadge</c>): the field names its
+        /// workflow, the workflow is loaded with its structure because the states are what
+        /// is being looked up, and the payload is matched against them.
+        /// </remarks>
+        /// <param name="field">The workflow-typed field. May carry no workflow.</param>
+        /// <param name="data">The persisted state key.</param>
+        /// <returns>The state name, or <see langword="null"/> when it cannot be resolved.</returns>
+        private static string ResolveStatusName(Field field, string data)
+        {
+            if (field?.WorkflowId is not Guid workflowId)
+            {
+                return null;
+            }
+
+            var workflow = CoreHub.WorkflowManager?.GetWorkflowWithStructure(workflowId);
+
+            return workflow is null
+                ? null
+                : CoreHub.WorkflowManager.ResolveStatus(workflow, data)?.Name;
         }
     }
 }

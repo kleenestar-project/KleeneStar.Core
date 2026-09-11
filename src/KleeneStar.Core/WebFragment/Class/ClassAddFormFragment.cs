@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebFragment.Object;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebFragment.Object;
 using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
@@ -104,17 +105,14 @@ namespace KleeneStar.Core.WebFragment.Class
 
         /// <summary>
         /// Gets the input selection control for the renderer - the surface the objects of
-        /// the class are read and written through. Left empty the class follows the
-        /// default of its object type, which is what a class that was never configured
-        /// does; only the renderers the chosen type offers are accepted.
+        /// the class are read and written through. Left at <em>follow the object type</em>
+        /// the class follows the default of its type, which is what a class that was never
+        /// configured does; only the renderers the chosen type offers are accepted. It
+        /// projects the renderer catalog itself, so the three class dialogs offer one list
+        /// and a plugin's renderer reaches all of them - see
+        /// <see cref="ObjectRendererSelectionControl"/>.
         /// </summary>
-        public ControlFormItemInputSelection RendererSelection { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Class.Renderer),
-            Label = _ => "kleenestar.core:class.renderer.label",
-            Placeholder = _ => "kleenestar.core:class.renderer.placeholder",
-            Help = _ => "kleenestar.core:class.renderer.help"
-        };
+        public ControlFormItemInputSelection RendererSelection { get; } = new ObjectRendererSelectionControl();
 
         /// <summary>
         /// Gets the input selection control for the access modifier.
@@ -178,25 +176,9 @@ namespace KleeneStar.Core.WebFragment.Class
                     Text = _ => kind.Label
                 }));
 
-            // the renderer options come from the extensible renderer catalog for the same
-            // reason - a plugin that ships a renderer becomes selectable here without this
-            // dialog knowing it exists. The list is not filtered by the chosen object type,
-            // which is picked in the same form: the endpoint refuses a pairing the type does
-            // not offer, and says which ones it does
-            // the entry that clears the field leads the list, the way the home-document
-            // selection leads with its empty one - the way back to the default has to be
-            // offered, not merely reachable by never having chosen
-            RendererSelection.Add(new ControlFormItemInputSelectionItem(ObjectRendererCatalog.Automatic)
-            {
-                Text = _ => "kleenestar.core:class.renderer.automatic"
-            });
-
-            RendererSelection.Add(ObjectRendererCatalog.Renderers
-                .Select(renderer => new ControlFormItemInputSelectionItem(renderer.Key)
-                {
-                    Text = _ => renderer.Label,
-                    Icon = _ => renderer.Icon
-                }));
+            // the renderer options are not filled in here: the catalog is open and a plugin
+            // registers into it after this fragment was built, so RendererSelection projects
+            // it per render instead of being handed a snapshot that predates every add-on
 
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
         }

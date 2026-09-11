@@ -5,8 +5,9 @@ using WebExpress.WebUI.WebIcon;
 namespace KleeneStar.Core.WebRestApi
 {
     /// <summary>
-    /// Takes the picture an avatar control submitted out of a CRUD payload and turns it into
-    /// the icon the entity should carry.
+    /// Reads a CRUD payload the way the endpoints have to: takes the picture an avatar control
+    /// submitted out of it and turns it into the icon the entity should carry, and answers a
+    /// plain field without removing it (<see cref="TryRead"/>).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -61,12 +62,52 @@ namespace KleeneStar.Core.WebRestApi
             if (fieldMap.Remove(name.ToLowerInvariant(), out var value) ||
                 fieldMap.Remove(name, out value))
             {
-                submitted = value as string ?? value?.ToString();
+                submitted = AsText(value);
 
                 return true;
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Reads a field from the payload without removing it, answering both its value and
+        /// whether the payload carried it at all.
+        /// </summary>
+        /// <remarks>
+        /// The same lookup <see cref="Detach"/> performs, for the endpoints that only want to
+        /// look: <see cref="RestApiCrudFormData"/> is a plain dictionary with the default
+        /// ordinal comparer, so the lower-cased key the JSON parser produces has to be tried
+        /// first and the declared casing second. "Absent" and "sent empty" are different
+        /// instructions on an update, which is why the two are reported separately here rather
+        /// than collapsed into a null.
+        /// </remarks>
+        /// <param name="fieldMap">The payload to read from. May be null.</param>
+        /// <param name="name">The field name as declared on the entity (e.g. <c>Renderer</c>).</param>
+        /// <returns>The value and whether the payload carried the field.</returns>
+        public static (string Value, bool Sent) TryRead(this RestApiCrudFormData fieldMap, string name)
+        {
+            if (fieldMap is null || string.IsNullOrEmpty(name))
+            {
+                return (null, false);
+            }
+
+            if (fieldMap.TryGetValue(name.ToLowerInvariant(), out var lower))
+            {
+                return (AsText(lower), true);
+            }
+
+            return fieldMap.TryGetValue(name, out var exact) ? (AsText(exact), true) : (null, false);
+        }
+
+        /// <summary>
+        /// Reads a payload entry as text.
+        /// </summary>
+        /// <param name="value">The entry. May be null.</param>
+        /// <returns>The text, or <see langword="null"/>.</returns>
+        private static string AsText(object value)
+        {
+            return value as string ?? value?.ToString();
         }
 
         /// <summary>

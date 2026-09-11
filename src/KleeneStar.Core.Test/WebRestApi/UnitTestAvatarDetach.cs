@@ -126,5 +126,44 @@ namespace KleeneStar.Core.Test.WebRestApi
             Assert.False(Payload(("icon", Submitted)).Detach(null, out var unnamed));
             Assert.Null(unnamed);
         }
+
+        /// <summary>
+        /// Verifies the looking half of the same lookup: a field is answered under either
+        /// casing and is <b>left in</b> the payload, so the binder still sees it. The endpoints
+        /// that validate a field they do not own - the class renderer against the object type
+        /// beside it - read it this way.
+        /// </summary>
+        [Fact]
+        public void TryRead_FindsEitherCasingAndLeavesThePayloadAlone()
+        {
+            var lower = Payload(("renderer", "form"), ("name", "Specification"));
+
+            Assert.Equal(("form", true), lower.TryRead("Renderer"));
+            Assert.Equal(2, lower.Count);
+
+            Assert.Equal(("form", true), Payload(("Renderer", "form")).TryRead("Renderer"));
+        }
+
+        /// <summary>
+        /// Verifies that "absent" and "sent empty" stay apart, which is the whole reason the
+        /// read answers a pair: on an update a field the payload does not carry is unchanged,
+        /// while one sent empty is an instruction to clear it.
+        /// </summary>
+        [Fact]
+        public void TryRead_AbsentAndEmptyAreDifferentAnswers()
+        {
+            Assert.Equal((null, false), Payload(("name", "Specification")).TryRead("Renderer"));
+            Assert.Equal(("", true), Payload(("renderer", "")).TryRead("Renderer"));
+        }
+
+        /// <summary>
+        /// Verifies that the read answers rather than throwing when there is nothing to read.
+        /// </summary>
+        [Fact]
+        public void TryRead_NoPayloadOrNoName_ReportsNothingSent()
+        {
+            Assert.Equal((null, false), ((RestApiCrudFormData)null).TryRead("Renderer"));
+            Assert.Equal((null, false), Payload(("renderer", "form")).TryRead(null));
+        }
     }
 }

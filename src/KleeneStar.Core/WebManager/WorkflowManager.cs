@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebWorkflow;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -215,6 +216,57 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the states the supplied object may actually be moved to by the supplied
+        /// identity: the reachable ones, narrowed to those whose transition the guards let
+        /// through.
+        /// </summary>
+        /// <remarks>
+        /// The difference to <see cref="GetTargetStatuses(Workflow, Status)"/> is who is asking.
+        /// That one answers what the state machine allows, which is a property of the workflow;
+        /// this one answers what this person may do to this object right now, which is what a
+        /// dropdown has to offer - a move a guard refuses must not be shown, or the refusal
+        /// arrives after the click and reads as a fault.
+        /// <para>
+        /// An entry move carries no transition and therefore no guards: there is nothing to
+        /// evaluate, and every entry state stays on offer.
+        /// </para>
+        /// </remarks>
+        /// <param name="workflow">The workflow to walk.</param>
+        /// <param name="currentStatus">The state to leave, or <c>null</c>.</param>
+        /// <param name="objectEntity">The object being moved.</param>
+        /// <param name="field">The workflow-backed field carrying the state.</param>
+        /// <param name="identityId">The identity that would make the move.</param>
+        /// <returns>The states to offer.</returns>
+        public IEnumerable<Status> GetOfferedStatuses(Workflow workflow, Status currentStatus, Model.Entities.Object objectEntity, Field field, Guid identityId)
+        {
+            var reachable = GetTargetStatuses(workflow, currentStatus);
+
+            if (workflow is null || currentStatus is null || objectEntity is null)
+            {
+                return reachable;
+            }
+
+            var transitions = (workflow.Transitions ?? [])
+                .Where(x => x.State == TransitionState.Active && x.SourceId == currentStatus.Id)
+                .ToList();
+
+            return [.. reachable.Where(target =>
+            {
+                var transition = transitions.FirstOrDefault(x => x.TargetId == target.Id);
+
+                return Guarded(transition, new WorkflowRuleContext
+                {
+                    Object = objectEntity,
+                    Field = field,
+                    Source = currentStatus,
+                    Target = target,
+                    Transition = transition,
+                    IdentityId = identityId
+                });
+            })];
+        }
+
+        /// <summary>
         /// Moves a workflow-backed field of an object to the requested state, enforcing the
         /// workflow server-side.
         /// </summary>
@@ -231,7 +283,7 @@ namespace KleeneStar.Core.WebManager
         /// <param name="targetStatusId">The id of the requested state.</param>
         /// <param name="identityId">The identity performing the change.</param>
         /// <returns>The outcome of the state change.</returns>
-        public WorkflowTransitionResult ExecuteTransition(Guid objectId, Guid fieldId, Guid targetStatusId, Guid identityId)
+        public WorkflowTransitionResult ExecuteTransition(Guid objectId, Guid fieldId, Guid targetStatusId, Guid identityId, IReadOnlyDictionary<string, string> screenValues = null)
         {
             // a transition also runs on an object the caller never named - the follower a
             // relation closes - and that one has to move whether or not the caller is cleared
@@ -289,6 +341,29 @@ namespace KleeneStar.Core.WebManager
                 return Failed(WorkflowTransitionOutcome.NotAllowed, "kleenestar.core:object.property.workflow.transition.notallowed", objectId, fieldId, source, target);
             }
 
+            // the context every configured rule is asked with. It is built once, before the
+            // guards, because a validator asks the same questions of the same move and a rule
+            // that changes stage should not have to be rewritten
+            var context = new WorkflowRuleContext
+            {
+                Object = objectEntity,
+                Field = field,
+                Source = source,
+                Target = target,
+                Transition = transition,
+                IdentityId = identityId,
+                ScreenValues = Screen(screenValues)
+            };
+
+            // configured guard stage - the condition the transition carries. A move a guard
+            // refuses is not offered in the first place (GetTargetStatuses asks the same
+            // question), so reaching this is either a stale page or a caller addressing the
+            // endpoint directly; both are answered as not allowed rather than explained
+            if (!Guarded(transition, context))
+            {
+                return Failed(WorkflowTransitionOutcome.NotAllowed, "kleenestar.core:object.property.workflow.transition.notallowed", objectId, fieldId, source, target);
+            }
+
             // relation guard - what the object is connected to can refuse a move the workflow
             // itself allows. Only a move into a closing state can be refused, so a blocked object
             // can still be worked on; it simply cannot be finished while what blocks it is open
@@ -312,9 +387,9 @@ namespace KleeneStar.Core.WebManager
                 };
             }
 
-            // validator stage - the rules a transition validates against are configured on the
-            // transition, which the data model does not carry yet, so there is nothing to check
-            var validationErrors = Validate(transition);
+            // validator stage - what the transition demands of the object, evaluated against
+            // the object and against what the screen carries, before anything is written
+            var validationErrors = Validate(transition, context);
 
             if (validationErrors.Count > 0)
             {
@@ -369,7 +444,7 @@ namespace KleeneStar.Core.WebManager
                     Transition = transition
                 };
 
-                RunPostFunctions(objectEntity, identityId, executed);
+                RunPostFunctions(objectEntity, identityId, executed, context);
 
                 return executed;
             }
@@ -383,7 +458,9 @@ namespace KleeneStar.Core.WebManager
         /// <param name="objectEntity">The object that changed state.</param>
         /// <param name="identityId">The identity that performed the change.</param>
         /// <param name="result">The result of the state change.</param>
-        private void RunPostFunctions(Model.Entities.Object objectEntity, Guid identityId, WorkflowTransitionResult result)
+        /// <param name="context">What is known about the move, handed to the configured post
+        /// functions.</param>
+        private void RunPostFunctions(Model.Entities.Object objectEntity, Guid identityId, WorkflowTransitionResult result, WorkflowRuleContext context)
         {
             objectEntity.Updated = DateTime.UtcNow;
 
@@ -400,8 +477,32 @@ namespace KleeneStar.Core.WebManager
             // follows it, which is how a duplicate is settled by its original
             CloseFollowers(result, identityId);
 
-            // the configured post functions of the transition would run here; the data model
-            // carries none yet (see the remarks on ExecuteTransition)
+            // ...and the ones the transition names, in the order they were administered. A post
+            // function that throws does not undo the move: the state change was legitimate, and
+            // a failing follow-up must not hold the workflow hostage - it is logged and the next
+            // one runs
+            foreach (var key in result.Transition?.PostFunctionKeys ?? [])
+            {
+                var postFunction = CoreHub.WorkflowPostFunctionManager?.Get(key);
+
+                if (postFunction is null)
+                {
+                    // a key of an uninstalled plugin is not an error either: the workflow keeps
+                    // working and simply does one thing less than it says
+                    _httpServerContext?.Log?.Warning($"Workflow post function '{key}' is not registered.");
+
+                    continue;
+                }
+
+                try
+                {
+                    postFunction.Execute(context);
+                }
+                catch (Exception ex)
+                {
+                    _httpServerContext?.Log?.Exception(ex);
+                }
+            }
 
             TransitionExecuted?.Invoke(this, result);
         }
@@ -465,19 +566,71 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Runs the validators configured on a transition.
         /// </summary>
+        /// <remarks>
+        /// The findings are the <em>messages</em> of the terms that have to become true, taken
+        /// from the conjunction closest to being satisfied - a refused move has to say what to do
+        /// next, and listing the unmet terms of every alternative would name work nobody has to
+        /// do. A term whose validator is no longer registered reports its key, so an installation
+        /// that lost a plugin sees which rule it lost rather than a move that cannot be made for
+        /// no stated reason.
+        /// </remarks>
         /// <param name="transition">
         /// The transition being travelled, or <c>null</c> when the object enters the workflow at
-        /// an entry state and therefore travels along none.
+        /// an entry state and therefore travels along none - an entry move validates nothing,
+        /// because there is no transition to carry a condition.
         /// </param>
-        /// <returns>
-        /// The findings, empty when the change may proceed. Always empty for now: validation rules
-        /// live on the transition, which the data model does not carry yet.
-        /// </returns>
-        private static IReadOnlyList<string> Validate(Transition transition)
+        /// <param name="context">What is known about the move.</param>
+        /// <returns>The findings, empty when the change may proceed.</returns>
+        private static IReadOnlyList<string> Validate(Transition transition, WorkflowRuleContext context)
         {
-            _ = transition;
+            var missing = WorkflowExpression.Missing
+            (
+                transition?.ValidatorExpression,
+                key => CoreHub.WorkflowValidatorManager?.Get(key)?.Evaluate(context) ?? false
+            );
 
-            return [];
+            return [.. missing.Select(key => CoreHub.WorkflowValidatorManager?.Get(key)?.Message ?? key)];
+        }
+
+        /// <summary>
+        /// Determines whether the guards configured on a transition let the move through.
+        /// </summary>
+        /// <param name="transition">The transition being travelled, or <c>null</c> for an entry
+        /// move, which carries no guards.</param>
+        /// <param name="context">What is known about the move.</param>
+        /// <returns><see langword="true"/> when the move may proceed.</returns>
+        private static bool Guarded(Transition transition, WorkflowRuleContext context)
+        {
+            return WorkflowExpression.Evaluate
+            (
+                transition?.GuardExpression,
+                key => CoreHub.WorkflowGuardManager?.Get(key)?.Evaluate(context) ?? false
+            );
+        }
+
+        /// <summary>
+        /// Normalizes what a caller handed over as the screen of the transition.
+        /// </summary>
+        /// <param name="values">The submitted values, or <see langword="null"/>.</param>
+        /// <returns>A map that answers by field name regardless of casing.</returns>
+        private static IReadOnlyDictionary<string, string> Screen(IReadOnlyDictionary<string, string> values)
+        {
+            if (values is null || values.Count == 0)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in values)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Key))
+                {
+                    normalized[entry.Key.Trim()] = entry.Value;
+                }
+            }
+
+            return normalized;
         }
 
         /// <summary>

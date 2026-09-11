@@ -21,6 +21,19 @@ namespace KleeneStar.Core.WebFragment.Object
     {
         private static readonly object _sync = new();
         private static readonly Dictionary<string, IObjectKind> _kinds = new(System.StringComparer.OrdinalIgnoreCase);
+        private static int _version;
+
+        /// <summary>
+        /// Gets a number that changes whenever the set of registered kinds does.
+        /// </summary>
+        /// <remarks>
+        /// It is watched by the same cached dialog controls that watch
+        /// <see cref="ObjectRendererCatalog.Version"/>, and for the same reason: a control
+        /// built once and reused for every request would otherwise describe the catalog as it
+        /// stood before the first add-on registered into it. The renderer picker watches both,
+        /// because the renderers a kind offers are the answer of the two catalogs together.
+        /// </remarks>
+        public static int Version => System.Threading.Volatile.Read(ref _version);
 
         /// <summary>
         /// Initializes the catalog with the built-in core kinds.
@@ -66,6 +79,10 @@ namespace KleeneStar.Core.WebFragment.Object
             lock (_sync)
             {
                 _kinds[key] = kind;
+
+                // the dialogs watch this, so a kind contributed by a plugin that loaded after
+                // them still reaches the pickers projected from the catalog
+                System.Threading.Interlocked.Increment(ref _version);
             }
         }
 

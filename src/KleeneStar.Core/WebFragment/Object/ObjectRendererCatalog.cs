@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
@@ -38,6 +39,20 @@ namespace KleeneStar.Core.WebFragment.Object
 
         private static readonly object _sync = new();
         private static readonly Dictionary<string, IObjectRenderer> _renderers = new(StringComparer.OrdinalIgnoreCase);
+        private static int _version;
+
+        /// <summary>
+        /// Gets a number that changes whenever the set of registered renderers does.
+        /// </summary>
+        /// <remarks>
+        /// The renderer picker on the class dialogs is a control on a cached fragment, built
+        /// once and reused for every request, so a renderer a plugin registers after that
+        /// fragment was constructed would never appear in it - and a plugin registering after
+        /// the core's own components is the normal case, not the exception. Rather than
+        /// rebuilding the options on every render, the picker projects the catalog again only
+        /// when this number has moved.
+        /// </remarks>
+        public static int Version => Volatile.Read(ref _version);
 
         /// <summary>
         /// Initializes the catalog with the built-in core renderers.
@@ -88,6 +103,10 @@ namespace KleeneStar.Core.WebFragment.Object
             lock (_sync)
             {
                 _renderers[key] = renderer;
+
+                // the pickers watch this, so a renderer contributed by a plugin that loaded
+                // after them still reaches the dialogs
+                Interlocked.Increment(ref _version);
             }
         }
 
@@ -129,16 +148,56 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Gets the renderers that serve the supplied kind - the ones that declare it, plus
-        /// the ones that declare no kind at all and therefore serve every kind.
+        /// Gets the renderers a kind offers - the ones that serve it (by declaring it, or by
+        /// declaring no kind at all), narrowed to the ones the kind itself accepts.
         /// </summary>
+        /// <remarks>
+        /// Both sides have to agree, and both express "no opinion" as an empty collection:
+        /// <see cref="IObjectRenderer.Kinds"/> is what a renderer is capable of drawing,
+        /// <see cref="IObjectKind.Renderers"/> what a kind is willing to be read through. The
+        /// second is what lets the blog kind refuse the mask without the mask - which serves
+        /// every kind, including the ones not yet written - having to know that blogs exist.
+        /// </remarks>
         /// <param name="kind">The kind key. May be null, which resolves to the default kind.</param>
         /// <returns>The renderers, in listing order.</returns>
         public static IEnumerable<IObjectRenderer> GetRenderers(string kind)
         {
             var normalized = Model.Entities.ObjectKind.Normalize(kind);
+            var accepted = ObjectKindCatalog.GetKind(normalized)?.Renderers?
+                .Select(Model.Entities.ObjectRenderer.Normalize)
+                .Where(x => x is not null)
+                .ToList() ?? [];
 
-            return Renderers.Where(x => Serves(x, normalized));
+            return Renderers.Where(x => Serves(x, normalized) && Accepts(accepted, x));
+        }
+
+        /// <summary>
+        /// Gets the keys of the registered kinds that offer the supplied renderer - the
+        /// inverse of <see cref="GetRenderers(string)"/>, answered by the same two-sided
+        /// handshake.
+        /// </summary>
+        /// <remarks>
+        /// The renderer picker on the class dialogs needs the question this way round: it
+        /// draws one entry per renderer and has to say, on each of them, which object types it
+        /// belongs to, so the picker can narrow itself to the type chosen beside it. The
+        /// answer covers only the kinds registered at the time it is asked, which is why the
+        /// picker projects it again when either catalog moves.
+        /// </remarks>
+        /// <param name="renderer">The renderer key. May be null, which answers nothing.</param>
+        /// <returns>The kind keys, in the listing order of the kinds.</returns>
+        public static IEnumerable<string> GetKinds(string renderer)
+        {
+            var normalized = Model.Entities.ObjectRenderer.Normalize(renderer);
+
+            if (normalized is null)
+            {
+                return [];
+            }
+
+            return [.. ObjectKindCatalog.Kinds
+                .Where(kind => GetRenderers(kind.Key)
+                    .Any(x => string.Equals(Model.Entities.ObjectRenderer.Normalize(x.Key), normalized, StringComparison.OrdinalIgnoreCase)))
+                .Select(kind => Model.Entities.ObjectKind.Normalize(kind.Key))];
         }
 
         /// <summary>
@@ -180,8 +239,12 @@ namespace KleeneStar.Core.WebFragment.Object
             var configured = Model.Entities.ObjectRenderer.Normalize(renderer);
 
             // a key that resolves to nothing belongs to an add-on that is no longer
-            // installed; the class keeps it in the data and reads as its kind meanwhile
-            if (configured is not null && GetRenderer(configured) is not null)
+            // installed; the class keeps it in the data and reads as its kind meanwhile.
+            // a key the kind does not offer is read the same way - the endpoint refuses to
+            // store one, but a class may have been given its renderer before the kind
+            // declined it, or moved to a kind that does, and a renderer no fragment on the
+            // kind's routes is gated on would leave the object with no reading view at all
+            if (configured is not null && GetRenderer(configured) is not null && IsOffered(kind, configured))
             {
                 return configured;
             }
@@ -238,6 +301,18 @@ namespace KleeneStar.Core.WebFragment.Object
             var kinds = renderer.Kinds?.ToList() ?? [];
 
             return kinds.Count == 0 || kinds.Any(x => string.Equals(Model.Entities.ObjectKind.Normalize(x), kind, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Determines whether a kind that named the supplied (already normalized) renderer
+        /// keys accepts the supplied descriptor.
+        /// </summary>
+        /// <param name="accepted">The renderer keys the kind named; empty means every one.</param>
+        /// <param name="renderer">The descriptor to test.</param>
+        /// <returns>True when the kind named the renderer, or named none at all.</returns>
+        private static bool Accepts(List<string> accepted, IObjectRenderer renderer)
+        {
+            return accepted.Count == 0 || accepted.Any(x => string.Equals(x, Model.Entities.ObjectRenderer.Normalize(renderer.Key), StringComparison.OrdinalIgnoreCase));
         }
     }
 }

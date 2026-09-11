@@ -1,4 +1,6 @@
 using KleeneStar.Core.WebParameter;
+using System;
+using System.Runtime.CompilerServices;
 using WebExpress.WebCore.WebCondition;
 using WebExpress.WebCore.WebMessage;
 
@@ -24,6 +26,19 @@ namespace KleeneStar.Core.WebFragment.Object
     public abstract class ObjectRendererCondition : ICondition
     {
         /// <summary>
+        /// The renderer in effect for the object each request addresses.
+        /// </summary>
+        /// <remarks>
+        /// Every gated fragment asks the same question of the same request, and there are
+        /// several of them on one page - the reading view, the editor, the edit button, once
+        /// per renderer - each of which would otherwise read the object and its class again,
+        /// before the one that wins reads the object a further time in its own render. The
+        /// answer depends on nothing but the request, so it is resolved once and kept beside
+        /// it; the table holds no request alive, so an entry dies when the request does.
+        /// </remarks>
+        private static readonly ConditionalWeakTable<IRequest, string[]> _resolved = new();
+
+        /// <summary>
         /// Gets the renderer key the condition asks about.
         /// </summary>
         protected abstract string Renderer { get; }
@@ -40,16 +55,50 @@ namespace KleeneStar.Core.WebFragment.Object
         /// </returns>
         public bool Fulfillment(IRequest request)
         {
-            var @object = CoreHub.ObjectManager.GetObjectByKey(request?.GetParameter<ObjectKeyParameter>()?.Value);
+            var effective = Resolve(request);
 
-            if (@object is null)
+            return effective is not null && string.Equals
+            (
+                effective,
+                Model.Entities.ObjectRenderer.Normalize(Renderer),
+                StringComparison.OrdinalIgnoreCase
+            );
+        }
+
+        /// <summary>
+        /// Answers the renderer key the object addressed by the request is read and written
+        /// through, resolving it at most once per request.
+        /// </summary>
+        /// <param name="request">The request the condition is evaluated for.</param>
+        /// <returns>
+        /// The effective renderer key, or <see langword="null"/> when the request addresses
+        /// no object.
+        /// </returns>
+        private static string Resolve(IRequest request)
+        {
+            if (request is null)
             {
-                return false;
+                return null;
             }
 
-            var @class = CoreHub.ClassManager.GetClass(@object.ClassId);
+            // the box is a one-element array rather than the key itself, because "resolved to
+            // nothing" has to be storable and distinguishable from "not resolved yet"
+            if (_resolved.TryGetValue(request, out var cached))
+            {
+                return cached[0];
+            }
 
-            return ObjectRendererCatalog.IsRenderedAs(@class, Renderer);
+            var @object = CoreHub.ObjectManager.GetObjectByKey(request.GetParameter<ObjectKeyParameter>()?.Value);
+            var @class = @object is null ? null : CoreHub.ClassManager.GetClass(@object.ClassId);
+
+            // a class that is gone answers nothing rather than the default of a kind nobody
+            // declared, so no surface draws around an object that cannot be described - the
+            // reading ObjectRendererCatalog.IsRenderedAs has always had of a null class
+            var key = @class is null ? null : ObjectRendererCatalog.ResolveKey(@class);
+
+            _resolved.AddOrUpdate(request, [key]);
+
+            return key;
         }
     }
 

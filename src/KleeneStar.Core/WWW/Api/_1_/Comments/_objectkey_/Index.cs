@@ -43,13 +43,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
     public sealed class Index : RestApiComment<Comment>
     {
         /// <summary>
-        /// Fallback identity used as the author when the request session does not
-        /// carry an authenticated user (e.g. during seeding or anonymous test traffic).
-        /// Matches the admin identity seeded by <see cref="KleeneStarDbSeeder"/>.
-        /// </summary>
-        private static readonly Guid FallbackAuthorId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
-
-        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
@@ -111,7 +104,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             ArgumentNullException.ThrowIfNull(payload);
 
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body))
+            var authorId = ResolveAuthorId(request);
+
+            // a comment is somebody's word, so it is not written when nobody can be named for
+            // it - the alternative is to sign it with an account that did not write it
+            if (objectId == Guid.Empty || authorId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body))
             {
                 return null;
             }
@@ -120,7 +117,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             {
                 Id = Guid.NewGuid(),
                 ObjectId = objectId,
-                AuthorId = ResolveAuthorId(request),
+                AuthorId = authorId,
                 Content = payload.Body.Trim(),
                 State = CommentState.Active,
                 Visibility = ResolveVisibility(payload),
@@ -208,8 +205,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return null;
             }
 
+            var authorId = ResolveAuthorId(request);
             var parent = CoreHub.CommentManager.GetComment(parentId);
-            if (parent is null)
+
+            if (parent is null || authorId == Guid.Empty)
             {
                 return null;
             }
@@ -218,7 +217,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             {
                 Id = Guid.NewGuid(),
                 ObjectId = parent.ObjectId,
-                AuthorId = ResolveAuthorId(request),
+                AuthorId = authorId,
                 Content = reply.Trim(),
                 State = CommentState.Active,
 
@@ -243,24 +242,28 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
-        /// Toggles a like on the comment for the identity resolved by name from the
-        /// supplied <paramref name="user"/> argument (the control sends back whatever
-        /// the host returned from <see cref="ResolveCurrentUser"/>). Returns the list
-        /// of identity names that currently like the comment.
+        /// Toggles a like on the comment for the signed-in user. Returns the list of identity
+        /// names that currently like the comment.
         /// </summary>
+        /// <remarks>
+        /// The <paramref name="user"/> the control sends along is ignored: it is a name that
+        /// travelled through the browser, and taking it would let a caller like as anybody
+        /// whose name they know. Whose like it is, is a question about the session.
+        /// </remarks>
         /// <param name="commentId">The id of the comment.</param>
-        /// <param name="user">The display name of the user toggling the like.</param>
+        /// <param name="user">The display name the control sends back; not trusted.</param>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The current likers.</returns>
         protected override IEnumerable<string> ToggleLike(string commentId, string user, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            var authorId = ResolveAuthorId(request);
+
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty)
             {
                 return [];
             }
 
-            var authorId = ResolveAuthorIdByName(user) ?? ResolveAuthorId(request);
             return CoreHub.CommentManager.ToggleLike(id, authorId);
         }
 
@@ -275,7 +278,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         /// <returns>The new pin state, or <c>null</c> when no comment matches.</returns>
         protected override bool? TogglePin(string commentId, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            // a pin carries no author of its own, but it is still somebody's act: the identity
+            // is resolved here so the notification and the audit event the manager raises are
+            // attributed to whoever pinned, and so an anonymous caller cannot pin at all
+            if (!Guid.TryParse(commentId, out var id) || ResolveAuthorId(request) == Guid.Empty)
             {
                 return null;
             }
@@ -284,43 +290,29 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
-        /// Toggles an emoji reaction on the comment for the identity resolved by name
-        /// from the supplied <paramref name="user"/> argument.
+        /// Toggles an emoji reaction on the comment for the signed-in user.
         /// </summary>
+        /// <remarks>
+        /// As with the like, the <paramref name="user"/> the control sends along is ignored in
+        /// favour of the session - a reaction says who felt that way about the comment, and a
+        /// name from the browser cannot answer that.
+        /// </remarks>
         /// <param name="commentId">The id of the comment.</param>
-        /// <param name="user">The display name of the user toggling the reaction.</param>
+        /// <param name="user">The display name the control sends back; not trusted.</param>
         /// <param name="reaction">The emoji to toggle.</param>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The reaction map (emoji → identity names) after the toggle.</returns>
         protected override IDictionary<string, IEnumerable<string>> ToggleReaction(string commentId, string user, string reaction, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            var authorId = ResolveAuthorId(request);
+
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty)
             {
                 return new Dictionary<string, IEnumerable<string>>();
             }
 
-            var authorId = ResolveAuthorIdByName(user) ?? ResolveAuthorId(request);
             return CoreHub.CommentManager.ToggleReaction(id, authorId, reaction);
-        }
-
-        /// <summary>
-        /// Looks up an identity by its display name and returns the id, or <c>null</c>
-        /// when no matching identity exists. The control sends back the name string from
-        /// <see cref="ResolveCurrentUser"/>; we re-resolve it server-side rather than
-        /// trusting the client-supplied value verbatim.
-        /// </summary>
-        /// <param name="name">The identity display name.</param>
-        /// <returns>The identity id or <c>null</c>.</returns>
-        private static Guid? ResolveAuthorIdByName(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                return null;
-            }
-
-            using var db = ModelHub.CreateDbContext();
-            return db.Identities.AsNoTracking().FirstOrDefault(i => i.Name == name)?.Id;
         }
 
         /// <summary>
@@ -344,48 +336,44 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
-        /// Resolves the author id for a new comment / reply. Looks up the identity by
-        /// the name returned from <see cref="ResolveCurrentUser"/>; falls back to the
-        /// seeded admin identity when no match exists.
+        /// Resolves the identity the request is served for - the author of whatever it
+        /// writes.
         /// </summary>
+        /// <remarks>
+        /// It is the signed-in user of the request's session and nothing else. There is
+        /// deliberately no fallback: a comment nobody can be named for is refused rather than
+        /// signed with the seeded administrator, which is what this endpoint used to do and
+        /// what put that person's name under every anonymous word.
+        /// </remarks>
         /// <param name="request">The HTTP request.</param>
-        /// <returns>The author identity id.</returns>
+        /// <returns>The author identity id, or <see cref="Guid.Empty"/> when the caller is not
+        /// signed in.</returns>
         private static Guid ResolveAuthorId(IRequest request)
         {
-            var name = ResolveCurrentUserName(request);
-            if (string.IsNullOrEmpty(name))
-            {
-                return FallbackAuthorId;
-            }
-
-            using var db = ModelHub.CreateDbContext();
-            var identity = db.Identities.AsNoTracking().FirstOrDefault(i => i.Name == name);
-            return identity?.Id ?? FallbackAuthorId;
+            return CoreHub.SessionManager?.GetCurrentIdentityId(request) ?? Guid.Empty;
         }
 
         /// <summary>
-        /// Returns the display name of the active user. The control passes this string
-        /// back through the like / pin / reaction endpoints; the endpoint then resolves
-        /// the identity by name. Falls back to the seeded admin identity name when the
-        /// request does not carry an authenticated session.
+        /// Returns the display name of the signed-in user, which the comment control marks
+        /// its own entries, likes and reactions by.
         /// </summary>
+        /// <remarks>
+        /// The control sends this string back through the like and reaction routes, and the
+        /// endpoint does <b>not</b> take it as the actor - it reads the session again. A name
+        /// travelling through the browser is a claim, and honouring it would let anybody like
+        /// as somebody else by returning a different one.
+        /// </remarks>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request.</param>
-        /// <returns>The current user's display name.</returns>
+        /// <returns>The current user's display name, or an empty string when nobody is signed
+        /// in.</returns>
         protected override string ResolveCurrentUser(IQueryContext context, IRequest request)
         {
-            return ResolveCurrentUserName(request);
-        }
+            var identityId = ResolveAuthorId(request);
 
-        private static string ResolveCurrentUserName(IRequest request)
-        {
-            // TODO: read the authenticated identity from request.Session once the
-            // WebExpress identity flow exposes it on the request. Until then, every
-            // anonymous request is attributed to the seeded admin identity so the
-            // like / pin / reaction toggles still resolve to a valid author.
-            using var db = ModelHub.CreateDbContext();
-            var admin = db.Identities.AsNoTracking().FirstOrDefault(i => i.Id == FallbackAuthorId);
-            return admin?.Name ?? "admin";
+            return identityId == Guid.Empty
+                ? string.Empty
+                : CoreHub.IdentityManager?.GetIdentity(identityId)?.Name ?? string.Empty;
         }
 
         /// <summary>

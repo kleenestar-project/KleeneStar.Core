@@ -96,17 +96,48 @@ namespace KleeneStar.Core.WebManager
         IEnumerable<Status> GetTargetStatuses(Workflow workflow, Status currentStatus);
 
         /// <summary>
+        /// Returns the states the supplied object may actually be moved to by the supplied
+        /// identity: the reachable ones, narrowed to those whose transition the guards let
+        /// through.
+        /// </summary>
+        /// <remarks>
+        /// What a dropdown offers, as opposed to what the state machine allows: a move a guard
+        /// refuses must not be shown, or the refusal arrives after the click and reads as a
+        /// fault. An entry move carries no transition and therefore no guards.
+        /// </remarks>
+        /// <param name="workflow">The workflow to walk.</param>
+        /// <param name="currentStatus">The state to leave, or <c>null</c>.</param>
+        /// <param name="objectEntity">The object being moved.</param>
+        /// <param name="field">The workflow-backed field carrying the state.</param>
+        /// <param name="identityId">The identity that would make the move.</param>
+        /// <returns>The states to offer.</returns>
+        IEnumerable<Status> GetOfferedStatuses(Workflow workflow, Status currentStatus, Model.Entities.Object objectEntity, Field field, Guid identityId);
+
+        /// <summary>
         /// Moves a workflow-backed field of an object to the requested state, enforcing the
         /// workflow server-side.
         /// </summary>
         /// <remarks>
-        /// The call runs the stages the workflow concept prescribes: the guard stage checks that
-        /// an active transition connects the current state to the requested one (or, for an
-        /// object that has not entered the state machine yet, that the requested state is an
-        /// entry state), the validator stage checks the rules configured on that transition, the
-        /// value is written, and finally the transition's post functions run. Guards, validators
-        /// and post functions beyond the built-in reachability check have no counterpart in the
-        /// data model yet, so those stages currently find nothing to run.
+        /// The call runs the stages the workflow concept prescribes, in this order:
+        /// <list type="number">
+        /// <item><description><b>reachability</b> - an active transition has to connect the
+        /// current state to the requested one, or, for an object that has not entered the state
+        /// machine yet, the requested state has to be an entry state;</description></item>
+        /// <item><description><b>guards</b> - the condition the transition carries
+        /// (<c>Transition.GuardExpression</c>, a disjunction of conjunctions over the keys of the
+        /// registered guards) has to hold, and so does the relation guard that refuses a move
+        /// into a closing state while something open blocks the object;</description></item>
+        /// <item><description><b>validators</b> - the condition
+        /// (<c>Transition.ValidatorExpression</c>) is evaluated against the object <em>and</em>
+        /// what the screen of the transition carries, so a move that demands a note is refused
+        /// before anything is written, naming what is missing;</description></item>
+        /// <item><description><b>apply</b> - the state is written;</description></item>
+        /// <item><description><b>post functions</b> - the built-in ones that keep the audit trail
+        /// honest and close what follows, then the ones the transition names, in their
+        /// order.</description></item>
+        /// </list>
+        /// All three configurable stages run inside the commit of the transition, so what a post
+        /// function changes belongs to the same revision as the state change.
         /// </remarks>
         /// <param name="objectId">The id of the object whose state changes.</param>
         /// <param name="fieldId">The id of the workflow-backed field carrying the state.</param>
@@ -115,8 +146,13 @@ namespace KleeneStar.Core.WebManager
         /// The identity performing the change, stamped on the object. Pass
         /// <see cref="Guid.Empty"/> to leave the previous updater in place.
         /// </param>
+        /// <param name="screenValues">
+        /// What was filled in on the screen of the transition, keyed by field name, or
+        /// <see langword="null"/> when the transition shows none. The values reach the validators
+        /// before anything is written and the post functions afterwards.
+        /// </param>
         /// <returns>The outcome of the state change.</returns>
-        WorkflowTransitionResult ExecuteTransition(Guid objectId, Guid fieldId, Guid targetStatusId, Guid identityId);
+        WorkflowTransitionResult ExecuteTransition(Guid objectId, Guid fieldId, Guid targetStatusId, Guid identityId, IReadOnlyDictionary<string, string> screenValues = null);
 
         /// <summary>
         /// Returns a workflow based on its id.

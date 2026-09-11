@@ -110,6 +110,50 @@ namespace KleeneStar.Core.Test.WebFragment
         }
 
         /// <summary>
+        /// Verifies the kind side of the offer: the blog kind names its renderers and names
+        /// only prose, so the mask — which serves every kind by declaring none — is not
+        /// offered on it, and neither is a universal renderer contributed afterwards.
+        /// </summary>
+        /// <remarks>
+        /// The second half is why the restriction is declared on the kind rather than by
+        /// enumerating kinds on the renderers: a post has to stay prose against surfaces the
+        /// blog kind never saw, and a renderer that serves everything cannot be asked to know
+        /// which kinds refuse it.
+        /// </remarks>
+        [Fact]
+        public void GetRenderers_BlogOffersProseAlone()
+        {
+            var blog = ObjectRendererCatalog.GetRenderers(ObjectKind.Blog).ToList();
+
+            Assert.Single(blog);
+            Assert.Equal(ObjectRenderer.Prose, blog[0].Key);
+
+            var universal = new TestRenderer("Test-Universal-Renderer");
+            ObjectRendererCatalog.Register(universal);
+
+            Assert.DoesNotContain(ObjectRendererCatalog.GetRenderers(ObjectKind.Blog), x => ReferenceEquals(x, universal));
+
+            // the document kind, which names nothing, takes it the way it takes the mask
+            Assert.Contains(ObjectRendererCatalog.GetRenderers(ObjectKind.Document), x => ReferenceEquals(x, universal));
+        }
+
+        /// <summary>
+        /// Verifies the gate the class endpoint validates on for the restricted kind: a blog
+        /// class may name prose, or name nothing and follow its kind, and naming the mask is
+        /// refused.
+        /// </summary>
+        [Fact]
+        public void IsOffered_BlogRefusesTheMask()
+        {
+            Assert.True(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, null));
+            Assert.True(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, ObjectRenderer.Prose));
+            Assert.True(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, ObjectRendererCatalog.Unwrap(ObjectRendererCatalog.Automatic)));
+
+            Assert.False(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, ObjectRenderer.Form));
+            Assert.False(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, " FORM "));
+        }
+
+        /// <summary>
         /// Verifies that a class naming no renderer follows the default of its kind: the two
         /// kinds with a body default to prose, the record-shaped ones to the mask.
         /// </summary>
@@ -142,6 +186,31 @@ namespace KleeneStar.Core.Test.WebFragment
 
             // a null class renders as nothing rather than throwing
             Assert.False(ObjectRendererCatalog.IsRenderedAs(null, ObjectRenderer.Form));
+        }
+
+        /// <summary>
+        /// Verifies that a renderer the kind does not offer is read as unset rather than
+        /// obeyed: a blog class carrying the mask — stored before the kind declined it, or
+        /// arrived by being moved to the blog kind — resolves to prose, the default of its
+        /// kind.
+        /// </summary>
+        /// <remarks>
+        /// The endpoint refuses to store such a pairing, but resolution cannot rely on that:
+        /// the fragments that draw a post are gated on the renderer, so a key none of them
+        /// answers to would leave the post with no reading view at all.
+        /// </remarks>
+        [Fact]
+        public void ResolveKey_IgnoresARendererTheKindDoesNotOffer()
+        {
+            var post = new Class { Kind = ObjectKind.Blog, Renderer = ObjectRenderer.Form };
+
+            Assert.Equal(ObjectRenderer.Prose, ObjectRendererCatalog.ResolveKey(post));
+            Assert.True(ObjectRendererCatalog.IsRenderedAs(post, ObjectRenderer.Prose));
+            Assert.False(ObjectRendererCatalog.IsRenderedAs(post, ObjectRenderer.Form));
+
+            // and the same the other way round, where the renderer is the one declining:
+            // prose against a kind with no body to write reads as that kind's mask
+            Assert.Equal(ObjectRenderer.Form, ObjectRendererCatalog.ResolveKey(new Class { Kind = ObjectKind.Issue, Renderer = ObjectRenderer.Prose }));
         }
 
         /// <summary>
@@ -214,6 +283,34 @@ namespace KleeneStar.Core.Test.WebFragment
             var cleared = new Class { Kind = ObjectKind.Document, Renderer = ObjectRendererCatalog.Unwrap(ObjectRendererCatalog.Automatic) };
 
             Assert.Equal(ObjectRenderer.Prose, ObjectRendererCatalog.ResolveKey(cleared));
+        }
+
+        /// <summary>
+        /// Verifies that registering moves the version the pickers watch.
+        /// </summary>
+        /// <remarks>
+        /// This is what makes a contributed renderer reach the class dialogs at all. They are
+        /// cached fragments built while the core's own components register - before any plugin
+        /// has had a chance to call <see cref="ObjectRendererCatalog.Register"/> - so a picker
+        /// that filled its options once would forever offer the list as it stood before the
+        /// first add-on arrived. It projects the catalog again when this number has moved, so
+        /// a version that did not move is the whole feature silently gone.
+        /// </remarks>
+        [Fact]
+        public void Register_MovesTheVersionThePickersWatch()
+        {
+            var before = ObjectRendererCatalog.Version;
+
+            ObjectRendererCatalog.Register(new TestRenderer("late-arriving-addon", ObjectKind.Document));
+
+            Assert.NotEqual(before, ObjectRendererCatalog.Version);
+
+            // and it keeps moving, so replacing a descriptor is noticed as well as adding one
+            var replaced = ObjectRendererCatalog.Version;
+
+            ObjectRendererCatalog.Register(new TestRenderer("late-arriving-addon", ObjectKind.Blog));
+
+            Assert.NotEqual(replaced, ObjectRendererCatalog.Version);
         }
     }
 }

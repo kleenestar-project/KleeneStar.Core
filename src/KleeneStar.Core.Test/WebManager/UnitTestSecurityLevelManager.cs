@@ -1,5 +1,6 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
+using System;
 using WebExpress.WebIndex.Queries;
 
 using ObjectEntity = KleeneStar.Model.Entities.Object;
@@ -20,8 +21,9 @@ namespace KleeneStar.Core.Test.WebManager
         private static readonly Guid OtherGroupId = Guid.Parse("9F4EAD51-C062-4DB4-AF81-4C5D6E7F8091");
 
         /// <summary>
-        /// The identity every request is attributed to until the WebExpress identity flow
-        /// exposes the authenticated one; see <c>SessionManager.GetCurrentIdentityId</c>.
+        /// The identity the tests act as. The manager narrows what it answers to the
+        /// signed-in user of the request; a test reaches it without a request and says who is
+        /// acting through <c>ISessionManager.BeginIdentity</c>.
         /// </summary>
         private static readonly Guid CurrentIdentityId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
 
@@ -31,7 +33,8 @@ namespace KleeneStar.Core.Test.WebManager
         /// cleared group and not of the other one.
         /// </summary>
         /// <param name="connectionString">The per-test in-memory database name.</param>
-        private static void Seed(string connectionString)
+        /// <returns>The acting scope; closing it stops acting as that identity.</returns>
+        private static IDisposable Seed(string connectionString)
         {
             CoreHubFixture.Initialize(connectionString);
 
@@ -67,6 +70,8 @@ namespace KleeneStar.Core.Test.WebManager
             }
 
             db.SaveChanges();
+
+            return CoreHub.SessionManager.BeginIdentity(CurrentIdentityId);
         }
 
         /// <summary>
@@ -76,7 +81,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void Add_Then_GetSecurityLevel_RoundTrip()
         {
-            Seed(nameof(Add_Then_GetSecurityLevel_RoundTrip));
+            using var acting = Seed(nameof(Add_Then_GetSecurityLevel_RoundTrip));
 
             var level = Sample("Confidential", ClearedGroupId);
             CoreHub.SecurityLevelManager.Add(level);
@@ -94,7 +99,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void GetSecurityLevels_ByClassId_IsOrderedByRank()
         {
-            Seed(nameof(GetSecurityLevels_ByClassId_IsOrderedByRank));
+            using var acting = Seed(nameof(GetSecurityLevels_ByClassId_IsOrderedByRank));
 
             CoreHub.SecurityLevelManager.Add(Sample("Confidential", ClearedGroupId, rank: 20));
             CoreHub.SecurityLevelManager.Add(Sample("Public", ClearedGroupId, rank: 0));
@@ -111,7 +116,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void IsCleared_FollowsTheGroupsTheLevelNames()
         {
-            Seed(nameof(IsCleared_FollowsTheGroupsTheLevelNames));
+            using var acting = Seed(nameof(IsCleared_FollowsTheGroupsTheLevelNames));
 
             var mine = Sample("Mine", ClearedGroupId);
             var theirs = Sample("Theirs", OtherGroupId);
@@ -131,7 +136,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void IsCleared_LevelWithoutGroups_IsClosed()
         {
-            Seed(nameof(IsCleared_LevelWithoutGroups_IsClosed));
+            using var acting = Seed(nameof(IsCleared_LevelWithoutGroups_IsClosed));
 
             var closed = Sample("Closed");
             CoreHub.SecurityLevelManager.Add(closed);
@@ -146,7 +151,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void GetAssignableSecurityLevels_OffersOnlyClearedActiveLevels()
         {
-            Seed(nameof(GetAssignableSecurityLevels_OffersOnlyClearedActiveLevels));
+            using var acting = Seed(nameof(GetAssignableSecurityLevels_OffersOnlyClearedActiveLevels));
 
             var mine = Sample("Mine", ClearedGroupId);
             var theirs = Sample("Theirs", OtherGroupId);
@@ -169,7 +174,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void Add_SecondDefault_DemotesTheFirst()
         {
-            Seed(nameof(Add_SecondDefault_DemotesTheFirst));
+            using var acting = Seed(nameof(Add_SecondDefault_DemotesTheFirst));
 
             var first = Sample("First", ClearedGroupId);
             first.IsDefault = true;
@@ -191,7 +196,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ObjectManager_HidesObjectsTheCallerIsNotClearedFor()
         {
-            Seed(nameof(ObjectManager_HidesObjectsTheCallerIsNotClearedFor));
+            using var acting = Seed(nameof(ObjectManager_HidesObjectsTheCallerIsNotClearedFor));
 
             var mine = Sample("Mine", ClearedGroupId);
             var theirs = Sample("Theirs", OtherGroupId);
@@ -223,7 +228,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void BeginUnrestricted_LiftsTheFilterForTheScopeOnly()
         {
-            Seed(nameof(BeginUnrestricted_LiftsTheFilterForTheScopeOnly));
+            using var acting = Seed(nameof(BeginUnrestricted_LiftsTheFilterForTheScopeOnly));
 
             var theirs = Sample("Theirs", OtherGroupId);
             CoreHub.SecurityLevelManager.Add(theirs);
@@ -256,7 +261,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void Remove_DeclassifiesTheObjectsItGuarded()
         {
-            Seed(nameof(Remove_DeclassifiesTheObjectsItGuarded));
+            using var acting = Seed(nameof(Remove_DeclassifiesTheObjectsItGuarded));
 
             var theirs = Sample("Theirs", OtherGroupId);
             CoreHub.SecurityLevelManager.Add(theirs);

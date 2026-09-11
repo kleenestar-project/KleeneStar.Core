@@ -15,12 +15,19 @@ namespace KleeneStar.Core.WebFragment.Object.Renderers
     /// also what an add-on kind gets for free, and it is the default of the issue and asset
     /// kinds - whose detail and edit views have always been exactly this.
     /// <para>
-    /// On the document and blog kinds it is the alternative to
-    /// <see cref="ProseRenderer"/>: the object still stands in the page tree or the
-    /// timeline beside the prose ones - the kind is unchanged and so is everything the kind
-    /// decides - but it opens as a form. The surfaces are
+    /// On the document kind it is the alternative to <see cref="ProseRenderer"/>: the object
+    /// still stands in the page tree beside the prose ones - the kind is unchanged and so is
+    /// everything the kind decides - but it opens as a form. The surfaces are
     /// <see cref="ObjectFormReadFragment"/> and <see cref="ObjectFormEditFragment"/>, each
     /// gated on <see cref="FormRendererCondition"/>.
+    /// </para>
+    /// <para>
+    /// Serving every kind is not the same as being offered on every kind. The <b>blog</b>
+    /// kind declines the mask (<see cref="Blogs.Blog.Renderers"/>): a post is an article on a
+    /// timeline and its body is what the timeline shows, so prose is the only renderer it
+    /// accepts. That refusal is declared there rather than by enumerating kinds here, which
+    /// is what keeps this collection empty and this renderer available to kinds that do not
+    /// exist yet.
     /// </para>
     /// </remarks>
     public sealed class FormRenderer : IObjectRenderer

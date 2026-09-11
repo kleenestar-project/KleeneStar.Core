@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebParameter;
+using System.Collections.Generic;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebIcon;
@@ -36,6 +37,26 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
         /// WYSIWYG editor.
         /// </summary>
         public string DefaultRenderer => Model.Entities.ObjectRenderer.Prose;
+
+        /// <summary>
+        /// Gets the renderers a post may be read and written through: prose, and nothing
+        /// else.
+        /// </summary>
+        /// <remarks>
+        /// The blog kind is the one kind that names its renderers rather than taking what
+        /// the renderers offer, and it names exactly one. A post is an article on a timeline -
+        /// a headline, a date, an author and a body someone wrote - and that body is what the
+        /// timeline shows, what a reader opens it for, and what the editor exists to write.
+        /// A structured mask has no body in that sense: it would put a post on the timeline
+        /// that cannot be read as one.
+        /// <para>
+        /// The document kind deliberately does <b>not</b> do this. A document is a page in a
+        /// tree, and a filled-in sheet standing in that tree beside the prose ones is a
+        /// coherent thing - a form-rendered handbook page is still a page. Only the timeline
+        /// insists on prose.
+        /// </para>
+        /// </remarks>
+        public IEnumerable<string> Renderers => [Model.Entities.ObjectRenderer.Prose];
 
         /// <summary>
         /// Gets the unbound route of the blog overview page (the blog timeline).

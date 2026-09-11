@@ -30,27 +30,49 @@ namespace KleeneStar.Core.WebFragment.Object
     /// condition that decides whether it is this mask or the WYSIWYG editor.
     /// </para>
     /// <para>
-    /// <see cref="Summary"/> is emitted before the configured structure because every object
-    /// carries a summary whatever its class models, and the classification is reported
-    /// through <see cref="ObjectFormLayout.CreateSecurityLevelNotice"/> but never edited
-    /// here - who may see the record is not part of the record's content.
+    /// <see cref="Summary"/> is not one of the items: every object carries a summary whatever
+    /// its class models, and it is the <em>name</em> of what is being edited rather than one
+    /// of its answers, so it is rendered into the form's <c>header</c>. Opened as a dialog -
+    /// which is how an issue and an asset are edited - the framework lifts that header onto
+    /// the dialog's title bar, so the record is titled by its own summary instead of by a
+    /// generic caption, exactly as the prose editor titles a document. The classification is
+    /// reported through <see cref="ObjectFormLayout.CreateSecurityLevelNotice"/> but never
+    /// edited here - who may see the record is not part of the record's content.
     /// </para>
     /// </remarks>
     public abstract class ObjectStructuredEditFormFragmentBase : FragmentControlDataFormEdit
     {
         /// <summary>
-        /// Gets the input text control for specifying the summary of the object. This
-        /// system field is always rendered first because every object carries a summary,
-        /// regardless of the form configuration.
+        /// Gets the input control for the summary of the object - the name the record is
+        /// titled by. It is rendered into the form's header instead of among its items, and
+        /// therefore becomes the title of the dialog the mask is opened as.
         /// </summary>
-        public ControlDataFormItemInputUnique Summary { get; } = new()
+        /// <remarks>
+        /// It carries no label and no help line: a caption reading <em>summary</em> over the
+        /// name of the thing on screen explains nothing, and a title bar is no place for a
+        /// sentence about the field. The placeholder says what belongs there while the field
+        /// is empty, which is the only moment the question arises.
+        /// <para>
+        /// It is a plain text input rather than the <c>ControlDataFormItemInputUnique</c> it
+        /// used to be. That control checked the summary against the <em>workspace</em> names
+        /// (<c>/api/1/workspaces/uniquename</c>) and refused the reserved workspace keys, so
+        /// an issue called like a workspace was reported as taken although two objects may
+        /// carry the same summary and nothing ever refused one. The creation wizard has always
+        /// used the plain input (<see cref="ObjectFormLayout.CreateSummaryInput"/>); the two
+        /// paths now agree, and the availability badge that check painted has no place on a
+        /// title bar anyway.
+        /// </para>
+        /// </remarks>
+        public ControlFormItemInputText Summary { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Object.Summary),
-            Label = _ => "kleenestar.core:object.summary.label",
             Placeholder = _ => "kleenestar.core:object.summary.placeholder",
-            Help = _ => "kleenestar.core:object.summary.help",
             Required = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.UniqueName>().ToString())};
+
+            // the framework's mark for an input that is the dialog's title: no frame, the
+            // title bar's own font, the whole width of it, the affordances on hover and focus
+            Classes = ["wx-modal-title-input"]
+        };
 
         /// <summary>
         /// Gets the input text control for specifying the description of the object. This
@@ -105,23 +127,87 @@ namespace KleeneStar.Core.WebFragment.Object
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext.Request);
             var items = BuildItems(@object, identityId);
 
-            return base.Render(renderContext, visualTree, items);
+            return TitleTheForm(base.Render(renderContext, visualTree, items), renderContext, visualTree);
         }
 
         /// <summary>
-        /// Builds the form items from the configured edit form. The system field
-        /// <see cref="Summary"/> is always emitted first; the rest of the structure is
-        /// reproduced from the form's tabs, groups, and field references by the shared
-        /// layout builder, which the creation wizard renders its last step from as well.
-        /// When no active edit form exists, only the system fields are rendered.
+        /// Puts <see cref="Summary"/> into the form's <c>header</c> section, which is what
+        /// makes it the title of the dialog the mask is opened as.
         /// </summary>
+        /// <remarks>
+        /// The header is where a form names what is being edited, and every dialog in the
+        /// framework lifts it onto its own title bar - the mask therefore says the same thing
+        /// on the page and in the dialog without knowing which of the two it is being fetched
+        /// for, which it could not know: both are the same request.
+        /// <para>
+        /// The section stays <em>inside</em> the form, so the summary is loaded with the row
+        /// and submitted with the answers like any other field; only where it is drawn
+        /// changes. The base emits a header only when a fragment contributed one, so one is
+        /// created when there is none, and it is placed ahead of the mask rather than appended
+        /// - on the page, where nothing lifts it, the name of the record belongs above it.
+        /// </para>
+        /// </remarks>
+        /// <param name="node">The rendered form.</param>
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="visualTree">The visual tree representing the control's structure.</param>
+        /// <returns>The form, with the summary on its header.</returns>
+        private IHtmlNode TitleTheForm(IHtmlNode node, IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
+        {
+            if (node is not IHtmlElement form)
+            {
+                return node;
+            }
+
+            Summary.Initialize(renderContext);
+
+            var summary = Summary.Render(renderContext, visualTree);
+            var header = form.Elements.OfType<HtmlElementSectionHeader>().FirstOrDefault();
+
+            if (header is not null)
+            {
+                // the name of the record leads whatever else a fragment put on the header
+                var contributed = header.Elements.ToList();
+                header.Clear();
+                header.Add(summary);
+                header.Add(contributed);
+
+                return form;
+            }
+
+            var children = form.Elements.ToList();
+            var main = children.OfType<HtmlElementSectionMain>().FirstOrDefault();
+
+            form.Clear();
+
+            foreach (var child in children)
+            {
+                if (child == main)
+                {
+                    form.Add(new HtmlElementSectionHeader(summary));
+                }
+
+                form.Add(child);
+            }
+
+            return form;
+        }
+
+        /// <summary>
+        /// Builds the form items from the configured edit form: the structure of the class's
+        /// edit form, reproduced from its tabs, groups, and field references by the shared
+        /// layout builder, which the creation wizard renders its last step from as well. When
+        /// no active edit form exists, only the system description is rendered.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Summary"/> is deliberately absent: it titles the record rather than
+        /// answering one of its questions, and is rendered onto the form's header by
+        /// <see cref="TitleTheForm"/>.
+        /// </remarks>
         /// <param name="object">The object the form is built for.</param>
         /// <param name="identityId">The identity the form is rendered for.</param>
         /// <returns>The form items.</returns>
         private IEnumerable<IControlFormItem> BuildItems(Model.Entities.Object @object, Guid identityId)
         {
-            yield return Summary;
-
             // the classification is reported here but never edited here: it decides who sees
             // the record, which is not part of the record's content. It is changed in the
             // dialog behind the 'security level' entry of the overflow menu - the surface that

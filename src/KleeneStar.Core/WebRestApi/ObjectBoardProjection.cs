@@ -410,21 +410,45 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Returns the address of the identity's own picture, or <see langword="null"/> when
-        /// it carries none.
+        /// Returns the address of the picture the identity actually chose, or
+        /// <see langword="null"/> when it carries none and the initials should stand.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// The initials beside this are the fallback, not the design: a board that answers a
         /// picture gets one, and only a person who has not set one is shown as two letters on
         /// a generated hue. The boards used to send the initials alone, so an identity with a
         /// portrait was still lettered on every card and backlog row while the same person
         /// appeared correctly everywhere else in the application.
+        /// </para>
+        /// <para>
+        /// <b>The generated mark is not a portrait.</b> Every identity created through the UI
+        /// or the API is given <c>CoreHub.GenerateIcon</c>, and the profile dialog restores it
+        /// when a picture is removed - so <c>Avatar</c> is virtually never null, and answering
+        /// it unconditionally would put the product star on every row and retire the initials
+        /// for everyone. The star is the same drawing for all of them, tinted from a palette
+        /// of 32, so two people out of the same bucket become indistinguishable where
+        /// <c>AU</c> and <c>MK</c> were not. The two are told apart by the file name, which is
+        /// what writes them: the generated mark is stored as <c>{id}.svg</c>
+        /// (<c>CoreHub.GenerateIcon</c>) and a real upload as
+        /// <c>{id}-{fingerprint}{extension}</c> (<c>CoreHub.StoreIcon</c>), so a picture whose
+        /// last segment is exactly the identity's id is the placeholder and nothing else is.
+        /// </para>
         /// </remarks>
         /// <param name="identity">The identity. May be null.</param>
         /// <returns>The picture address, or <see langword="null"/>.</returns>
         public static string AvatarImage(Identity identity)
         {
-            return identity?.Avatar?.Uri?.ToString();
+            var uri = identity?.Avatar?.Uri?.ToString();
+
+            if (string.IsNullOrWhiteSpace(uri))
+            {
+                return null;
+            }
+
+            return uri.EndsWith($"/{identity.Id}.svg", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : uri;
         }
 
         /// <summary>

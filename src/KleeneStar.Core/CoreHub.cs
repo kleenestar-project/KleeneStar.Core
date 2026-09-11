@@ -56,7 +56,14 @@ namespace KleeneStar.Core
         private static CommitManager _commitManager;
         private static ObjectRelationManager _objectRelationManager;
         private static ObjectRelationTypeManager _objectRelationTypeManager;
+        private static ObjectImpactManager _objectImpactManager;
+        private static ObjectProgressManager _objectProgressManager;
+        private static WorkflowGuardManager _workflowGuardManager;
+        private static WorkflowValidatorManager _workflowValidatorManager;
+        private static WorkflowPostFunctionManager _workflowPostFunctionManager;
         private static SessionManager _sessionManager;
+
+        private static WqlHistoryManager _wqlHistoryManager;
         private static NotificationCenterManager _notificationCenterManager;
         private static IdentitySessionManager _identitySessionManager;
         private static AccessTokenManager _accessTokenManager;
@@ -283,10 +290,47 @@ namespace KleeneStar.Core
         public static IObjectRelationTypeManager ObjectRelationTypeManager => _objectRelationTypeManager ??= ComponentHub.GetComponentManager<ObjectRelationTypeManager>();
 
         /// <summary>
+        /// Gets the impact manager responsible for answering what changing an object touches -
+        /// the relations of the installation walked transitively rather than one hop at a time.
+        /// </summary>
+        public static IObjectImpactManager ObjectImpactManager => _objectImpactManager ??= ComponentHub.GetComponentManager<ObjectImpactManager>();
+
+        /// <summary>
+        /// Gets the progress manager responsible for rolling the progress of an object up from
+        /// the objects it aggregates - the computed half of the relation effect
+        /// <c>AggregatesProgress</c>.
+        /// </summary>
+        public static IObjectProgressManager ObjectProgressManager => _objectProgressManager ??= ComponentHub.GetComponentManager<ObjectProgressManager>();
+
+        /// <summary>
+        /// Gets the registry of the conditions that decide whether a workflow transition may be
+        /// taken - the core's own guards plus whatever the plugins of the installation added.
+        /// </summary>
+        public static IWorkflowGuardManager WorkflowGuardManager => _workflowGuardManager ??= ComponentHub.GetComponentManager<WorkflowGuardManager>();
+
+        /// <summary>
+        /// Gets the registry of the conditions a workflow transition validates the object
+        /// against.
+        /// </summary>
+        public static IWorkflowValidatorManager WorkflowValidatorManager => _workflowValidatorManager ??= ComponentHub.GetComponentManager<WorkflowValidatorManager>();
+
+        /// <summary>
+        /// Gets the registry of the actions a workflow transition performs once it has been
+        /// applied.
+        /// </summary>
+        public static IWorkflowPostFunctionManager WorkflowPostFunctionManager => _workflowPostFunctionManager ??= ComponentHub.GetComponentManager<WorkflowPostFunctionManager>();
+
+        /// <summary>
         /// Gets the session manager responsible for per-identity session/preference
         /// entries (e.g. persisted REST API table column layouts).
         /// </summary>
         public static ISessionManager SessionManager => _sessionManager ??= ComponentHub.GetComponentManager<SessionManager>();
+
+        /// <summary>
+        /// Gets the manager of the WQL queries each identity has run, which the query
+        /// prompts offer back as their history.
+        /// </summary>
+        public static IWqlHistoryManager WqlHistoryManager => _wqlHistoryManager ??= ComponentHub.GetComponentManager<WqlHistoryManager>();
 
         /// <summary>
         /// Gets the notification-center manager responsible for the in-app notifications an

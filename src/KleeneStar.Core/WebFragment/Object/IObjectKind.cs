@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebUri;
 
@@ -57,6 +58,30 @@ namespace KleeneStar.Core.WebFragment.Object
         /// views without any work of their own.
         /// </remarks>
         string DefaultRenderer => Model.Entities.ObjectRenderer.Form;
+
+        /// <summary>
+        /// Gets the keys of the renderers this kind accepts. An <b>empty</b> collection means
+        /// every renderer that serves the kind, including renderers registered later - it is
+        /// the declaration of a kind that has no opinion beyond what the renderers themselves
+        /// say.
+        /// </summary>
+        /// <remarks>
+        /// This is the counterpart of <see cref="IObjectRenderer.Kinds"/>, and a renderer is
+        /// offered only where <em>both</em> sides say so. The two exist because the two
+        /// statements are genuinely different ones: a renderer knows which kinds it is capable
+        /// of drawing, while a kind knows which of them it is willing to be read through -
+        /// prose declines the issue kind because it has no body to write, and the blog kind
+        /// declines the mask because a post is prose by definition. Neither could be expressed
+        /// from the other side without the universal renderers having to enumerate every kind
+        /// that ever exists, which is exactly what the empty collection is there to avoid.
+        /// <para>
+        /// A kind that names renderers is a closed list, so a renderer an add-on contributes
+        /// later is <em>not</em> offered on it until the kind names that too - which is the
+        /// point of naming any: the restriction has to survive the arrival of surfaces its
+        /// author never saw.
+        /// </para>
+        /// </remarks>
+        IEnumerable<string> Renderers => [];
 
         /// <summary>
         /// Gets the unbound route of the kind's overview page. The route carries the

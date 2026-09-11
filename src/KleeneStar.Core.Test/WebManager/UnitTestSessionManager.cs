@@ -1,5 +1,6 @@
-using KleeneStar.Core.Test;
+﻿using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebRestApi;
@@ -19,10 +20,13 @@ namespace KleeneStar.Core.Test.WebManager
 
         /// <summary>
         /// Seeds the in-memory database with a single identity that owns the
-        /// session entries created by each test case.
+        /// session entries created by each test case, and begins acting as it - the
+        /// request-less overloads read the acting identity, which a request would otherwise
+        /// have named.
         /// </summary>
         /// <param name="connectionString">The per-test in-memory database name.</param>
-        private static void Seed(string connectionString)
+        /// <returns>The acting scope; closing it stops acting as that identity.</returns>
+        private static IDisposable Seed(string connectionString)
         {
             CoreHubFixture.Initialize(connectionString);
 
@@ -40,6 +44,8 @@ namespace KleeneStar.Core.Test.WebManager
             }
 
             db.SaveChanges();
+
+            return CoreHub.SessionManager.BeginIdentity(OwnerId);
         }
 
         /// <summary>
@@ -49,7 +55,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void SetValue_Then_GetValue_RoundTrip()
         {
-            Seed(nameof(SetValue_Then_GetValue_RoundTrip));
+            using var acting = Seed(nameof(SetValue_Then_GetValue_RoundTrip));
 
             CoreHub.SessionManager.SetValue(OwnerId, Scope, "MyTable", "{\"x\":1}");
 
@@ -65,7 +71,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void GetValue_Missing_ReturnsNull()
         {
-            Seed(nameof(GetValue_Missing_ReturnsNull));
+            using var acting = Seed(nameof(GetValue_Missing_ReturnsNull));
 
             var value = CoreHub.SessionManager.GetValue(OwnerId, Scope, "Unknown");
 
@@ -80,7 +86,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void SetValue_Twice_OverwritesPrevious()
         {
-            Seed(nameof(SetValue_Twice_OverwritesPrevious));
+            using var acting = Seed(nameof(SetValue_Twice_OverwritesPrevious));
 
             CoreHub.SessionManager.SetValue(OwnerId, Scope, "MyTable", "first");
             CoreHub.SessionManager.SetValue(OwnerId, Scope, "MyTable", "second");
@@ -97,7 +103,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void SetValue_Null_DeletesEntry()
         {
-            Seed(nameof(SetValue_Null_DeletesEntry));
+            using var acting = Seed(nameof(SetValue_Null_DeletesEntry));
 
             CoreHub.SessionManager.SetValue(OwnerId, Scope, "MyTable", "payload");
             CoreHub.SessionManager.SetValue(OwnerId, Scope, "MyTable", null);
@@ -115,7 +121,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void SetTableLayout_Then_GetTableLayout_RoundTrip()
         {
-            Seed(nameof(SetTableLayout_Then_GetTableLayout_RoundTrip));
+            using var acting = Seed(nameof(SetTableLayout_Then_GetTableLayout_RoundTrip));
 
             const string tableKey = "MyNamespace.MyTable";
             var columns = new[]
@@ -145,7 +151,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ApplyStoredTableLayout_ReordersAndAppliesWidthAndVisibility()
         {
-            Seed(nameof(ApplyStoredTableLayout_ReordersAndAppliesWidthAndVisibility));
+            using var acting = Seed(nameof(ApplyStoredTableLayout_ReordersAndAppliesWidthAndVisibility));
 
             const string tableKey = "MyNamespace.MyTable";
             var defaults = new[]
@@ -194,7 +200,7 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ApplyStoredTableLayout_NothingStored_ReturnsDefaults()
         {
-            Seed(nameof(ApplyStoredTableLayout_NothingStored_ReturnsDefaults));
+            using var acting = Seed(nameof(ApplyStoredTableLayout_NothingStored_ReturnsDefaults));
 
             var defaults = new[]
             {
@@ -219,13 +225,82 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void GetValue_DifferentScope_DoesNotLeak()
         {
-            Seed(nameof(GetValue_DifferentScope_DoesNotLeak));
+            using var acting = Seed(nameof(GetValue_DifferentScope_DoesNotLeak));
 
             CoreHub.SessionManager.SetValue(OwnerId, "scope-a", "shared-key", "a");
             CoreHub.SessionManager.SetValue(OwnerId, "scope-b", "shared-key", "b");
 
             Assert.Equal("a", CoreHub.SessionManager.GetValue(OwnerId, "scope-a", "shared-key"));
             Assert.Equal("b", CoreHub.SessionManager.GetValue(OwnerId, "scope-b", "shared-key"));
+        }
+
+        /// <summary>
+        /// Verifies the identity a request-less caller is answered with: the one the enclosing
+        /// scope acts as, and nobody at all outside every scope.
+        /// </summary>
+        /// <remarks>
+        /// This is what a notification raised deep inside a manager, or an audit event nobody
+        /// named an actor for, is attributed to. Answering <see cref="Guid.Empty"/> outside a
+        /// scope is the point: it used to answer with the seeded administrator, which turned
+        /// "nobody knows who did this" into a statement about a real person.
+        /// </remarks>
+        [Fact]
+        public void GetCurrentIdentityId_WithoutRequest_FollowsTheActingScope()
+        {
+            using var acting = Seed(nameof(GetCurrentIdentityId_WithoutRequest_FollowsTheActingScope));
+
+            Assert.Equal(OwnerId, CoreHub.SessionManager.GetCurrentIdentityId(null));
+
+            acting.Dispose();
+
+            Assert.Equal(Guid.Empty, CoreHub.SessionManager.GetCurrentIdentityId(null));
+        }
+
+        /// <summary>
+        /// Verifies that acting scopes nest and put back what they found, so a scope may be
+        /// opened without knowing what its caller did - and that acting as nobody is a
+        /// statement of its own rather than a way of keeping the enclosing identity.
+        /// </summary>
+        [Fact]
+        public void BeginIdentity_NestsAndRestores()
+        {
+            using var acting = Seed(nameof(BeginIdentity_NestsAndRestores));
+
+            var other = Guid.Parse("BB223344-5566-7788-99AA-BBCCDDEEFF00");
+
+            using (CoreHub.SessionManager.BeginIdentity(other))
+            {
+                Assert.Equal(other, CoreHub.SessionManager.GetCurrentIdentityId(null));
+
+                using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
+                {
+                    Assert.Equal(Guid.Empty, CoreHub.SessionManager.GetCurrentIdentityId(null));
+                }
+
+                Assert.Equal(other, CoreHub.SessionManager.GetCurrentIdentityId(null));
+            }
+
+            Assert.Equal(OwnerId, CoreHub.SessionManager.GetCurrentIdentityId(null));
+        }
+
+        /// <summary>
+        /// Verifies that a preference written for nobody is not written at all: the
+        /// convenience overloads resolve the identity first, and there is no row to own the
+        /// entry when that answers nobody.
+        /// </summary>
+        [Fact]
+        public void SetValue_WithoutAnIdentity_WritesNothing()
+        {
+            using var acting = Seed(nameof(SetValue_WithoutAnIdentity_WritesNothing));
+
+            using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
+            {
+                CoreHub.SessionManager.SetValue(null, Scope, "MyTable", "[]");
+
+                Assert.Null(CoreHub.SessionManager.GetValue(null, Scope, "MyTable"));
+            }
+
+            Assert.Null(CoreHub.SessionManager.GetValue(OwnerId, Scope, "MyTable"));
         }
     }
 }
