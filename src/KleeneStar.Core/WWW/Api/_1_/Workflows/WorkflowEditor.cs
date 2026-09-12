@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebWorkflow;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
@@ -17,6 +19,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
     /// Supports retrieval of workflow structure including states and transitions
     /// for the visual workflow editor control.
     /// </summary>
+    /// <remarks>
+    /// The rules a transition carries - its guards, validators and post functions - are
+    /// configured here as well. The catalogs offered in the editor's pickers are the rules the
+    /// <see cref="CoreHub.WorkflowGuardManager"/>, <see cref="CoreHub.WorkflowValidatorManager"/>
+    /// and <see cref="CoreHub.WorkflowPostFunctionManager"/> registries know, and what the editor
+    /// lists on a transition is written back as the expressions <see cref="WebManager.WorkflowManager"/>
+    /// evaluates (<see cref="Transition.GuardExpression"/>, <see cref="Transition.ValidatorExpression"/>,
+    /// <see cref="Transition.PostFunctionKeys"/>). The rule <em>key</em> travels in the entry's
+    /// <c>type</c>, because that is the one field the editor preserves from a picked catalog
+    /// entry; the label is only shown.
+    /// </remarks>
     [Title("Workflow editor")]
     public sealed class WorkflowEditor : RestApiWorkflow
     {
@@ -374,6 +387,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                     current.Color = transition.Color;
                     current.DashArray = transition.DashArray;
                     current.Waypoints = ToWaypoints(transition.Waypoints);
+                    current.GuardExpression = ToExpression(transition.Guards?.Select(x => RuleKey(x?.Type)), current.GuardExpression);
+                    current.ValidatorExpression = ToExpression(transition.Validators?.Select(x => RuleKey(x?.Type)), current.ValidatorExpression);
+                    current.PostFunctionKeys = ToKeys(transition.PostFunctions?.Select(x => RuleKey(x?.Type)));
                     current.Updated = timestamp;
 
                     continue;
@@ -391,6 +407,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                     Color = transition.Color,
                     DashArray = transition.DashArray,
                     Waypoints = ToWaypoints(transition.Waypoints),
+                    GuardExpression = ToExpression(transition.Guards?.Select(x => RuleKey(x?.Type)), null),
+                    ValidatorExpression = ToExpression(transition.Validators?.Select(x => RuleKey(x?.Type)), null),
+                    PostFunctionKeys = ToKeys(transition.PostFunctions?.Select(x => RuleKey(x?.Type))),
                     Created = timestamp,
                     Updated = timestamp
                 };
@@ -536,8 +555,135 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                 DashArray = t.DashArray,
                 Waypoints = t.Waypoints?
                     .Select(w => new RestApiWorkflowWaypoint() { X = w.X, Y = w.Y })
+                    .ToList(),
+                Guards = Terms(t.GuardExpression)
+                    .Select(key => new RestApiWorkflowGuard { Id = key, Type = key, Label = RuleLabel(CoreHub.WorkflowGuardManager?.Get(key), key, request) })
+                    .ToList(),
+                Validators = Terms(t.ValidatorExpression)
+                    .Select(key => new RestApiWorkflowValidator { Id = key, Type = key, Label = RuleLabel(CoreHub.WorkflowValidatorManager?.Get(key), key, request) })
+                    .ToList(),
+                PostFunctions = ToKeys(t.PostFunctionKeys)
+                    .Select(key => new RestApiWorkflowPostFunction { Id = key, Type = key, Label = RuleLabel(CoreHub.WorkflowPostFunctionManager?.Get(key), key, request) })
                     .ToList()
             });
+        }
+
+        /// <summary>
+        /// Reads the distinct terms of a rule expression, in order of appearance, regardless of
+        /// how they are grouped.
+        /// </summary>
+        /// <remarks>
+        /// The editor lists a transition's rules as one flat list, so a disjunction written by
+        /// hand (<c>a;b|c</c>) is shown as the rules it mentions. <see cref="ToExpression"/> keeps
+        /// such an expression as long as the list is not edited.
+        /// </remarks>
+        /// <param name="expression">The stored expression.</param>
+        /// <returns>The keys the expression mentions.</returns>
+        private static List<string> Terms(string expression)
+        {
+            return [.. WorkflowExpression.Parse(expression)
+                .SelectMany(group => group)
+                .Distinct(StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <summary>
+        /// Writes the rule keys the editor lists on a transition as the expression the workflow
+        /// evaluates: one conjunction, because a list of rules means all of them.
+        /// </summary>
+        /// <remarks>
+        /// An expression the editor cannot express - a disjunction of several groups - is kept
+        /// as it is while the list it was shown as is unchanged, so opening a transition in the
+        /// editor does not flatten what an administrator wrote by other means.
+        /// </remarks>
+        /// <param name="keys">The keys as posted, or <see langword="null"/> when the payload
+        /// carries no list.</param>
+        /// <param name="stored">The expression currently stored.</param>
+        /// <returns>The expression to store; <see langword="null"/> for an empty list.</returns>
+        internal static string ToExpression(IEnumerable<string> keys, string stored)
+        {
+            var wanted = ToKeys(keys);
+
+            if (wanted.Count == 0)
+            {
+                return null;
+            }
+
+            var current = Terms(stored);
+
+            if (current.Count == wanted.Count && !current.Except(wanted, StringComparer.OrdinalIgnoreCase).Any())
+            {
+                return stored;
+            }
+
+            return WorkflowExpression.Serialize([wanted]);
+        }
+
+        /// <summary>
+        /// Normalizes a list of rule keys: trimmed, non-empty, distinct, in the order given.
+        /// </summary>
+        /// <param name="keys">The keys, or <see langword="null"/>.</param>
+        /// <returns>The keys, never <see langword="null"/>.</returns>
+        internal static List<string> ToKeys(IEnumerable<string> keys)
+        {
+            return [.. (keys ?? [])
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <summary>
+        /// Reads the rule key out of a rule entry the editor posted.
+        /// </summary>
+        /// <remarks>
+        /// A picked catalog entry keeps the catalog's <c>type</c>, which is where the key is
+        /// served. The <c>id</c> is the editor's own - <c>validators_1731…</c> - and is never
+        /// read as a key: an entry without a type names no rule, and storing an editor id as
+        /// one would block the transition on a rule that does not exist.
+        /// </remarks>
+        /// <param name="type">The entry's type.</param>
+        /// <returns>The key, or <see langword="null"/> when the entry names none.</returns>
+        private static string RuleKey(string type)
+        {
+            return string.IsNullOrWhiteSpace(type) ? null : type.Trim();
+        }
+
+        /// <summary>
+        /// Resolves the label a rule is shown under: its translated label, or its key when the
+        /// rule is not registered - so a transition that names a rule of an uninstalled plugin
+        /// still shows which one.
+        /// </summary>
+        /// <param name="rule">The rule, or <see langword="null"/>.</param>
+        /// <param name="key">The key the rule was addressed by.</param>
+        /// <param name="request">The request, for the culture.</param>
+        /// <returns>The label.</returns>
+        private static string RuleLabel(IWorkflowRule rule, string key, IRequest request)
+        {
+            if (rule is null || string.IsNullOrWhiteSpace(rule.Label))
+            {
+                return key;
+            }
+
+            return request is null ? rule.Label : I18N.Translate(request, rule.Label);
+        }
+
+        /// <summary>
+        /// Projects the registered rules of one kind onto the editor's catalog entries, in the
+        /// order the rules ask to be listed.
+        /// </summary>
+        /// <typeparam name="TRule">The kind of rule.</typeparam>
+        /// <typeparam name="TItem">The catalog entry type.</typeparam>
+        /// <param name="rules">The registered rules.</param>
+        /// <param name="request">The request, for the culture.</param>
+        /// <param name="create">Builds an entry from a key and a label.</param>
+        /// <returns>The catalog.</returns>
+        private static List<TItem> Catalog<TRule, TItem>(IEnumerable<TRule> rules, IRequest request, Func<string, string, TItem> create)
+            where TRule : IWorkflowRule
+        {
+            return [.. (rules ?? [])
+                .Where(x => x is not null && !string.IsNullOrWhiteSpace(x.Key))
+                .OrderBy(x => x.Order)
+                .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(x => create(x.Key, RuleLabel(x, x.Key, request)))];
         }
 
         /// <summary>
@@ -558,8 +704,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         /// </returns>
         protected override IEnumerable<RestApiWorkflowValidator> RetrieveValidations(string workflowId, IQueryContext context, IRequest request)
         {
-            // return empty by default
-            return [];
+            return Catalog
+            (
+                CoreHub.WorkflowValidatorManager?.Rules,
+                request,
+                (key, label) => new RestApiWorkflowValidator { Id = key, Type = key, Label = label }
+            );
         }
 
         /// <summary>
@@ -580,8 +730,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         /// </returns>
         protected override IEnumerable<RestApiWorkflowPostFunction> RetrievePostFunctions(string workflowId, IQueryContext context, IRequest request)
         {
-            // return empty by default
-            return [];
+            return Catalog
+            (
+                CoreHub.WorkflowPostFunctionManager?.Rules,
+                request,
+                (key, label) => new RestApiWorkflowPostFunction { Id = key, Type = key, Label = label }
+            );
         }
 
         /// <summary>
@@ -602,8 +756,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         /// </returns>
         protected override IEnumerable<RestApiWorkflowGuard> RetrieveGuards(string workflowId, IQueryContext context, IRequest request)
         {
-            // return empty by default
-            return [];
+            return Catalog
+            (
+                CoreHub.WorkflowGuardManager?.Rules,
+                request,
+                (key, label) => new RestApiWorkflowGuard { Id = key, Type = key, Label = label }
+            );
         }
     }
 }

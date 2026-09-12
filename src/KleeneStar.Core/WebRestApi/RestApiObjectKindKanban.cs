@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -26,6 +27,14 @@ namespace KleeneStar.Core.WebRestApi
     /// active object of the <see cref="Kind"/> becomes a card placed by its workflow-field
     /// value. A concrete subclass only fixes the kind it lists (issue, asset, …); each
     /// concrete endpoint registers at its own route, so the base must stay abstract.
+    /// <para>
+    /// The board filter (<see cref="KanbanBoard.Filter"/>, a WQL expression over the object)
+    /// narrows what the board is made of: the cards, the classes that populate the default
+    /// swimlanes and the objects that decide whether a customized board needs its "Other"
+    /// swimlane are all read through <see cref="Narrow"/>, so the board never shows a lane
+    /// for an object it does not show a card for. A filter the request carries wins over the
+    /// stored one, which is how the settings dialog previews what it is about to store.
+    /// </para>
     /// </summary>
     public abstract class RestApiObjectKindKanban : RestApiKanban<Model.Entities.Object>
     {
@@ -70,6 +79,40 @@ namespace KleeneStar.Core.WebRestApi
         protected override IQueryContext CreateContext()
         {
             return ModelHub.CreateDbContext();
+        }
+
+        /// <summary>
+        /// Leaves the query alone: the board filter is applied in memory by <see cref="Narrow"/>,
+        /// beside the quickfilter and the sprint scope, because the swimlane population is read
+        /// without a query and has to see the same objects the cards do - and because an
+        /// expression the store cannot translate must narrow the board rather than fail it.
+        /// </summary>
+        /// <param name="wql">The effective WQL filter.</param>
+        /// <param name="query">The card query.</param>
+        /// <param name="request">The request that provides the operational context.</param>
+        /// <returns>The query, unchanged.</returns>
+        protected override IQuery<Model.Entities.Object> ApplyWql(string wql, IQuery<Model.Entities.Object> query, IRequest request)
+        {
+            return query;
+        }
+
+        /// <summary>
+        /// Applies everything that decides which objects the board is made of, in one place:
+        /// the sprint scope, the kind's quickfilter and the board filter.
+        /// </summary>
+        /// <param name="objects">The active objects of the kind in the workspace.</param>
+        /// <param name="sprintId">The sprint to scope to, or <see langword="null"/>.</param>
+        /// <param name="request">The request that provides the operational context.</param>
+        /// <returns>The objects the board shows.</returns>
+        private IEnumerable<Model.Entities.Object> Narrow(IEnumerable<Model.Entities.Object> objects, Guid? sprintId, IRequest request)
+        {
+            objects = objects
+                .Where(x => x.State == WorkspaceState.Active)
+                .Where(x => sprintId is null || x.SprintId == sprintId);
+
+            objects = ApplyQuickfilter(objects, request);
+
+            return WqlFilter.Apply(RetrieveFilter(request?.GetParameter("wql")?.Value, request), objects);
         }
 
         /// <summary>
@@ -231,10 +274,7 @@ namespace KleeneStar.Core.WebRestApi
                 .WhereEquals(x => x.WorkspaceId, workspace.Id)
                 .WhereEquals(x => x.Kind, Kind);
 
-            var cards = CoreHub.ObjectManager.GetObjects(query, context)
-                .Where(x => x.State == WorkspaceState.Active)
-                .Where(x => sprintId is null || x.SprintId == sprintId);
-            cards = ApplyQuickfilter(cards, request);
+            var cards = Narrow(CoreHub.ObjectManager.GetObjects(query, context), sprintId, request);
 
             foreach (var entity in cards)
             {
@@ -379,14 +419,21 @@ namespace KleeneStar.Core.WebRestApi
 
         /// <summary>
         /// Persists the board-level WQL filter submitted through the board settings dialog. The
-        /// filter is echoed back on the next load; it is not yet applied to narrow the card
-        /// query (no WQL query engine is wired up for object boards).
+        /// filter narrows the board from the next load on (see <see cref="Narrow"/>); a blank
+        /// one clears it.
         /// </summary>
+        /// <remarks>
+        /// An expression that does not compile against the object is refused here, at the
+        /// moment it is written, rather than being stored and silently ignored on every read:
+        /// a board that quietly shows everything is worse than a dialog that says why it
+        /// cannot save. The refusal reaches the client as a 400 carrying the parser's reason.
+        /// </remarks>
         /// <param name="layout">
         /// The layout payload whose <see cref="RestApiDashboardLayout.Filter"/> carries the
         /// submitted WQL filter.
         /// </param>
         /// <param name="request">The current HTTP request. Cannot be null.</param>
+        /// <exception cref="ArgumentException">The filter does not compile.</exception>
         protected override void UpdateSettings(RestApiDashboardLayout layout, IRequest request)
         {
             var workspace = GetWorkspace(request);
@@ -396,9 +443,16 @@ namespace KleeneStar.Core.WebRestApi
                 return;
             }
 
+            var filter = string.IsNullOrWhiteSpace(layout?.Filter) ? null : layout.Filter.Trim();
+
+            if (!WqlFilter.TryValidate<Model.Entities.Object>(filter, out var error))
+            {
+                throw new ArgumentException($"The board filter is not a valid WQL expression: {error}");
+            }
+
             var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);
 
-            CoreHub.KanbanBoardManager.SetFilter(board.Id, layout?.Filter);
+            CoreHub.KanbanBoardManager.SetFilter(board.Id, filter);
         }
 
         /// <summary>
@@ -543,11 +597,7 @@ namespace KleeneStar.Core.WebRestApi
                 .WhereEquals(x => x.WorkspaceId, workspaceId)
                 .WhereEquals(x => x.Kind, Kind);
 
-            var objects = CoreHub.ObjectManager.GetObjects(query)
-                .Where(x => x.State == WorkspaceState.Active)
-                .Where(x => sprintId is null || x.SprintId == sprintId);
-
-            return ApplyQuickfilter(objects, request);
+            return Narrow(CoreHub.ObjectManager.GetObjects(query), sprintId, request);
         }
 
         /// <summary>

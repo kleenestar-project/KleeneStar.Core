@@ -272,11 +272,12 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <remarks>
         /// The stages run in the order the workflow concept prescribes: guard, validator, apply,
-        /// post function. Transition-level guards, validators and post functions are not part of
-        /// the data model yet — <see cref="Transition"/> carries no rule collections — so those
-        /// stages resolve an empty configuration and pass. The reachability check and the
-        /// built-in post function (stamping the updater and raising
-        /// <see cref="TransitionExecuted"/>) always run.
+        /// post function. The configured rules are read off the transition
+        /// (<see cref="Transition.GuardExpression"/>, <see cref="Transition.ValidatorExpression"/>,
+        /// <see cref="Transition.PostFunctionKeys"/>, written by the workflow editor) and resolved
+        /// against the rule registries; a transition that carries none passes those stages. The
+        /// reachability check, the relation guard and the built-in post function (stamping the
+        /// updater and raising <see cref="TransitionExecuted"/>) always run.
         /// </remarks>
         /// <param name="objectId">The id of the object whose state changes.</param>
         /// <param name="fieldId">The id of the workflow-backed field carrying the state.</param>

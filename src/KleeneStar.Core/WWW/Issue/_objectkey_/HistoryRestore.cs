@@ -1,6 +1,8 @@
 ﻿using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using System;
 using System.Globalization;
 using WebExpress.WebApp.WebPage;
@@ -26,17 +28,17 @@ namespace KleeneStar.Core.WWW.Issue._objectkey_
     /// Nothing is rewound: <see cref="ICommitManager.RestoreCommit"/> appends a new commit of type
     /// <c>Restored</c> describing what it wrote, so the chain still reads forward.
     /// </para>
+    /// <para>
+    /// The grant this page needs is <c>object_restore_state</c>. It is demanded in
+    /// <see cref="Process"/> through <see cref="PageAuthorization"/> rather than by a page-level
+    /// policy attribute (which asks the framework's global group question, not this
+    /// application's - see the remarks there): the button in the history dialog is only the
+    /// offer, and a caller who types the address must be refused by the page itself.
+    /// </para>
     /// </remarks>
     [WebIcon<IconArrowRotateLeft>]
     [Title("kleenestar.core:object.history.restore.title")]
     [Scope<IScopeGeneral>]
-    // the grant this page needs is object_restore_state, carried by ObjectEditPolicy. It is left
-    // inactive here for the same reason every other page-level policy in this application is
-    // (see Workspaces/Index.cs and siblings): page-level gating rejects every request while the
-    // identity flow does not yet put an authenticated user on it, and the page would answer an
-    // empty document rather than act. The gate that does work today sits on
-    // ObjectHistoryRestoreFragment, which is what offers the button.
-    //[Policy<ObjectEditPolicy>]
     public sealed class HistoryRestore : IPage<VisualTreeWebApp>, IScope
     {
         private readonly IObjectManager _objectManager;
@@ -65,6 +67,14 @@ namespace KleeneStar.Core.WWW.Issue._objectkey_
 
             if (@object is not null)
             {
+                // refused before anything is written: the redirect this throws ends the page
+                PageAuthorization.Demand
+                (
+                    renderContext.Request,
+                    typeof(ObjectRestoreStatePermission),
+                    PageAuthorization.ChainOf(@object)
+                );
+
                 Restore(@object, renderContext);
             }
 

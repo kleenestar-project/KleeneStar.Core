@@ -10,7 +10,6 @@ using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex;
 using WebExpress.WebIndex.Queries;
-using WebExpress.WebIndex.Wql;
 using WebExpress.WebUI.WebIcon;
 
 namespace KleeneStar.Core.WebQuickfilter
@@ -352,9 +351,8 @@ namespace KleeneStar.Core.WebQuickfilter
         /// Turns a WQL expression into a condition.
         /// </summary>
         /// <remarks>
-        /// The statement's own <c>ToQuery</c> starts from an empty query and would drop everything
-        /// applied so far, so only its filter condition is taken and left to the caller to add to
-        /// whatever it is already narrowing.
+        /// The board filters compile the same way (<see cref="WqlFilter"/>), so a stored
+        /// expression means the same thing wherever it is applied.
         /// </remarks>
         /// <typeparam name="TIndexItem">The type the view lists.</typeparam>
         /// <param name="wql">The expression to compile.</param>
@@ -364,30 +362,7 @@ namespace KleeneStar.Core.WebQuickfilter
         private static Expression<Func<TIndexItem, bool>> Compile<TIndexItem>(string wql)
             where TIndexItem : IIndexItem
         {
-            if (string.IsNullOrWhiteSpace(wql))
-            {
-                return null;
-            }
-
-            try
-            {
-                var statement = new WqlParser<TIndexItem>().Parse(wql);
-
-                if (statement is null || statement.HasErrors || statement.Filter is null)
-                {
-                    return null;
-                }
-
-                var param = Expression.Parameter(typeof(TIndexItem), "x");
-                var body = statement.Filter.ToExpression(param);
-
-                return Expression.Lambda<Func<TIndexItem, bool>>(body, param);
-            }
-            catch
-            {
-                // a stored expression that no longer parses must not take the whole view down
-                return null;
-            }
+            return WqlFilter.Compile<TIndexItem>(wql);
         }
     }
 }

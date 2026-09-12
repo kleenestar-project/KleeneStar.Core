@@ -1,5 +1,7 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using KleeneStar.Core.WebPolicies;
 using System;
 using System.Globalization;
@@ -29,7 +31,9 @@ namespace KleeneStar.Core.WebFragment.Object
     /// while the revision beside it carries the view policy: reading a history and writing one of
     /// its states back are different grants (<c>object_read_history</c> against
     /// <c>object_restore_state</c>), and a user holding only the first must see the revision
-    /// without being offered a way to reapply it.
+    /// without being offered a way to reapply it. The policy attribute documents that; what
+    /// withholds the button is the same <see cref="PageAuthorization"/> question the restore
+    /// page asks, so the offer and the act cannot disagree.
     /// </remarks>
     [Section<SectionContentSecondary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.HistoryDetail>]
@@ -72,6 +76,12 @@ namespace KleeneStar.Core.WebFragment.Object
             var commit = @object is null ? null : Resolve(@object, renderContext);
 
             if (commit is null)
+            {
+                return null;
+            }
+
+            // a caller the restore page would refuse is not offered the button
+            if (!PageAuthorization.IsGranted(renderContext?.Request, typeof(ObjectRestoreStatePermission), PageAuthorization.ChainOf(@object)))
             {
                 return null;
             }
