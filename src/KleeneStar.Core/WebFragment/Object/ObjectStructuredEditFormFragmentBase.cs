@@ -35,9 +35,15 @@ namespace KleeneStar.Core.WebFragment.Object
     /// of its answers, so it is rendered into the form's <c>header</c>. Opened as a dialog -
     /// which is how an issue and an asset are edited - the framework lifts that header onto
     /// the dialog's title bar, so the record is titled by its own summary instead of by a
-    /// generic caption, exactly as the prose editor titles a document. The classification is
-    /// reported through <see cref="ObjectFormLayout.CreateSecurityLevelNotice"/> but never
-    /// edited here - who may see the record is not part of the record's content.
+    /// generic caption, exactly as the prose editor titles a document.
+    /// </para>
+    /// <para>
+    /// The classification is neither edited nor mentioned here. Who may see the record is
+    /// not part of the record's content, and it is set in its own dialog behind the
+    /// <em>security level</em> entry of the overflow menu; the notice
+    /// <see cref="ObjectFormLayout.CreateSecurityLevelNotice"/> writes for the creation
+    /// wizard and the clone form has nothing to say on an edit, because an edit never
+    /// changes the level - the record the caller opened stays where it is.
     /// </para>
     /// </remarks>
     public abstract class ObjectStructuredEditFormFragmentBase : FragmentControlDataFormEdit
@@ -71,7 +77,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             // the framework's mark for an input that is the dialog's title: no frame, the
             // title bar's own font, the whole width of it, the affordances on hover and focus
-            Classes = ["wx-modal-title-input"]
+            Classes = [FormTitleInput.Mark]
         };
 
         /// <summary>
@@ -124,72 +130,11 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             var keyParam = renderContext.Request.GetParameter<ObjectKeyParameter>();
             var @object = CoreHub.ObjectManager.GetObjectByKey(keyParam);
-            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext.Request);
-            var items = BuildItems(@object, identityId);
+            var items = BuildItems(@object);
 
-            return TitleTheForm(base.Render(renderContext, visualTree, items), renderContext, visualTree);
-        }
-
-        /// <summary>
-        /// Puts <see cref="Summary"/> into the form's <c>header</c> section, which is what
-        /// makes it the title of the dialog the mask is opened as.
-        /// </summary>
-        /// <remarks>
-        /// The header is where a form names what is being edited, and every dialog in the
-        /// framework lifts it onto its own title bar - the mask therefore says the same thing
-        /// on the page and in the dialog without knowing which of the two it is being fetched
-        /// for, which it could not know: both are the same request.
-        /// <para>
-        /// The section stays <em>inside</em> the form, so the summary is loaded with the row
-        /// and submitted with the answers like any other field; only where it is drawn
-        /// changes. The base emits a header only when a fragment contributed one, so one is
-        /// created when there is none, and it is placed ahead of the mask rather than appended
-        /// - on the page, where nothing lifts it, the name of the record belongs above it.
-        /// </para>
-        /// </remarks>
-        /// <param name="node">The rendered form.</param>
-        /// <param name="renderContext">The context in which the control is rendered.</param>
-        /// <param name="visualTree">The visual tree representing the control's structure.</param>
-        /// <returns>The form, with the summary on its header.</returns>
-        private IHtmlNode TitleTheForm(IHtmlNode node, IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
-        {
-            if (node is not IHtmlElement form)
-            {
-                return node;
-            }
-
-            Summary.Initialize(renderContext);
-
-            var summary = Summary.Render(renderContext, visualTree);
-            var header = form.Elements.OfType<HtmlElementSectionHeader>().FirstOrDefault();
-
-            if (header is not null)
-            {
-                // the name of the record leads whatever else a fragment put on the header
-                var contributed = header.Elements.ToList();
-                header.Clear();
-                header.Add(summary);
-                header.Add(contributed);
-
-                return form;
-            }
-
-            var children = form.Elements.ToList();
-            var main = children.OfType<HtmlElementSectionMain>().FirstOrDefault();
-
-            form.Clear();
-
-            foreach (var child in children)
-            {
-                if (child == main)
-                {
-                    form.Add(new HtmlElementSectionHeader(summary));
-                }
-
-                form.Add(child);
-            }
-
-            return form;
+            // the summary titles the form: it goes onto the header, which the dialog lifts
+            // onto its title bar, rather than among the answers of the mask
+            return FormTitleInput.Place(base.Render(renderContext, visualTree, items), Summary, renderContext, visualTree);
         }
 
         /// <summary>
@@ -201,26 +146,12 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <remarks>
         /// <see cref="Summary"/> is deliberately absent: it titles the record rather than
         /// answering one of its questions, and is rendered onto the form's header by
-        /// <see cref="TitleTheForm"/>.
+        /// <see cref="FormTitleInput"/>.
         /// </remarks>
         /// <param name="object">The object the form is built for.</param>
-        /// <param name="identityId">The identity the form is rendered for.</param>
         /// <returns>The form items.</returns>
-        private IEnumerable<IControlFormItem> BuildItems(Model.Entities.Object @object, Guid identityId)
+        private IEnumerable<IControlFormItem> BuildItems(Model.Entities.Object @object)
         {
-            // the classification is reported here but never edited here: it decides who sees
-            // the record, which is not part of the record's content. It is changed in the
-            // dialog behind the 'security level' entry of the overflow menu - the surface that
-            // replaced the object's permission dialog
-            var notice = @object is not null
-                ? ObjectFormLayout.CreateSecurityLevelNotice(@object.ClassId, identityId, @object.SecurityLevelId)
-                : null;
-
-            if (notice is not null)
-            {
-                yield return notice;
-            }
-
             var form = @object is not null
                 ? ObjectFormLayout.ResolveStandardForm(@object.ClassId, FormType.Edit)
                 : null;

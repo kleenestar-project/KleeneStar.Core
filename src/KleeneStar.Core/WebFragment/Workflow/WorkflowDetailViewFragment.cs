@@ -38,11 +38,15 @@ namespace KleeneStar.Core.WebFragment.Workflow
             Grid = _ => 20;
             GridSnap = _ => true;
 
-            // the editor needs a definite height and defaults to 600px. Measuring against the
-            // viewport rather than the parent gives the designer the room it wants without
-            // depending on an unbroken chain of parent heights; the control's own min-height
-            // keeps it usable on a short viewport.
-            Styles = ["--wx-we-host-height: calc(100vh - 260px);"];
+            // the designer is the whole page rather than a block among others, so it takes
+            // the height the content region offers instead of bringing one of its own: the
+            // canvas and the properties pane then end where the pane does, and scroll on
+            // their own, rather than leaving the rest of the page empty below a fixed frame.
+            // The viewport arithmetic this used to be (100vh minus a guessed chrome height)
+            // was never applied anyway - the rule it fed was keyed on the controller class,
+            // which is stripped at mount - and would have drifted with every change of the
+            // header above it
+            Fill = _ => true;
         }
 
         /// <summary>

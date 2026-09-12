@@ -4,8 +4,10 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebMessage;
@@ -77,6 +79,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
                 Visible = true
             };
 
+            // the object type decides in which overview the objects of a class appear, which
+            // is the one fact about a class a reader scans the list for; it is drawn as a chip
+            // so the four or five words the catalog knows read as a category rather than as
+            // one more column of prose
+            yield return new RestApiTableColumn()
+            {
+                Id = "kind",
+                Label = I18N.Translate(request, "kleenestar.core:class.kind.label"),
+                Visible = true,
+                Template = new RestApiTableColumnTemplateTag()
+            };
+
             yield return new RestApiTableColumn()
             {
                 Id = "state",
@@ -129,6 +143,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
                             Content = x.Description
                         },
                         new() {
+                            Content = ResolveKindLabel(x, request)
+                        },
+                        new() {
                             Content = x.State.ToString()
                         }
                     ],
@@ -136,6 +153,28 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
                     Uri = GetUri(x, request)?.ToString(),
                     Image = x.Icon?.Uri?.ToString()
                 });
+        }
+
+        /// <summary>
+        /// Resolves the chip a class is shown under in the object type column: the label of
+        /// the registered kind, translated for the request, or the stored key itself when no
+        /// kind of that key is registered - the key of an uninstalled add-on is still worth
+        /// reading, and a blank chip would hide that the class has a type at all.
+        /// </summary>
+        /// <param name="row">The class.</param>
+        /// <param name="request">The request, for the culture the label is written in.</param>
+        /// <returns>The text of the chip.</returns>
+        public static string ResolveKindLabel(Model.Entities.Class row, IRequest request)
+        {
+            var key = Model.Entities.ObjectKind.Normalize(row?.Kind);
+            var kind = ObjectKindCatalog.GetKind(key);
+
+            if (kind is null)
+            {
+                return key;
+            }
+
+            return request is null ? I18N.Translate(kind.Label) : I18N.Translate(request, kind.Label);
         }
 
         /// <summary>

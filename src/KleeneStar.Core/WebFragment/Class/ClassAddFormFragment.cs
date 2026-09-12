@@ -1,5 +1,6 @@
 ﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
+using KleeneStar.Core.WebParameter;
 using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
@@ -23,6 +24,17 @@ namespace KleeneStar.Core.WebFragment.Class
     [Cache]
     public sealed class ClassAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the workspace the class is created in. The page
+        /// the form is shown on is workspace scoped, so the workspace is taken from the
+        /// route and travels with the payload; the create endpoint refuses a class that
+        /// names none, and the foreign key used to refuse it less helpfully.
+        /// </summary>
+        public ControlFormItemInputHidden WorkspaceId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Class.WorkspaceId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the class.
         /// </summary>
@@ -156,6 +168,7 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(WorkspaceId);
             Add(ClassName);
             Add(Description);
             Add(KindSelection);
@@ -197,6 +210,16 @@ namespace KleeneStar.Core.WebFragment.Class
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is workspace scoped, so the workspace it creates
+            // the class in is taken from the request and carried in the hidden input
+            var key = renderContext?.Request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+            var workspace = CoreHub.WorkspaceManager?.GetWorkspaceByKey(key);
+
+            if (workspace is not null)
+            {
+                renderContext.SetValue(WorkspaceId, new ControlFormInputValueString(workspace.Id.ToString()));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

@@ -33,7 +33,11 @@ namespace KleeneStar.Core.WebFragment.Class
             Placeholder = _ => "kleenestar.core:class.name.placeholder",
             Help = _ => "kleenestar.core:class.name.help",
             Required = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>().ToString())};
+            // the page is keyed by the class, not the workspace, so the workspace of the
+            // original is bound by hand - without it the check called ${workspacekey} literally
+            ServiceFactory = ctx => DataServiceDescriptor
+                .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>().ToString())
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the class.
@@ -56,7 +60,9 @@ namespace KleeneStar.Core.WebFragment.Class
             Label = _ => "kleenestar.core:class.inherited.label",
             Placeholder = _ => "kleenestar.core:class.inherited.placeholder",
             Help = _ => "kleenestar.core:class.inherited.help",
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Inherited>().ToString())};
+            ServiceFactory = ctx => DataServiceDescriptor
+                .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Inherited>().ToString())
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the checkbox control for the abstract flag.
@@ -78,7 +84,9 @@ namespace KleeneStar.Core.WebFragment.Class
             Label = _ => "kleenestar.core:class.parent.label",
             Placeholder = _ => "kleenestar.core:class.parent.placeholder",
             Help = _ => "kleenestar.core:class.parent.help",
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Parent>().ToString())};
+            ServiceFactory = ctx => DataServiceDescriptor
+                .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Parent>().ToString())
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the tag input control for specifying the allowed children classes.

@@ -301,6 +301,26 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Resolves the identity a new object is attributed to, as the value its creator and
+        /// updater references take.
+        /// </summary>
+        /// <remarks>
+        /// An anonymous caller is nobody, and nobody is not a row in the identity table:
+        /// written as the empty guid the creator broke the foreign key and the create answered
+        /// a bare <em>error creating resource</em>, so the references stay unset instead - the
+        /// way the update path and the workspace templates already leave them. The commit the
+        /// creation is recorded in makes the same distinction on its own.
+        /// </remarks>
+        /// <param name="request">The request, or null to ask the ambient scope.</param>
+        /// <returns>The identity, or null for an anonymous caller.</returns>
+        public static Guid? ResolveAuthor(IRequest request)
+        {
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            return identityId == Guid.Empty ? null : identityId;
+        }
+
+        /// <summary>
         /// Persists the newly created resource.
         /// Override this method in derived classes to implement the actual
         /// persistence logic and return a result describing the creation.
@@ -323,12 +343,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var id = Guid.NewGuid();
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
+
             newItem = new Model.Entities.Object(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
                 State = WorkspaceState.Active,
-                CreatorId = currentUser,
-                UpdaterId = currentUser
+                CreatorId = author,
+                UpdaterId = author
             };
 
             fieldMap.BindTo(newItem);
@@ -378,12 +400,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var id = Guid.NewGuid();
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
+
             newItem = new Model.Entities.Object(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
                 State = WorkspaceState.Active,
-                CreatorId = currentUser,
-                UpdaterId = currentUser
+                CreatorId = author,
+                UpdaterId = author
             };
 
             fieldMap.BindTo(newItem);
@@ -605,6 +629,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
 
             foreach (var childTemplate in CoreHub.TemplateManager.GetChildTemplates(templateId))
             {
@@ -629,8 +654,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     ClassId = childTemplate.ClassId,
                     WorkspaceId = parent.WorkspaceId,
                     ParentId = parent.Id,
-                    CreatorId = currentUser,
-                    UpdaterId = currentUser
+                    CreatorId = author,
+                    UpdaterId = author
                 };
 
                 EnsureKey(child);

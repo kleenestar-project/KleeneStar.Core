@@ -207,7 +207,9 @@ The `ObjectCommentFragment` and `ObjectCommentComposerFragment` are registered f
 
 ### Reaction / pin / like
 
-Reactions, pins, and likes are not modelled on the `Comment` entity today. The REST endpoint implements the abstract `ToggleLike`, `TogglePin`, and `ToggleReaction` overrides as empty / null returns so the control degrades gracefully — the buttons are absent and no traffic is generated when the user clicks them.
+*Resolved* — the three were once left out of the model, and are now part of it. A comment carries `IsPinned` (a pinned comment sorts before everything else in the thread and survives the ordering by date), a `Likes` collection (`CommentLike`, one row per identity) and a `Reactions` collection (`CommentReaction`, one row per identity and emoji). `ICommentManager.TogglePin`, `ToggleLike` and `ToggleReaction` flip them and answer the new state — the pin flag, the names of everybody who likes the comment, the full emoji → names map — which is what the control redraws from. The REST endpoint implements the framework's three toggle overrides on top of them. Who liked or reacted is read off the session, never off the name the browser sends along; an anonymous caller can do neither, nor pin.
+
+A comment also carries a `Visibility` (`Public` or `InternalTeam`), sent as the composer's category and shown as a label on the entry; a reply inherits the visibility of its parent. And every add, edit, delete and pin raises a notification through `CoreHub.AddNotification`, so the change reaches the notification center and the toast the way every other change does.
 
 ## Sitemap Comment Management
 
@@ -229,6 +231,9 @@ For programmatic interaction, the comment thread of a single object is exposed v
 |`/api/1/comments/{objectKey}/{commentId}`         |PUT         |Updates the body of an existing comment. The server automatically sets `State = Edited` and refreshes `Updated`.
 |`/api/1/comments/{objectKey}/{commentId}`         |DELETE      |Soft-deletes a comment via `CommentManager.SoftDelete` — sets `State = Deleted`, populates `DeletedAt`, clears `Content`. The row is kept so replies still resolve.
 |`/api/1/comments/{objectKey}/{commentId}/reply`   |POST        |Appends a reply to the parent comment identified by `commentId`. Returns the created reply mapped to the REST DTO.
+|`/api/1/comments/{objectKey}/{commentId}/likes`   |POST        |Toggles the like of the signed-in identity on the comment. Returns the names of everybody who currently likes it.
+|`/api/1/comments/{objectKey}/{commentId}/pin`     |POST        |Toggles the pin of the comment. Returns the new pin state; an anonymous caller is refused.
+|`/api/1/comments/{objectKey}/{commentId}/reactions`|POST        |Toggles an emoji reaction of the signed-in identity on the comment. Returns the full reaction map (emoji → names).
 
 The endpoint maps the persisted `Comment` entity to the `RestApiCommentItem` / `RestApiCommentReply` DTOs from `WebExpress.WebApp`:
 
@@ -273,4 +278,4 @@ Assignment is performed via the standard group-policy mechanism. Most deployment
 
 ## Conclusion
 
-This document describes the comment concept in **KleeneStar** as a thin, reusable conversation layer that lives directly on the object detail page. The reference implementation comprises the `Comment` entity, the `CommentManager` component, a single REST endpoint at `/api/1/comments/{objectkey}`, two object-scoped WebFragments hosting the existing `ControlRestComment` / `ControlRestCommentComposer` controls, and a seeded set of per-object class-flavoured threads that exercise both the top-level and the reply rendering paths. The model is intentionally narrow — no reactions, no pins, no per-comment permissions — so future additions (notifications, attachments, @-mentions) can be layered on top without revisiting the storage schema.
+This document describes the comment concept in **KleeneStar** as a thin, reusable conversation layer that lives directly on the object detail page. The reference implementation comprises the `Comment` entity, the `CommentManager` component, a single REST endpoint at `/api/1/comments/{objectkey}`, two object-scoped WebFragments hosting the existing `ControlRestComment` / `ControlRestCommentComposer` controls, and a seeded set of per-object class-flavoured threads that exercise both the top-level and the reply rendering paths. The model started deliberately narrow, and the additions it was left open for have since landed without revisiting the storage schema: pins, likes and emoji reactions (`IsPinned`, `CommentLike`, `CommentReaction`), a public / internal-team visibility per comment, and notifications on every change. Per-comment permissions beyond that visibility, attachments on a comment and @-mentions remain open.

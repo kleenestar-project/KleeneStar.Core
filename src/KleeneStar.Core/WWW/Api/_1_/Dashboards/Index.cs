@@ -85,7 +85,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboards
         /// </returns>
         protected override IRestApiCrudResultRetrieve RetrieveForCreate(IRequest request)
         {
-            return RetrieveForCreate(request);
+            // the base answer, not this method again: the override used to call itself and
+            // overflowed the stack on the first create-mode load
+            return base.RetrieveForCreate(request);
         }
 
         /// <summary>

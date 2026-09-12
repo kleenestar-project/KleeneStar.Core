@@ -469,6 +469,8 @@ In the visual view, workflows can be designed intuitively via drag-and-drop, whi
 
 The Workflow Designer enables visual modeling of a class’s state machine with drag-and-drop support, direct editing of state and transition properties, and embedded validation and publication control. States are arranged as nodes on a canvas, and transitions are represented as directed edges. A properties panel provides context-sensitive settings, including labels, guards, validators, and post functions. Changes to the draft are revision-safe. Before publication, the designer consistently checks the reachability of all end states and reference integrity to forms.
 
+The designer **is** the page rather than a block on it, and takes the height the content region offers (`ControlDataWorkflow.Fill`, set by `WorkflowDetailViewFragment`): the canvas and the properties pane end where the pane does and scroll on their own, instead of a fixed frame leaving the rest of the page empty below it. The viewport arithmetic this used to be (`100vh` minus a guessed chrome height) is gone — it was never applied anyway, because the rule it fed was keyed on the controller class the framework strips at mount, and the designer sat at the graph editor's 400px floor.
+
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║

@@ -125,9 +125,10 @@ wizard, the edit dialog and the clone dialog write what a record *says*; who may
 part of that, and it is set where the permissions it replaced were set. A new object starts on
 the default level of its class and is reclassified afterwards.
 
-Those forms do still *report* it: `ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning**
-on them, and on the classification dialog itself, in exactly two situations — both ones the form
-would otherwise leave to be discovered by the record disappearing:
+The two forms that *create* a record — the wizard and the clone dialog — do still *report* it:
+`ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning** on them, and on the
+classification dialog itself, in exactly two situations — both ones the form would otherwise
+leave to be discovered by the record disappearing:
 
 - The class classifies its objects but the caller is cleared for **none** of its levels. In the
   dialog the input is then absent altogether, and the notice says why
@@ -138,7 +139,10 @@ would otherwise leave to be discovered by the record disappearing:
   (`securitylevel.object.hint`).
 
 Where there is nothing to say, there is no notice. A warning that is always there stops being a
-signal.
+signal. The **edit mask** (`ObjectStructuredEditFormFragmentBase`, the issue and asset edit
+dialog) says nothing about the level at all: an edit never changes the classification, the
+record the caller opened stays where it is, and the only place the level is set — or even
+mentioned as settable — is the overflow menu's own dialog.
 
 **On the object detail page**, `ObjectPropertySecurityLevelCardFragment` shows the level and the
 groups cleared for it — and is absent on an unclassified object. Anybody reading the page is by

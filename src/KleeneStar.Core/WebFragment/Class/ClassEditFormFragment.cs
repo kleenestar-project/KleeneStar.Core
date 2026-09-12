@@ -12,6 +12,7 @@ using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebPage;
 
@@ -26,18 +27,35 @@ namespace KleeneStar.Core.WebFragment.Class
     public sealed class ClassEditFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
-        /// Gets the input text control for specifying the name of the class.
+        /// Gets the input control for the name of the class - the name the record is titled
+        /// by. It is rendered into the form's header instead of among its items, and
+        /// therefore becomes the title of the dialog the form is opened as.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// It carries no label and no help line: a caption reading <em>class name</em> over
+        /// the name of the thing on screen explains nothing, and a title bar is no place for
+        /// a sentence about the field. The placeholder says what belongs there while the
+        /// field is empty, which is the only moment the question arises.
+        /// </para>
+        /// <para>
+        /// It stays the availability-checking input, because a class name is unique within
+        /// its workspace and the dialog should say so while the name is being typed rather
+        /// than on save. The check names the class being edited (<c>exclude</c>), which never
+        /// counts against itself - without that the record's own name was reported as taken
+        /// the moment the user typed it back in. The verdict is drawn beside the name on the
+        /// title bar; the gate is the endpoint's validation, which every caller passes.
+        /// </para>
+        /// </remarks>
         public ControlDataFormItemInputUnique ClassName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.Name),
-            Label = _ => "kleenestar.core:class.name.label",
             Placeholder = _ => "kleenestar.core:class.name.placeholder",
-            Help = _ => "kleenestar.core:class.name.help",
             Required = _ => true,
+            Classes = [FormTitleInput.Mark],
             ServiceFactory = ctx => DataServiceDescriptor
-                .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>().ToString())
-                .BindPathVariables(BuildWorkspaceKeyBindings(ctx))};
+                .QueryData(UniqueNameUri(ctx))
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the class.
@@ -62,7 +80,7 @@ namespace KleeneStar.Core.WebFragment.Class
             Help = _ => "kleenestar.core:class.inherited.help",
             ServiceFactory = ctx => DataServiceDescriptor
                 .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Inherited>().ToString())
-                .BindPathVariables(BuildWorkspaceKeyBindings(ctx))};
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the checkbox control for the abstract flag.
@@ -86,7 +104,7 @@ namespace KleeneStar.Core.WebFragment.Class
             Help = _ => "kleenestar.core:class.parent.help",
             ServiceFactory = ctx => DataServiceDescriptor
                 .QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Parent>().ToString())
-                .BindPathVariables(BuildWorkspaceKeyBindings(ctx))};
+                .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
         /// Gets the tag input control for specifying the allowed children classes.
@@ -165,7 +183,8 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassEditFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Add(ClassName);
+            // the name is not among the items: it titles the record and is rendered onto
+            // the form's header by Render, see ClassName
             Add(Description);
             Add(KindSelection);
             Add(RendererSelection);
@@ -215,47 +234,29 @@ namespace KleeneStar.Core.WebFragment.Class
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
-            return base.Render(renderContext, visualTree);
+            // the name titles the form: it goes onto the header, which the dialog lifts onto
+            // its title bar, rather than among the fields of the class
+            return FormTitleInput.Place(base.Render(renderContext, visualTree), ClassName, renderContext, visualTree);
         }
 
         /// <summary>
-        /// Builds the manual ${workspacekey} path variable bindings for a
-        /// service descriptor whose endpoint is keyed by the workspace route
-        /// parameter but rendered on a page that only carries the class id.
-        /// The class referenced by the request is loaded to read its
-        /// workspace key, which substitutes the placeholder the sitemap
-        /// would otherwise leave in the resolved base address. The
-        /// automatic request binding of <see cref="EmitDataIslands"/>
-        /// leaves the placeholder intact on this scope (the edit page is
-        /// keyed by classid, not workspacekey), so the manual binding is
-        /// required to make the client call the concrete resource.
+        /// Builds the address of the availability check, naming the class being edited so
+        /// the check leaves it out of the count. The sitemap hands out a fresh uri per call,
+        /// so the query is added to it in place without accumulating across renders.
         /// </summary>
         /// <param name="renderContext">The current render context, or null.</param>
-        /// <returns>The bindings to apply, possibly empty when no workspace is resolvable.</returns>
-        private static IEnumerable<KeyValuePair<string, string>> BuildWorkspaceKeyBindings(IRenderControlContext renderContext)
+        /// <returns>The address, without the exclusion when the request names no class.</returns>
+        private static string UniqueNameUri(IRenderControlContext renderContext)
         {
-            var request = renderContext?.Request;
-            if (request == null)
+            var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>();
+            var classId = renderContext?.Request?.GetParameter<ClassIdParameter>()?.Value;
+
+            if (!string.IsNullOrWhiteSpace(classId))
             {
-                return System.Array.Empty<KeyValuePair<string, string>>();
+                uri = uri?.Add(new UriQuery(global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName.ExcludeParameter, classId));
             }
 
-            var classParameter = request.GetParameter<ClassIdParameter>();
-            if (classParameter == null)
-            {
-                return System.Array.Empty<KeyValuePair<string, string>>();
-            }
-
-            var @class = CoreHub.ClassManager?.GetClass(classParameter);
-            if (@class?.Workspace == null || string.IsNullOrEmpty(@class.Workspace.Key))
-            {
-                return System.Array.Empty<KeyValuePair<string, string>>();
-            }
-
-            return new[]
-            {
-                new KeyValuePair<string, string>("workspacekey", @class.Workspace.Key)
-            };
+            return uri?.ToString();
         }
     }
 }
