@@ -44,17 +44,80 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// <summary>
         /// Retrieves the response for the specified request using the configured retrieval logic.
         /// </summary>
+        /// <remarks>
+        /// The dialog modes - the data the edit, clone and delete forms are filled from - are
+        /// gated the way the dialog pages are, so the form data of a refused dialog is not
+        /// answered to a caller who asks the endpoint directly. Reading a workspace as such is
+        /// not guarded: the list narrows by nothing yet, and a read gate here would only make
+        /// the dialog modes stricter than the listing they sit beside.
+        /// </remarks>
         /// <param name="request">
         /// The request object containing the parameters for the retrieval operation. Must not be null.
         /// </param>
         /// <returns>
-        /// An IResponse object that represents the result of the retrieval operation. The response 
+        /// An IResponse object that represents the result of the retrieval operation. The response
         /// contains the data requested according to the parameters provided.
         /// </returns>
         [Method(RequestMethod.GET)]
         public override IResponse Retrieve(IRequest request)
         {
-            return base.Retrieve(request);
+            var workspace = WorkspaceAuthorization.ResolveById(request);
+
+            var authorized = request?.GetParameter("mode")?.Value switch
+            {
+                "edit" => WorkspaceAuthorization.MayUpdate(workspace, request),
+                "delete" => WorkspaceAuthorization.MayDelete(workspace, request),
+                "clone" or "new" => WorkspaceAuthorization.MayClone(workspace, request),
+                _ => true
+            };
+
+            return authorized ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates a workspace, or clones one when the request names an original.
+        /// </summary>
+        /// <remarks>
+        /// Only the clone is guarded, and on the original: the copy does not exist yet and is
+        /// on no chain, and neither is a workspace created from nothing - see
+        /// <see cref="WorkspaceAuthorization"/> for why that gap is stated rather than closed
+        /// here.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return WorkspaceAuthorization.MayClone(WorkspaceAuthorization.ResolveById(request), request)
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes a workspace, once the caller may.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return WorkspaceAuthorization.MayUpdate(WorkspaceAuthorization.ResolveById(request), request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes a workspace, once the caller may.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return WorkspaceAuthorization.MayDelete(WorkspaceAuthorization.ResolveById(request), request)
+                ? base.Delete(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>

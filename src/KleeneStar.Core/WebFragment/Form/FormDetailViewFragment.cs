@@ -15,8 +15,14 @@ namespace KleeneStar.Core.WebFragment.Form
     /// class within a ControlView. This fragment is only rendered for standard forms. Additional
     /// forms do not have these predefined views and will display an empty or custom layout instead.
     /// </summary>
+    /// <remarks>
+    /// The editor is offered only where the form's class reads its forms - a class rendered as
+    /// prose asks for no fields and shows none, so <see cref="FormProseNoticeFragment"/> takes
+    /// this fragment's place there. See <see cref="FormRendererCondition"/>.
+    /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
+    [Condition<FormFieldRendererCondition>]
     [Cache]
     public sealed class FormDetailViewFragment : FragmentControlDataFormEditor
     {

@@ -33,5 +33,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_
 
             return CoreHub.WorkspaceManager.GetWorkspaceByKey(key)?.Id.ToString();
         }
+
+        /// <summary>
+        /// Determines whether the caller may administer the grants of the addressed workspace -
+        /// the same question the permission dialog page demands an answer to before it opens.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><see langword="true"/> when the request may proceed.</returns>
+        protected override bool Authorized(IRequest request)
+        {
+            var key = request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+
+            return WorkspaceAuthorization.MayAdminister(CoreHub.WorkspaceManager.GetWorkspaceByKey(key), request);
+        }
     }
 }

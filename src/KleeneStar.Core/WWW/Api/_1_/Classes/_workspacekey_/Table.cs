@@ -288,7 +288,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
 
             yield return new RestApiOptionCustom(request)
             {
-                Text = "kleenestar.core:class.permission.label",
+                // a payload string is not a control: nothing on the client resolves a key in
+                // it, so the label is translated here like the built-in options translate theirs
+                Text = I18N.Translate(request, "kleenestar.core:class.permission.label"),
                 Icon = new IconUserShield(),
                 PrimaryAction = new ActionModal("modal-form", permissionUri, TypeModalSize.ExtraLarge)
             };

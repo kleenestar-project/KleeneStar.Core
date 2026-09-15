@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 
 namespace KleeneStar.Core.WebRestApi
@@ -34,6 +35,67 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="request">The request whose route names the resource.</param>
         /// <returns>The identifier, or null when the route addresses none.</returns>
         protected abstract string ResolveScopeId(IRequest request);
+
+        /// <summary>
+        /// Determines whether the caller may read and change the grants the request addresses.
+        /// </summary>
+        /// <remarks>
+        /// Administering who may do what on a resource is itself something the resource grants,
+        /// and the dialog page that opens this surface demands that grant before it renders.
+        /// The endpoint is what the dialog and every other caller submit to, so a resource that
+        /// wants the gate to hold answers the same question here; the default refuses nobody,
+        /// which is what every scope did before a page demanded anything.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><see langword="true"/> when the request may proceed.</returns>
+        protected virtual bool Authorized(IRequest request)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Answers the grants, once the caller may administer them.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            return Authorized(request) ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Adds grants, once the caller may administer them.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return Authorized(request) ? base.Create(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes the grants of a group, once the caller may administer them.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        public override IResponse Update(IRequest request)
+        {
+            return Authorized(request) ? base.Update(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Withdraws a grant, once the caller may administer them.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return Authorized(request) ? base.Delete(request) : new ResponseForbidden();
+        }
 
         /// <summary>
         /// Returns the grants on the addressed resource.

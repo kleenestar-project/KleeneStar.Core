@@ -78,6 +78,8 @@ The home page is **named as such** (`Workspace.HomeId`) rather than left to be g
 
 What the pages say is written by `WorkspaceTemplateContent`, and it is written **once, at creation**, in the language of whoever created the workspace rather than the installation's default: the person filling in the wizard is reading it in one particular language, and an author is going to rewrite the page anyway. A page that silently changed language under an author who had edited it would be worse than one written in the wrong one. Both carry a banner drawn from the product's own mark in the workspace's accent colour, inline as a `data:` SVG so it needs no route, no file and no cleanup, and survives a database copied to another installation.
 
+The class descriptions are written the same way. A template names them as i18n keys - a template is code, and code speaks every language of the installation - but a class is data: its description is read in the class table, edited in the class dialog and shown on every surface that lists classes, and none of those translates a stored string. Stored as a key, the description stayed `kleenestar.templates:template.servicedesk.class.ticket` everywhere but in the opening post, which happened to pass it through the translator. `Apply` therefore resolves each key once, in the creator's language, and the class carries a sentence (`WorkspaceTemplateManager.Describe`). A description that is not a key comes back unchanged, so a template may name free text as well.
+
 Applying a template twice adds what is missing rather than a second set of everything, per the table above — so a retried create, or a template applied to a workspace somebody had already set up by hand, does the useful thing instead of the destructive one.
 
 An unknown template key creates nothing and raises nothing. That is the ordinary answer for a workspace whose template has since been uninstalled, and for every caller of the REST API that is not the wizard. A workspace created **without** a template gets none of this either: the empty-workspace card means an empty workspace.
@@ -138,7 +140,7 @@ public sealed class ResearchTemplate : IWorkspaceTemplate
 }
 ```
 
-The key is stable and outlives renames of the class; the name and description are i18n keys; class names are **not** translated, because a class name is data an administrator renames rather than a caption of the product.
+The key is stable and outlives renames of the class; the name and description are i18n keys, and so are the class descriptions - resolved once when the workspace is created, see above. Class names are **not** translated, because a class name is data an administrator renames rather than a caption of the product.
 
 A plugin has to declare an application — the framework refuses one that belongs to nothing — so a template-only plugin names the application it extends rather than defining one of its own.
 

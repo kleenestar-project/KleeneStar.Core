@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebCore.WebParameter;
@@ -56,14 +57,20 @@ namespace KleeneStar.Core.WebUri
         /// The rendering context that provides information required to determine the appropriate icon.
         /// </param>
         /// <returns>
-        /// An icon associated with the current instance. The value may be <c>null</c> or empty 
-        /// if no icon is available.
+        /// The icon of the object's class, or the object's own when the class carries none; 
+        /// <c>null</c> when the key names no object.
         /// </returns>
+        /// <remarks>
+        /// Resolved through <see cref="ObjectIcon"/> like every other surface: the picture an
+        /// object carries itself is a copy written once at creation and never updated, so the
+        /// breadcrumb read off it kept showing the class avatar of that day while the lists
+        /// beside it showed the current one.
+        /// </remarks>
         public override IIcon GetIcon(IRenderContext renderContext)
         {
             var @object = CoreHub.ObjectManager.GetObjectByKey(Value);
 
-            return @object?.Icon;
+            return ObjectIcon.Resolve(@object);
         }
     }
 }

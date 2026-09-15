@@ -134,11 +134,13 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
                 .ThenBy(p => p.Name)
                 .ToList();
 
+            // a class without an agreement has no section: most classes never get one, and a
+            // card announcing its own absence on every ticket of them is noise, not information.
+            // A policy that names no target stays reported below - that is a configuration
+            // somebody started and did not finish, which is worth a line
             if (policies.Count == 0)
             {
-                section.Add(EmptyState("object-sla-empty", "kleenestar.core:object.sla.card.none"));
-
-                return section.Render(renderContext, visualTree);
+                return null;
             }
 
             // the status is what decides whether a clock runs, is stopped or is settled, so it

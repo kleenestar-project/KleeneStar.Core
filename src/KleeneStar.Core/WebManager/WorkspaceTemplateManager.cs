@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using WebExpress.WebCore;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebLog;
 using WebExpress.WebCore.WebPlugin;
@@ -264,8 +265,9 @@ namespace KleeneStar.Core.WebManager
         /// <param name="workspaceId">The workspace to set up.</param>
         /// <param name="identityId">Who is doing this, recorded as the author of the two pages
         /// and of the commits that create them. Empty when it is not known.</param>
-        /// <param name="culture">The language the two pages are written in. Null falls back to
-        /// the installation's own, which is what a caller with no request behind it has.</param>
+        /// <param name="culture">The language the two pages and the class descriptions are written
+        /// in. Null falls back to the installation's own, which is what a caller with no request
+        /// behind it has.</param>
         /// <returns>What was created.</returns>
         public WorkspaceTemplateResult Apply(string key, Guid workspaceId, Guid identityId = default, CultureInfo culture = null)
         {
@@ -277,7 +279,7 @@ namespace KleeneStar.Core.WebManager
                 return WorkspaceTemplateResult.Empty;
             }
 
-            var classes = new List<Class>(ApplyClasses(template, workspaceId));
+            var classes = new List<Class>(ApplyClasses(template, workspaceId, culture));
             var views = ApplyViews(workspaceId);
 
             // the pages describe the workspace as it now stands, so they are written from every
@@ -297,7 +299,7 @@ namespace KleeneStar.Core.WebManager
                     continue;
                 }
 
-                var host = CreateProseClass(workspaceId, kind);
+                var host = CreateProseClass(workspaceId, kind, culture);
 
                 if (host is not null)
                 {
@@ -327,8 +329,9 @@ namespace KleeneStar.Core.WebManager
         /// </remarks>
         /// <param name="template">The template being applied.</param>
         /// <param name="workspaceId">The workspace the classes are created in.</param>
+        /// <param name="culture">The language the descriptions are written in.</param>
         /// <returns>The classes created.</returns>
-        private static IReadOnlyList<Class> ApplyClasses(IWorkspaceTemplate template, Guid workspaceId)
+        private static IReadOnlyList<Class> ApplyClasses(IWorkspaceTemplate template, Guid workspaceId, CultureInfo culture)
         {
             var existing = CoreHub.ClassManager
                 .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
@@ -348,7 +351,7 @@ namespace KleeneStar.Core.WebManager
                 (
                     workspaceId,
                     descriptor.Name,
-                    descriptor.Description,
+                    Describe(descriptor.Description, culture),
                     descriptor.Icon,
                     descriptor.Kind,
                     descriptor.Renderer,
@@ -366,8 +369,8 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the class belongs to.</param>
         /// <param name="name">The class name.</param>
-        /// <param name="description">What the class holds - free text, or an
-        /// internationalization key when a template wrote it.</param>
+        /// <param name="description">What the class holds, as the text the class will carry - a
+        /// template's key is resolved by the caller first, see <see cref="Describe"/>.</param>
         /// <param name="icon">The path of the icon, or null.</param>
         /// <param name="kind">The kind of object the class holds.</param>
         /// <param name="renderer">The renderer the objects are read and written through, or null
@@ -624,13 +627,14 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <remarks>
         /// The names are untranslated, like every other class name: a class name is data an
-        /// administrator renames, not a caption of the product. The descriptions are
-        /// internationalization keys, which is what a template writes too.
+        /// administrator renames, not a caption of the product. The descriptions are written in
+        /// the language the workspace is being created in, like the ones a template names.
         /// </remarks>
         /// <param name="workspaceId">The workspace the class belongs to.</param>
         /// <param name="kind">The prose kind the class holds.</param>
+        /// <param name="culture">The language the description is written in.</param>
         /// <returns>The class, or <see langword="null"/> for a kind that is not a prose kind.</returns>
-        private static Class CreateProseClass(Guid workspaceId, string kind)
+        private static Class CreateProseClass(Guid workspaceId, string kind, CultureInfo culture)
         {
             if (string.Equals(kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
             {
@@ -638,7 +642,7 @@ namespace KleeneStar.Core.WebManager
                 (
                     workspaceId,
                     "Page",
-                    "kleenestar.core:workspace.template.class.page",
+                    Describe("kleenestar.core:workspace.template.class.page", culture),
                     "/kleenestar/assets/icons/doc.svg",
                     ObjectKind.Document
                 );
@@ -650,13 +654,42 @@ namespace KleeneStar.Core.WebManager
                 (
                     workspaceId,
                     "News",
-                    "kleenestar.core:workspace.template.class.news",
+                    Describe("kleenestar.core:workspace.template.class.news", culture),
                     "/kleenestar/assets/icons/release.svg",
                     ObjectKind.Blog
                 );
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Resolves the description a template gives a class into the text the class carries.
+        /// </summary>
+        /// <remarks>
+        /// A template names its class descriptions as internationalization keys, because a
+        /// template is code and code speaks every language of the installation. A class is not:
+        /// its description is data an administrator reads in the class table, edits in the class
+        /// dialog and sees on every surface that shows it, none of which translates a stored
+        /// string - so a key stored as-is stayed a key everywhere but in the opening post, which
+        /// happened to pass it through the translator. The key is therefore resolved once, here,
+        /// in the language of whoever is creating the workspace - the same choice the home page
+        /// and the opening post make - and the class carries a sentence. A description that is
+        /// not a key comes back unchanged, so a template may name free text as well.
+        /// </remarks>
+        /// <param name="description">The description as the template names it.</param>
+        /// <param name="culture">The language to resolve it in; null for the installation's own.</param>
+        /// <returns>The resolved description, or <see langword="null"/> when there is none.</returns>
+        private static string Describe(string description, CultureInfo culture)
+        {
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                return description;
+            }
+
+            return culture is null
+                ? I18N.Translate(description)
+                : I18N.Translate(culture, description);
         }
 
         /// <summary>

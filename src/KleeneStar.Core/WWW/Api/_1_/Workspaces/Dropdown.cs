@@ -18,8 +18,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
     /// </summary>
     /// <remarks>
     /// The dropdown is personal to the calling identity. With no search text it surfaces the most
-    /// recently visited workspaces first, newest first (a visit to any of a workspace's subpages â€”
-    /// its content, an object detail page, its class management â€” counts), with favorites marked by
+    /// recently visited workspaces first, newest first (a visit to any of a workspace's subpages —
+    /// its content, an object detail page, its class management — counts), with favorites marked by
     /// a leading star; any favorites that have not been visited recently are appended so they are
     /// never hidden. As soon as a search term is supplied the dropdown switches to a full-text
     /// search across every workspace. When the identity has no bookmarks yet it falls back to the
@@ -163,7 +163,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             return new RestApiDropdownItem()
             {
                 Id = workspace.Id,
-                Text = (pinned ? "â˜… " : string.Empty) + workspace.Name,
+                Text = (pinned ? "★ " : string.Empty) + workspace.Name,
                 Image = workspace.Icon?.Uri?.ToString(),
                 Uri = GetUri(workspace, request)?.ToString()
             };

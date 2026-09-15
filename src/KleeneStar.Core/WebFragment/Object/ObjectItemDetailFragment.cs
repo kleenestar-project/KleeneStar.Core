@@ -58,13 +58,15 @@ namespace KleeneStar.Core.WebFragment.Object
         /// Converts the control to an HTML representation. The object's field structure
         /// (derived from the active <see cref="FormType.View"/> form of its class) is
         /// rendered inside a single <see cref="ControlSection"/>. When no view form is
-        /// configured the section renders without a field structure; the description, comment
-        /// thread, and composer are surfaced separately by their own fragments.
+        /// configured, or the form places no field the section would show, nothing is
+        /// rendered: a captioned section with nothing under it reads as a fault, and the
+        /// description, comment thread, and composer are surfaced separately by their own
+        /// fragments either way.
         /// </summary>
         /// <param name="renderContext">The context in which the control is rendered.</param>
         /// <param name="visualTree">The visual tree representing the control's structure.</param>
         /// <returns>An HTML node representing the rendered section, or <c>null</c> when no
-        /// object can be resolved from the request.</returns>
+        /// object can be resolved from the request or the section would be empty.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             var keyParam = renderContext?.Request?.GetParameter<ObjectKeyParameter>();
@@ -91,7 +93,10 @@ namespace KleeneStar.Core.WebFragment.Object
             body.AddUserAttribute("data-object-key", @object.Key);
             body.AddUserAttribute("data-rest-url", objectUri?.ToString());
 
-            AddFieldStructure(body, @object, objectUri, renderContext, visualTree);
+            if (!AddFieldStructure(body, @object, objectUri, renderContext, visualTree))
+            {
+                return null;
+            }
 
             var section = new ControlSection("object-detail-section")
             {
@@ -122,8 +127,9 @@ namespace KleeneStar.Core.WebFragment.Object
         /// Resolves the active <see cref="FormType.View"/> form for the object's class and
         /// appends its field structure to the supplied detail body: a single field list
         /// when the form defines one tab, or a tab control when it defines several. When
-        /// no active view form (or no tab) is configured the body is left without a field
-        /// structure, so the section renders empty.
+        /// no active view form (or no tab) is configured, or every field the form places is
+        /// one the list skips - a system alias, a workflow or date field shown elsewhere - the
+        /// body is left as it was and the caller renders no section at all.
         /// </summary>
         /// <param name="body">The detail body container the field structure is appended to.</param>
         /// <param name="object">The object whose field values are displayed.</param>
@@ -131,7 +137,8 @@ namespace KleeneStar.Core.WebFragment.Object
         /// inline smart-edit controls to persist value changes.</param>
         /// <param name="renderContext">The context in which the control is rendered.</param>
         /// <param name="visualTree">The visual tree representing the control's structure.</param>
-        private static void AddFieldStructure
+        /// <returns><see langword="true"/> when at least one field row was appended.</returns>
+        private static bool AddFieldStructure
         (
             HtmlElementTextContentDiv body,
             Model.Entities.Object @object,
@@ -144,7 +151,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             if (form is null || form.Tabs is null || form.Tabs.Count == 0)
             {
-                return;
+                return false;
             }
 
             var fields = CoreHub.FieldManager
@@ -159,18 +166,21 @@ namespace KleeneStar.Core.WebFragment.Object
             if (orderedTabs.Count == 1)
             {
                 var list = BuildFieldList(orderedTabs[0].Elements, fields, values, @object, objectUri);
-                if (list is not null)
+                if (list is null)
                 {
-                    body.Add(list.Render(renderContext, visualTree));
+                    return false;
                 }
 
-                return;
+                body.Add(list.Render(renderContext, visualTree));
+
+                return true;
             }
 
             var tabControl = new ControlTab("tabs-" + @object.Id.ToString("N"))
             {
                 Layout = _ => TypeLayoutTab.Underline
             };
+            var populated = false;
 
             foreach (var t in orderedTabs)
             {
@@ -183,12 +193,21 @@ namespace KleeneStar.Core.WebFragment.Object
                 if (tabList is not null)
                 {
                     view.Add(tabList);
+                    populated = true;
                 }
 
                 tabControl.Add(view);
             }
 
+            // a tab strip over nothing but empty tabs is the empty section with more chrome
+            if (!populated)
+            {
+                return false;
+            }
+
             body.Add(tabControl.Render(renderContext, visualTree));
+
+            return true;
         }
 
         /// <summary>
