@@ -196,7 +196,7 @@ namespace KleeneStar.Core.Test.WebManager
         /// <returns>The connection string.</returns>
         private static string TestDatabase()
         {
-            return KleeneStar.Model.ModelHub.DatabaseConfig.ConnectionString;
+            return KleeneStar.Model.ModelHub.DatabaseSettings.ConnectionString;
         }
     }
 }

@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WWW.Blog._objectkey_
     /// <c>/blog/{objectkey}/edit</c>.
     /// </summary>
     /// <remarks>
-    /// The editor is the framework's <c>ModalDataEditor</c>, contributed by
+    /// The editor is the framework's <c>ControlDataModalEditor</c>, contributed by
     /// <see cref="WebFragment.Object.ObjectProseEditorPageFragment"/>. It is the same dialog the
     /// reading view opens, configured to show itself rather than to wait for a trigger - which is
     /// what this route is for: an editor that can be linked to, from a notification or a

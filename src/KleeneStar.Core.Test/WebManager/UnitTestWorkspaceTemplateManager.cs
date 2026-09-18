@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebWorkspaceTemplate;
 using KleeneStar.Model.Entities;
+using Microsoft.Extensions.Configuration;
 using System.Reflection;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebEndpoint;
@@ -137,6 +138,7 @@ namespace KleeneStar.Core.Test.WebManager
             public string License => null;
             public IRoute Icon => null;
             public Assembly Assembly => typeof(UnitTestWorkspaceTemplateManager).Assembly;
+            public IConfiguration Settings => null;
         }
 
         /// <summary>

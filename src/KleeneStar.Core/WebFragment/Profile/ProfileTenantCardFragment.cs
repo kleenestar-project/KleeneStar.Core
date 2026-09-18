@@ -72,7 +72,7 @@ namespace KleeneStar.Core.WebFragment.Profile
                 return null;
             }
 
-            var card = new ControlPanelCard("profile-tenant-card")
+            var card = new ControlCard("profile-tenant-card")
             {
                 Header = _ => I18N.Translate(renderContext, "kleenestar.core:profile.tenant.active.label"),
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Two)

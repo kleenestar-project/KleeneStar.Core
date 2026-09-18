@@ -52,7 +52,7 @@ A draft column left `null` means *unchanged*, so a draft that touched only the b
 | Its whole life cycle                        | `IObjectDraftManager` / `ObjectDraftManager`
 | The draft endpoint — `GET`, `PUT`, `DELETE` | `/api/1/drafts/{objectkey}`
 | The record endpoint — load and publish      | `/api/1/prose`
-| The editor itself                           | `ObjectProseEditorFragment` / `…PageFragment`, both configuring the framework's `ModalDataEditor`
+| The editor itself                           | `ObjectProseEditorFragment` / `…PageFragment`, both configuring the framework's `ControlDataModalEditor`
 | What the draft would change                 | `/issue/{objectkey}/draft` + `ObjectDraftChangesFragment`
 
 The split between the two endpoints is the split between the two meanings of save. The draft endpoint writes no commit and touches no object — an autosave every few seconds must not produce a revision every few seconds, and a reader must keep seeing the published text while somebody writes. The prose endpoint's `PUT` *is* the publication: it copies the text onto the object inside one commit and drops the draft. Its `GET` is what makes "editing resumes the draft" true without any client-side logic — it answers the draft's text when there is one, and the published text otherwise.
@@ -61,7 +61,7 @@ Publishing trusts the submitted payload over the stored draft, because the edito
 
 ## The Editor Is a Framework Control
 
-The writing surface itself is **not** KleeneStar's. It is the framework's `ModalDataEditor`: a
+The writing surface itself is **not** KleeneStar's. It is the framework's `ControlDataModalEditor`: a
 fullscreen dialog whose title bar holds the document's name as an editable field, whose content
 is the writing surface and nothing else, and whose footer bar reads *state · presence · ⋯ ·
 publish · close*. The autosave, the save indicator, the discard, the resumed draft and the

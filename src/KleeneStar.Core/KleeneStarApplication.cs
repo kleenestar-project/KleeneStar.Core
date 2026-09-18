@@ -2,12 +2,10 @@
 using KleeneStar.Core.WebTheme;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
-using KleeneStar.Model.Config;
+using KleeneStar.Model.Settings;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Data.Common;
-using System.IO;
-using System.Xml.Serialization;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebAttribute;
@@ -43,25 +41,11 @@ namespace KleeneStar.Core
 
             CoreHub.ComponentHub.IdentityManager.RegisterIdentityProvider(new WebIdentity.IdentityProvider(), applicationContext);
 
-            // load configuration
-            try
-            {
-                var configFile = Path.Combine(httpServerContext.ConfigPath, "kleenestar.db.config.xml");
-                using var reader = new FileStream(configFile, FileMode.Open);
-                var serializer = new XmlSerializer(typeof(DbConfig));
-                var config = serializer.Deserialize(reader) as DbConfig;
-                ModelHub.DatabaseConfig = config;
-            }
-            catch
-            {
-                // default
-                ModelHub.DatabaseConfig = new DbConfig()
-                {
-                    Provider = "SQLite",
-                    Assembly = "KleeneStar.Model.Sqlite",
-                    ConnectionString = "Data Source=data/db/kleenestar.db"
-                };
-            }
+            // the database settings are the plugin's own section of the settings directory
+            // (settings/kleenestar.core.settings.json, overridable from webexpress.settings.json
+            // or the environment); a section that is missing, or silent about a value, keeps
+            // the built-in sqlite defaults
+            ModelHub.DatabaseSettings = DatabaseSettings.From(applicationContext.PluginContext?.Settings);
 
             try
             {
@@ -159,8 +143,8 @@ namespace KleeneStar.Core
                     AuditAction.Started,
                     AuditTarget.Installation,
                     [
-                        AuditDelta.Added("provider", ModelHub.DatabaseConfig?.Provider, AuditValueKind.Text),
-                        AuditDelta.Added("assembly", ModelHub.DatabaseConfig?.Assembly, AuditValueKind.Text),
+                        AuditDelta.Added("provider", ModelHub.DatabaseSettings?.Provider, AuditValueKind.Text),
+                        AuditDelta.Added("assembly", ModelHub.DatabaseSettings?.Assembly, AuditValueKind.Text),
                         AuditDelta.Added
                         (
                             "version",

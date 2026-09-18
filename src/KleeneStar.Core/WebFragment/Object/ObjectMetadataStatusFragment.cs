@@ -113,7 +113,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            var panel = new ControlPanelFlex("object-metadata-status")
+            var panel = new ControlFlex("object-metadata-status")
             {
                 Layout = _ => TypeLayoutFlex.Default,
                 Align = _ => TypeAlignFlex.Center,

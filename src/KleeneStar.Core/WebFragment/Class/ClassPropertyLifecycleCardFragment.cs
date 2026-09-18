@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Class
     /// <summary>
     /// Class-scoped property card that groups the lifecycle attributes of the class
     /// (creation timestamp, last update timestamp, and lifecycle state) inside a single
-    /// <see cref="ControlPanelCard"/>.
+    /// <see cref="ControlCard"/>.
     /// </summary>
     [Section<SectionPropertyPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
@@ -56,7 +56,7 @@ namespace KleeneStar.Core.WebFragment.Class
                 return null;
             }
 
-            var card = new ControlPanelCard("class-property-lifecycle-card")
+            var card = new ControlCard("class-property-lifecycle-card")
             {
                 Header = _ => "kleenestar.core:class.property.lifecycle.header",
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Two)

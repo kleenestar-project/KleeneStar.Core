@@ -162,7 +162,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 Payload = _ => System.Text.Json.JsonSerializer.Serialize(new { @object = home.Key })
             };
 
-            var comments = new ControlPanelFlex
+            var comments = new ControlFlex
             (
                 "document-home-comments-" + id,
                 new ControlText
@@ -178,7 +178,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 Classes = ["ks-object-metric"]
             };
 
-            return new ControlPanelFlex("document-home-metrics-" + id, like, comments)
+            return new ControlFlex("document-home-metrics-" + id, like, comments)
             {
                 Classes = ["ks-object-metrics"]
             };

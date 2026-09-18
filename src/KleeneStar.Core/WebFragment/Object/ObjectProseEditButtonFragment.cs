@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// The editor is a dialog that already stands on this page - the framework's
-    /// <see cref="WebExpress.WebApp.WebControl.ModalDataEditor"/>, contributed by
+    /// <see cref="WebExpress.WebApp.WebControl.ControlDataModalEditor"/>, contributed by
     /// <see cref="ObjectProseEditorFragment"/> - so the button only opens it. Nothing is
     /// fetched and nothing is composed here: the text the dialog opens on, the draft it
     /// resumes and the publication it ends with are all the editor's.

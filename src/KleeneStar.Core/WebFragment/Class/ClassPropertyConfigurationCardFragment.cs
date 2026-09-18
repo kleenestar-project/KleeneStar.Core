@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Class
     /// <summary>
     /// Class-scoped property card that groups the structural configuration of the class
     /// (access modifier, abstract / sealed flags, inheritance chain) inside a single
-    /// <see cref="ControlPanelCard"/>.
+    /// <see cref="ControlCard"/>.
     /// </summary>
     [Section<SectionPropertyPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
@@ -56,7 +56,7 @@ namespace KleeneStar.Core.WebFragment.Class
                 return null;
             }
 
-            var card = new ControlPanelCard("class-property-configuration-card")
+            var card = new ControlCard("class-property-configuration-card")
             {
                 Header = _ => "kleenestar.core:class.property.configuration.header",
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Two)

@@ -39,7 +39,7 @@ namespace KleeneStar.Core.WWW.Settings
         public void Process(IRenderContext renderContext, VisualTreeWebAppSetting visualTree)
         {
             // retrieve provider and connection string
-            var dbInfo = ModelHub.DatabaseConfig;
+            var dbInfo = ModelHub.DatabaseSettings;
             var providerName = dbInfo.Provider ?? string.Empty;
             var connectionString = dbInfo.ConnectionString ?? string.Empty;
 

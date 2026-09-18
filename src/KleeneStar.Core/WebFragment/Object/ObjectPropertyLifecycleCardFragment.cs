@@ -94,7 +94,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 Value = ctx => @object.Updated.ToString("g", Culture(ctx))
             });
 
-            section.Add(new ControlPanelFlex
+            section.Add(new ControlFlex
             (
                 "object-property-state",
                 new ControlIcon

@@ -25,7 +25,7 @@ namespace KleeneStar.Core.WebFragment.Landing
         /// <returns>The section control.</returns>
         public static IControl Build(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            var callout = new ControlPanelCallout("landing-feedback")
+            var callout = new ControlCallout("landing-feedback")
             {
                 Title = _ => "kleenestar.core:landing.feedback.title",
                 Color = _ => new PropertyColorCallout(TypeColorCallout.Info)
@@ -37,7 +37,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                 Format = _ => TypeFormatText.Paragraph
             });
 
-            callout.Add(new ControlPanelFlex
+            callout.Add(new ControlFlex
             (
                 "landing-feedback-actions",
                 BuildAction("landing-feedback-report", "kleenestar.core:landing.feedback.report", new IconComment()),

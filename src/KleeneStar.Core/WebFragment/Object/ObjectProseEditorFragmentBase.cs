@@ -11,7 +11,7 @@ namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
     /// The prose editor of the document and blog kinds: the framework's
-    /// <see cref="ModalDataEditor"/>, configured for an object of this application.
+    /// <see cref="ControlDataModalEditor"/>, configured for an object of this application.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// reading view it waits for the edit button; on the object's own edit route it is the page.
     /// </para>
     /// </remarks>
-    public abstract class ObjectProseEditorFragmentBase : ModalDataEditor, IFragmentControl<ModalDataEditor>
+    public abstract class ObjectProseEditorFragmentBase : ControlDataModalEditor, IFragmentControl<ControlDataModalEditor>
     {
         /// <summary>
         /// The well-known id the edit button targets. It is shared by both subclasses because a

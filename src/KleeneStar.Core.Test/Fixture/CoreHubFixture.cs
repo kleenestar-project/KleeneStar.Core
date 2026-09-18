@@ -1,6 +1,6 @@
 ﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Model;
-using KleeneStar.Model.Config;
+using KleeneStar.Model.Settings;
 using System;
 using System.Reflection;
 using WebExpress.WebCore;
@@ -80,7 +80,7 @@ namespace KleeneStar.Core.Test
         /// </param>
         public static void Initialize(string connectionString)
         {
-            ModelHub.DatabaseConfig = new DbConfig
+            ModelHub.DatabaseSettings = new DatabaseSettings
             {
                 Assembly = "KleeneStar.Core.Test",
                 ConnectionString = connectionString

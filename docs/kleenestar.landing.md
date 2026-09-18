@@ -111,7 +111,7 @@ The page is assembled from WebExpress controls, not from markup of its own:
 | Frequently asked questions | `ControlAccordion` |
 | First steps | `ControlSteps` |
 | Help how-tos | `ControlList` |
-| Help shape KleeneStar | `ControlPanelCallout` |
+| Help shape KleeneStar | `ControlCallout` |
 
 `ControlGroup` was added to `WebExpress.WebUI` for this page. Things placed side by side are read as one statement about one subject; left as separate framed boxes they read as separate claims. The group gives them one surface, divides the fields evenly across the available width, and draws the rule between them — including where a row wraps, which only the laid-out geometry can answer. It ships with its own controller, stylesheet, unit tests, headless JavaScript tests, a tutorial page and `docs/js/group.md`.
 
