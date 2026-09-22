@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -373,9 +374,9 @@ namespace KleeneStar.Core.WebFragment.Object
                         Class = "wx-kleenestar-field-label"
                     };
 
-                    if (!string.IsNullOrWhiteSpace(field.Description))
+                    if (!ProseText.IsEmpty(field.Description))
                     {
-                        span.AddUserAttribute("title", field.Description);
+                        span.AddUserAttribute("title", ProseText.ToPlainText(field.Description));
                     }
 
                     span.Add(new HtmlText(field.Name + (field.Required ? " *" : "") + ":"));
@@ -497,7 +498,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Name = _ => field.Name,
                         Label = _ => field.Name,
                         Description = _ => field.HelpText,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
 
@@ -508,7 +509,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
                         Description = _ => field.HelpText,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
 
@@ -518,7 +519,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Name = _ => field.Name,
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
                     foreach (var option in field.Options ?? [])
@@ -537,7 +538,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Name = _ => field.Name,
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
                     foreach (var priority in ResolveFieldPriorities(field))
@@ -556,7 +557,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Name = _ => field.Name,
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
 
@@ -566,7 +567,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Name = _ => field.Name,
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
 
@@ -582,7 +583,7 @@ namespace KleeneStar.Core.WebFragment.Object
                         Label = _ => field.Name,
                         Placeholder = _ => field.Placeholder,
                         Description = _ => field.HelpText,
-                        Help = _ => field.Description,
+                        Help = _ => ProseText.ToPlainText(field.Description),
                         Required = _ => field.Required
                     };
             }

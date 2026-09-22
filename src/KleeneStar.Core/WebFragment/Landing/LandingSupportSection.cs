@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebManager;
 using System.Collections.Generic;
@@ -164,7 +165,7 @@ namespace KleeneStar.Core.WebFragment.Landing
 
                 item.Add(new ControlText()
                 {
-                    Text = _ => page.Description ?? string.Empty,
+                    Text = _ => ProseText.ToPlainText(page.Description) ?? string.Empty,
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                     Format = _ => TypeFormatText.Paragraph
                 });

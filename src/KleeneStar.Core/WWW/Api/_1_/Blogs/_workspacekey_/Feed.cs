@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
@@ -182,7 +183,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Blogs._workspacekey_
         /// <returns>The addresses of the pictures.</returns>
         private static IEnumerable<string> BuildImages(Model.Entities.Object post)
         {
-            var images = ImageRegex().Matches(post.Description ?? string.Empty)
+            var images = ImageRegex().Matches(ProseText.ToHtml(post.Description) ?? string.Empty)
                 .Select(x => x.Groups[1].Value)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Take(MaxImages)
@@ -250,7 +251,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Blogs._workspacekey_
         /// <returns>The teaser.</returns>
         private static string BuildTeaser(string description)
         {
-            var text = TagRegex().Replace(description ?? string.Empty, " ")
+            var text = TagRegex().Replace(ProseText.ToHtml(description) ?? string.Empty, " ")
                 .Replace("&nbsp;", " ", StringComparison.OrdinalIgnoreCase);
 
             text = WhitespaceRegex().Replace(text, " ").Trim();

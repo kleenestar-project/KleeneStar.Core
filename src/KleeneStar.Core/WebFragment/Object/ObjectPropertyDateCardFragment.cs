@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System;
@@ -144,7 +145,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 Format = _ => "yyyy-MM-dd",
                 Placeholder = _ => field.Placeholder,
                 Description = _ => field.HelpText,
-                Help = _ => field.Description,
+                Help = _ => ProseText.ToPlainText(field.Description),
                 Required = _ => field.Required
             };
 
@@ -168,9 +169,9 @@ namespace KleeneStar.Core.WebFragment.Object
                         Class = "wx-kleenestar-field-label"
                     };
 
-                    if (!string.IsNullOrWhiteSpace(field.Description))
+                    if (!ProseText.IsEmpty(field.Description))
                     {
-                        span.AddUserAttribute("title", field.Description);
+                        span.AddUserAttribute("title", ProseText.ToPlainText(field.Description));
                     }
 
                     span.Add(new HtmlText(field.Name + (field.Required ? " *" : "") + ":"));

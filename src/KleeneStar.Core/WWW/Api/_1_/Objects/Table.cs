@@ -1,5 +1,6 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebRestApi;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System.Collections.Generic;
@@ -98,7 +99,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                         new RestApiTableCell() { Content = x.Key },
                         new() { Content = x.Summary },
                         new() { Content = workspaceNames.TryGetValue(x.WorkspaceId, out var name) ? name : string.Empty },
-                        new() { Content = x.Description }
+                        new() { Content = ProseText.ToPlainText(x.Description) }
                     ],
                     Uri = GetUri(x)?.ToString(),
                     Image = x.Icon?.Uri?.ToString()

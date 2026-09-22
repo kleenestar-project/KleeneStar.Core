@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using System;
@@ -84,13 +85,13 @@ namespace KleeneStar.Core.WebFragment.Object
                 BadgeColor = _ => new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Warning)
             };
 
-            if (!string.IsNullOrWhiteSpace(securityLevel.Description))
+            if (!ProseText.IsEmpty(securityLevel.Description))
             {
                 section.Add(new ControlAttribute("object-property-securitylevel-description")
                 {
                     Icon = _ => new IconInfo(),
                     Key = _ => "kleenestar.core:securitylevel.description.label",
-                    Value = _ => securityLevel.Description
+                    Value = _ => ProseText.ToPlainText(securityLevel.Description)
                 });
             }
 

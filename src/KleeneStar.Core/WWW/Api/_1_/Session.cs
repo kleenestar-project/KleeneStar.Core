@@ -7,6 +7,9 @@ using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebIdentity;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
+// the framework carries an identity of its own in the namespace this file imports, so the
+// stored one is named explicitly rather than by the name both of them carry
+using IdentityEntity = KleeneStar.Model.Entities.Identity;
 
 namespace KleeneStar.Core.WWW.Api._1_
 {
@@ -65,6 +68,39 @@ namespace KleeneStar.Core.WWW.Api._1_
         }
 
         /// <summary>
+        /// Issues the credentials a verified sign-in is carried by, and answers a failed
+        /// sign-in rather than a server error when none can be issued.
+        /// </summary>
+        /// <remarks>
+        /// The credential is what a sign-in produces: since the framework signs tokens instead
+        /// of keeping a session, an installation whose <c>WebExpress:Authentication</c> section
+        /// is missing or unusable refuses every sign-in from inside the issuer, and the
+        /// endpoint answered a 500 whose cause nothing named - the framework logs the
+        /// reflection wrapper around the endpoint, never the exception inside it. This is a
+        /// configuration fault rather than a wrong password, so it is logged with its own
+        /// message and audited as a failed attempt by the account it was made for; the caller
+        /// is told the sign-in failed, which is the truth of it.
+        /// </remarks>
+        /// <param name="identity">The account the credentials belong to.</param>
+        /// <param name="request">The request the sign-in was made with.</param>
+        /// <returns>The issued credentials, or null when they could not be issued.</returns>
+        protected override IdentityTokenPair EstablishIdentity(IIdentity identity, IRequest request)
+        {
+            try
+            {
+                return base.EstablishIdentity(identity, request);
+            }
+            catch (Exception ex)
+            {
+                CoreHub.ComponentHub?.LogManager?.DefaultLog?.Exception(ex);
+
+                RecordSignInFailure(identity, ex);
+
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Ends the session and records that its owner ended it deliberately.
         /// </summary>
         /// <remarks>
@@ -106,7 +142,7 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// <param name="username">The username the attempt was made with.</param>
         /// <param name="identity">The account the name resolved to, or <see langword="null"/>
         /// when it named none - which is what makes the attempt a failed one.</param>
-        private static void RecordSignIn(string username, Identity identity)
+        private static void RecordSignIn(string username, IdentityEntity identity)
         {
             var succeeded = identity is not null;
 
@@ -129,12 +165,43 @@ namespace KleeneStar.Core.WWW.Api._1_
         }
 
         /// <summary>
+        /// Records a sign-in that was refused after the credentials had been accepted.
+        /// </summary>
+        /// <remarks>
+        /// The attempt named a real account and still ended without a credential, so the event
+        /// names that account and carries the issuer's reason as a delta. It is critical rather
+        /// than a warning: a failed password is one person's bad morning, an installation that
+        /// cannot issue credentials is everybody's.
+        /// </remarks>
+        /// <param name="identity">The account the sign-in was made for.</param>
+        /// <param name="reason">The failure the issuer reported.</param>
+        private static void RecordSignInFailure(IIdentity identity, Exception reason)
+        {
+            using var activity = CoreHub.AuditManager.BeginActivity
+            (
+                AuditOrigin.User,
+                identity?.Id ?? Guid.Empty,
+                Agent
+            );
+
+            CoreHub.AuditManager.Record
+            (
+                AuditCategory.Security,
+                AuditAction.SignInFailed,
+                new AuditTarget(AuditTargetType.Identity, identity?.Id, identity?.Name),
+                [AuditDelta.Added("reason", reason?.Message, AuditValueKind.Text)],
+                AuditOutcome.Failed,
+                AuditSeverity.Critical
+            );
+        }
+
+        /// <summary>
         /// Resolves the stored identity a username names, so a successful sign-in is attributed
         /// to a durable id rather than to a string.
         /// </summary>
         /// <param name="username">The username.</param>
         /// <returns>The identity, or <see langword="null"/> when none carries that name.</returns>
-        private static Identity Resolve(string username)
+        private static IdentityEntity Resolve(string username)
         {
             try
             {

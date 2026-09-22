@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebIcon;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WWW.Workspaces._workspacekey_;
 using KleeneStar.Model;
@@ -82,7 +83,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
                 {
                     Id = x.Id.ToString(),
                     Title = x.Name,
-                    Text = $"{x.Description}\n{x.AccessModifier} | {I18N.Translate(request, x.Sealed ? "kleenestar.core:workspace.state.sealed" : "kleenestar.core:workspace.state.open")}",
+                    Text = $"{ProseText.ToPlainText(x.Description)}\n{x.AccessModifier} | {I18N.Translate(request, x.Sealed ? "kleenestar.core:workspace.state.sealed" : "kleenestar.core:workspace.state.open")}",
                     Image = x.Icon?.Uri?.ToString()
                     //Options = GetOptions(x, request)
                 });

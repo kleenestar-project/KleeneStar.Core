@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -359,6 +360,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             EnsureKey(newItem);
             ApplyDefaultSecurityLevel(fieldMap, newItem, currentUser);
 
+            var template = ResolveTemplate(fieldMap);
+            var presets = template is null
+                ? new Dictionary<string, string>()
+                : CoreHub.TemplateManager.GetPresets(template.Id);
+
+            // the summary and the description are columns of the object row, not value rows,
+            // so a preset on them has to land before the row is written - the genesis commit
+            // then records the object the way the template meant it
+            ApplyPresetProperties(newItem, presets);
+
             // the object row, its field values and the presets of its template are one act of
             // creation; the scope makes them one genesis commit rather than a create followed by
             // a handful of edits nobody performed
@@ -368,7 +379,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
                 UpsertFieldValues(newItem, fieldMap);
 
-                ApplyTemplate(newItem, fieldMap, request);
+                ApplyPresetValues(newItem, presets, fieldMap);
+
+                if (template is not null)
+                {
+                    CreateChildren(newItem, template.Id, request, new HashSet<Guid> { template.Id });
+                }
             }
 
             return new RestApiCrudResultCreate();
@@ -557,58 +573,125 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
-        /// Applies the template the payload names to a freshly created object: its presets become
-        /// field values, and each of its child templates becomes an object below the created one.
+        /// Resolves the template a create payload names, when it names one that can be applied.
         /// </summary>
         /// <remarks>
-        /// A value the caller submitted wins over the preset that would otherwise fill the same
-        /// field — a template pre-fills a form, it does not overrule what the user typed into it.
+        /// The template step of the wizard submits <c>none</c> for "no template", which is not a
+        /// guid and reads as absent; an archived template is offered nowhere and is not applied
+        /// through a stale id either.
         /// </remarks>
-        /// <param name="object">The object that was created.</param>
         /// <param name="fieldMap">The payload, which may name a template.</param>
-        /// <param name="request">The request, for resolving the acting identity.</param>
-        private static void ApplyTemplate(Model.Entities.Object @object, RestApiCrudFormData fieldMap, IRequest request)
+        /// <returns>The active template, or null when the payload names none.</returns>
+        private static Model.Entities.Template ResolveTemplate(RestApiCrudFormData fieldMap)
         {
             if (!fieldMap.TryGetGuid("TemplateId", out var templateId))
             {
-                return;
+                return null;
             }
 
             var template = CoreHub.TemplateManager.GetTemplate(templateId);
 
-            if (template is null || template.State != TemplateState.Active)
+            return template?.State == TemplateState.Active ? template : null;
+        }
+
+        /// <summary>
+        /// Puts the presets a template holds for the summary and the description onto an object
+        /// whose own are blank.
+        /// </summary>
+        /// <remarks>
+        /// The two are the attributes every object carries on its own row; a create form asks
+        /// for them under those names and <c>BindTo</c> writes them there, never into a value
+        /// row - so <see cref="UpsertFieldValues"/> skips them by design and a preset on either
+        /// would be lost without this. The caller's answer wins where there is one. The
+        /// description preset is what the template manager answers for it: the template's own
+        /// description unless its presets name one, so the text a template was written with is
+        /// the text its objects start with.
+        /// </remarks>
+        /// <param name="object">The object being created.</param>
+        /// <param name="presets">The presets of the template, keyed by field name.</param>
+        private static void ApplyPresetProperties(Model.Entities.Object @object, IReadOnlyDictionary<string, string> presets)
+        {
+            if (IsBlank(@object.Summary) && TryGetPreset(presets, nameof(Model.Entities.Object.Summary), out var summary))
             {
-                return;
+                @object.Summary = summary;
             }
 
-            ApplyPresets(@object, templateId, fieldMap);
-            CreateChildren(@object, templateId, request, new HashSet<Guid> { templateId });
+            if (IsBlank(@object.Description) && TryGetPreset(presets, nameof(Model.Entities.Object.Description), out var description))
+            {
+                @object.Description = description;
+            }
         }
 
         /// <summary>
         /// Writes the presets of a template as field values of an object, skipping the fields the
-        /// payload already set.
+        /// payload answered.
         /// </summary>
+        /// <remarks>
+        /// A value the caller submitted wins over the preset that would otherwise fill the same
+        /// field - a template pre-fills a form, it does not overrule what the user typed into
+        /// it. What the caller submitted has to be an answer, though: the wizard posts every
+        /// input of the create form, so a field the form could not pre-fill (a choice the
+        /// template names by a value the field does not offer, a control that ignores a seeded
+        /// value) arrives as an empty string, and a payload that merely mentions the field used
+        /// to shadow the preset - the object then came out without the very value the template
+        /// was picked for. Blank is treated as unanswered, and the preset lands.
+        /// </remarks>
         /// <param name="object">The object to write the values to.</param>
-        /// <param name="templateId">The template whose presets are applied.</param>
-        /// <param name="payload">The payload whose own values take precedence, or null.</param>
-        private static void ApplyPresets(Model.Entities.Object @object, Guid templateId, RestApiCrudFormData payload)
+        /// <param name="presets">The presets of the template, keyed by field name.</param>
+        /// <param name="payload">The payload whose own answers take precedence, or null.</param>
+        private static void ApplyPresetValues(Model.Entities.Object @object, IReadOnlyDictionary<string, string> presets, RestApiCrudFormData payload)
         {
-            var presets = new RestApiCrudFormData();
+            var values = new RestApiCrudFormData();
 
-            foreach (var preset in CoreHub.TemplateManager.GetPresets(templateId))
+            foreach (var preset in presets)
             {
                 var key = preset.Key.ToLowerInvariant();
 
-                if (payload?.ContainsKey(key) == true)
+                if (payload is not null
+                    && payload.TryGetValue(key, out var answer)
+                    && !IsBlank(SerializePayloadValue(answer)))
                 {
                     continue;
                 }
 
-                presets[key] = preset.Value;
+                values[key] = preset.Value;
             }
 
-            UpsertFieldValues(@object, presets);
+            UpsertFieldValues(@object, values);
+        }
+
+        /// <summary>
+        /// Reads a preset by field name, ignoring case - the presets are keyed the way the
+        /// template author wrote them, the payload keys arrive lower-cased.
+        /// </summary>
+        /// <param name="presets">The presets of the template.</param>
+        /// <param name="name">The field name.</param>
+        /// <param name="value">When this method returns, the preset, or null.</param>
+        /// <returns>True when the template presets the field with a non-blank value.</returns>
+        private static bool TryGetPreset(IReadOnlyDictionary<string, string> presets, string name, out string value)
+        {
+            value = presets
+                .FirstOrDefault(x => string.Equals(x.Key, name, StringComparison.OrdinalIgnoreCase))
+                .Value;
+
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        /// <summary>
+        /// Decides whether a submitted value says nothing.
+        /// </summary>
+        /// <remarks>
+        /// Null and whitespace are blank, and so is the document the prose editor submits for a
+        /// surface nobody wrote into: an editor posts a document rather than an empty string,
+        /// so a rich-text field the form could not pre-fill would otherwise arrive as an answer
+        /// and shadow the preset it was supposed to start from. A document carrying a picture
+        /// is not blank - <see cref="ProseText.IsEmpty"/> measures what is in it.
+        /// </remarks>
+        /// <param name="value">The serialized value.</param>
+        /// <returns>True when the value carries nothing.</returns>
+        private static bool IsBlank(string value)
+        {
+            return ProseText.IsEmpty(value);
         }
 
         /// <summary>
@@ -644,11 +727,19 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
+                // nobody answers for a child, so every preset applies. The summary is the
+                // template's name unless a preset says otherwise; the description is what the
+                // template manager answers for it - the template's own unless a preset names one
+                var presets = CoreHub.TemplateManager.GetPresets(childTemplate.Id);
                 var id = Guid.NewGuid();
                 var child = new Model.Entities.Object(id)
                 {
-                    Summary = childTemplate.Name,
-                    Description = childTemplate.Description,
+                    Summary = TryGetPreset(presets, nameof(Model.Entities.Object.Summary), out var summary)
+                        ? summary
+                        : childTemplate.Name,
+                    Description = TryGetPreset(presets, nameof(Model.Entities.Object.Description), out var description)
+                        ? description
+                        : null,
                     Icon = childTemplate.Icon ?? CoreHub.GenerateIcon(id),
                     State = WorkspaceState.Active,
                     ClassId = childTemplate.ClassId,
@@ -666,7 +757,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 {
                     CoreHub.ObjectManager.Add(child);
 
-                    ApplyPresets(child, childTemplate.Id, null);
+                    ApplyPresetValues(child, presets, null);
                 }
 
                 CreateChildren(child, childTemplate.Id, request, visited);

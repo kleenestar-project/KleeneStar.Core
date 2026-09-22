@@ -1,4 +1,5 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using System.Collections.Generic;
 using System.Linq;
@@ -128,7 +129,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                             Content = x.Summary
                         },
                         new() {
-                            Content = x.Description
+                            Content = ProseText.ToPlainText(x.Description)
                         },
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),

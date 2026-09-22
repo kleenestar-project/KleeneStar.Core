@@ -1,5 +1,6 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebQuickfilter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -129,7 +130,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
                              Content = x.Name
                         },
                         new() {
-                            Content = x.Description
+                            Content = ProseText.ToPlainText(x.Description)
                         },
                         new() {
                             Content = string.Join(", ", x.Workspaces.Select(x => x.Name))

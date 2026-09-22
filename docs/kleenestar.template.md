@@ -43,6 +43,18 @@ When a user initiates the object creation process, the system queries the `Templ
 
 If a template is modified or its underlying class changes (e.g., a required field is added to the class), the template remains valid but the object creation form will simply present the new required field as empty, prompting the user for input. Templates act as *pre-fillers*, not strict immutable contracts.
 
+### Applying a template
+
+A template is applied by `/api/1/objects` when a create payload names it (`TemplateId`), and the endpoint - not the wizard - is where the presets reach the object, so a script or a hand-written client gets the same result as the dialog. Three rules govern the transfer:
+
+- **Presets are keyed by field name** (`{"Priority":"P3 - Moderate","Impact":"Medium"}`) and land as value rows of the fields the class defines. A preset on a field the class lacks is dropped; a preset on a fixed set of options (a priority, a selection) has to name a value the field offers - the create form cannot pre-select a value the input does not know, and the shipped seeds are checked for exactly this (`SeedTemplatePresetsNameFieldsAndValuesOfTheirClass`).
+- **The caller's answer wins, a blank is not an answer.** The wizard pre-fills the create form from the presets and posts *every* input of it, so an input the form could not pre-fill arrives as an empty string. Such a field takes the preset; a field the caller actually answered keeps the answer. The empty document the prose editor submits for a field nobody wrote into counts as blank.
+- **`Summary` and `Description` are columns of the object, not value rows.** A preset on either is written onto the row itself before the object is stored, and only where the caller left it blank. A child of a composite template has nobody answering for it: every preset applies, and a summary or description it presets wins over the child template's own name and description.
+
+- **The template's own description is the `Description` preset**, unless its presets name one. The description is written with the same editor the object description uses, and a child of a composite has always been described by it; answering it as a preset is what makes the text a template was written with the text its objects start with. A template that wants to say one thing on its card and another in its objects writes `Description` into its presets, which wins. Preset names are matched ignoring case.
+
+The object row, its answered values, its presets and the children of a composite template are recorded in one genesis commit per object.
+
 ## UI Concepts and Pages
 
 Template management is integrated into the workspace settings, typically accessible alongside classes and fields. For end-users, templates manifest as the starting point of the object creation journey.

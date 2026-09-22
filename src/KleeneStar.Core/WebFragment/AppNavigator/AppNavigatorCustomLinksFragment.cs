@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebNavigator;
 using System.Linq;
 using WebExpress.WebApp.WebScope;
@@ -63,7 +64,7 @@ namespace KleeneStar.Core.WebFragment.AppNavigator
                 {
                     Text = _ => link.Name,
                     // the control emits the tooltip verbatim, so it is resolved here
-                    Tooltip = _ => I18N.Translate(renderContext, link.Description),
+                    Tooltip = _ => ProseText.ToPlainText(I18N.Translate(renderContext, link.Description)),
                     Uri = _ => ResolveUri(link.Uri),
                     Icon = _ => link.Icon
                 };

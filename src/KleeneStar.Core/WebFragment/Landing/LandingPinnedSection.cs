@@ -125,11 +125,11 @@ namespace KleeneStar.Core.WebFragment.Landing
                 Uri = _ => ObjectKindCatalog.ResolveDetailUri(entry)
             });
 
-            if (!string.IsNullOrWhiteSpace(entry.Description))
+            if (!ProseText.IsEmpty(entry.Description))
             {
                 panel.Add(new ControlText("landing-pinned-description-" + id)
                 {
-                    Text = _ => entry.Description,
+                    Text = _ => ProseText.ToPlainText(entry.Description),
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                     Format = _ => TypeFormatText.Paragraph
                 });

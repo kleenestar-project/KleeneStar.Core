@@ -39,7 +39,10 @@ namespace KleeneStar.Core
             CoreHub.ApplicationContext = applicationContext;
             ModelHub.ApplicationContext = applicationContext;
 
-            CoreHub.ComponentHub.IdentityManager.RegisterIdentityProvider(new WebIdentity.IdentityProvider(), applicationContext);
+            // the provider registry moved out of the identity manager with the token-based
+            // authentication: a provider is now owned by the plugin that brought it, and is
+            // dropped again when that plugin goes
+            CoreHub.ComponentHub.IdentityProviderManager.Register(new WebIdentity.IdentityProvider(), applicationContext);
 
             // the database settings are the plugin's own section of the settings directory
             // (settings/kleenestar.core.settings.json, overridable from webexpress.settings.json

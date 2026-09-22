@@ -402,7 +402,7 @@ namespace KleeneStar.Core.WebControl
                         {
                             Text = _ => ShortLabel(priority.Name),
                             Value = _ => priority.Name,
-                            Description = _ => priority.Description ?? priority.Name,
+                            Description = _ => ProseText.ToPlainText(priority.Description) ?? priority.Name,
                             Color = _ => new PropertyColorTile(color)
                         });
                     }

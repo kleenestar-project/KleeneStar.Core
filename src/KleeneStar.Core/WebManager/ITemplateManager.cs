@@ -79,7 +79,9 @@ namespace KleeneStar.Core.WebManager
         /// Returns the field presets a template applies.
         /// </summary>
         /// <remarks>
-        /// The keys are field names as the object create endpoint expects them.
+        /// The keys are field names as the object create endpoint expects them. The description
+        /// of the template is the text an object created from it starts with and is answered as
+        /// the <c>Description</c> preset unless the template carries one of its own.
         /// </remarks>
         /// <param name="templateId">The id of the template whose presets are read.</param>
         /// <returns>The presets, keyed by field name. The map may be empty.</returns>

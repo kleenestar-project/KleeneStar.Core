@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -174,7 +175,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
                             Content = string.Join(";", x.Categories)
                         },
                         new() {
-                            Content = x.Description
+                            Content = ProseText.ToPlainText(x.Description)
                         },
                         new() {
                             Content = x.State.ToString()

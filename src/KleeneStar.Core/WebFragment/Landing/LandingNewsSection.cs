@@ -110,11 +110,11 @@ namespace KleeneStar.Core.WebFragment.Landing
                 Uri = _ => ObjectKindCatalog.ResolveDetailUri(post)
             });
 
-            if (!string.IsNullOrWhiteSpace(post.Description))
+            if (!ProseText.IsEmpty(post.Description))
             {
                 panel.Add(new ControlText("landing-news-excerpt-" + id)
                 {
-                    Text = _ => Excerpt(post.Description),
+                    Text = _ => Excerpt(ProseText.ToPlainText(post.Description)),
                     TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
                     Format = _ => TypeFormatText.Paragraph
                 });

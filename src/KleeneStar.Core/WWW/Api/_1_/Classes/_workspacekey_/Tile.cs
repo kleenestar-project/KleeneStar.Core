@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
@@ -79,7 +80,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
                 {
                     Id = x.Id.ToString(),
                     Title = x.Name,
-                    Text = x.Description,
+                    Text = ProseText.ToPlainText(x.Description),
                     Image = x.Icon?.Uri?.ToString()
                     //Options = GetOptions(x, request)
                 });

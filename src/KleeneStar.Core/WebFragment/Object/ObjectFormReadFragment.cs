@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebControl;
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
@@ -405,7 +405,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
                 // what the field is for is the explanation a printed form prints in its
                 // margin; here it is the tooltip of the line it belongs to
-                Title = _ => string.IsNullOrWhiteSpace(field.Description) ? null : field.Description
+                Title = _ => ProseText.IsEmpty(field.Description) ? null : ProseText.ToPlainText(field.Description)
             });
 
             if (field.Required)

@@ -124,11 +124,28 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Returns the field presets a template applies.
         /// </summary>
+        /// <remarks>
+        /// The description of a template is the text an object created from it starts with:
+        /// the template dialog writes it with the same editor the object description uses, and
+        /// a child of a composite template has always been described by it. It therefore stands
+        /// in for a <c>Description</c> preset the template does not carry explicitly - one the
+        /// serialized presets name wins, so a template can say one thing on its card and start
+        /// the object with another.
+        /// </remarks>
         /// <param name="templateId">The id of the template whose presets are read.</param>
         /// <returns>The presets, keyed by field name. The map may be empty.</returns>
         public IReadOnlyDictionary<string, string> GetPresets(Guid templateId)
         {
-            return ParsePresets(GetTemplate(templateId)?.Presets);
+            var template = GetTemplate(templateId);
+            var presets = ParsePresets(template?.Presets);
+
+            if (!string.IsNullOrWhiteSpace(template?.Description)
+                && !presets.ContainsKey(nameof(Model.Entities.Object.Description)))
+            {
+                presets[nameof(Model.Entities.Object.Description)] = template.Description;
+            }
+
+            return presets;
         }
 
         /// <summary>
@@ -189,11 +206,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="presets">The serialized presets.</param>
         /// <returns>The parsed presets. The map may be empty.</returns>
-        private static IReadOnlyDictionary<string, string> ParsePresets(string presets)
+        private static Dictionary<string, string> ParsePresets(string presets)
         {
             if (string.IsNullOrWhiteSpace(presets))
             {
-                return new Dictionary<string, string>();
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             }
 
             try
@@ -212,7 +229,7 @@ namespace KleeneStar.Core.WebManager
             }
             catch (JsonException)
             {
-                return new Dictionary<string, string>();
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             }
         }
 
