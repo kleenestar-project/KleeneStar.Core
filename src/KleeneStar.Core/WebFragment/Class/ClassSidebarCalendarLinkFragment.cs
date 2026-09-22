@@ -32,6 +32,7 @@ namespace KleeneStar.Core.WebFragment.Class
     [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendar._calendarid_.Index>]
+    [Condition<ClassServiceLevelCondition>]
     [Order(10)]
     [Cache]
     public sealed class ClassSidebarCalendarLinkFragment : FragmentControlSidebarItemLink

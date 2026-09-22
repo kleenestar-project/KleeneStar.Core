@@ -59,6 +59,12 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
         public IEnumerable<string> Renderers => [Model.Entities.ObjectRenderer.Prose];
 
         /// <summary>
+        /// Gets <see langword="false"/>: a post is published, not resolved, so no SLA
+        /// times it.
+        /// </summary>
+        public bool ServiceLevels => false;
+
+        /// <summary>
         /// Gets the unbound route of the blog overview page (the blog timeline).
         /// </summary>
         public IUri OverviewUri => CoreHub.GetUri<global::KleeneStar.Core.WWW.Blogs._workspacekey_.Index>();

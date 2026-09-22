@@ -141,6 +141,8 @@ The validation runs against the kind the class **will** carry, not the one it ha
 
 `ClassManager.Add` and `Update` normalize the key on the way in, exactly as they normalize the kind — to `null` rather than to a default, per the asymmetry above.
 
+The class administration follows the renderer too. A prose class has no mask a field could stand in or a form could arrange, so its sidebar offers neither the *Fields* nor the *Forms* link: `ClassStructuredRendererCondition` gates both on the **effective** renderer (`IsRenderedAs`), resolving the class from whichever segment the route carries - the class, or a form, workflow, SLA or calendar of it. A blog class therefore never shows them, a document class only once it is switched to the form renderer. A form opened by its own address still answers with `FormProseNoticeFragment`.
+
 ## Seeded Example
 
 The seed carries one document class of each renderer, so both surfaces are reachable on a fresh installation without anybody having configured anything: **Documentation** and **Knowledge** are prose, **Specification** (Software Development workspace) names the form renderer. All three stand in the page tree of their workspace; opening a Specification shows the mask, opening a Documentation shows the article.

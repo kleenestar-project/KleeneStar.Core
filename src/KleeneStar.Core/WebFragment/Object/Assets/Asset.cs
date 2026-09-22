@@ -34,6 +34,12 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
         public int Order => 4;
 
         /// <summary>
+        /// Gets <see langword="false"/>: an asset is inventory, not work - nothing waits on
+        /// it, so no SLA times it.
+        /// </summary>
+        public bool ServiceLevels => false;
+
+        /// <summary>
         /// Gets the unbound route of the asset overview page (the asset list).
         /// </summary>
         public IUri OverviewUri => CoreHub.GetUri<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>();

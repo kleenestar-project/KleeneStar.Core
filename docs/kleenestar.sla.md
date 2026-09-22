@@ -186,6 +186,8 @@ The SLA management UI integrates into the class detail pages. From the class sid
 
 Entry into SLA management occurs directly from the class detail page via the "SLA" item in the class sidebar. The sidebar item is `ClassSidebarSlaLinkFragment` and is registered with every class-bound page.
 
+The item - and the calendar item beside it, whose business hours only an SLA counts in - is offered only where the class's kind is measured against service levels at all. That is a statement of the kind, `IObjectKind.ServiceLevels`, read by `ClassServiceLevelCondition`: the document, blog and asset kinds answer `false` (a page, a post or an inventory item is never overdue), the issue kind and every add-on kind keep the default `true`. The routes themselves stay reachable; only the sidebar stops offering them.
+
 ### SLA Management (Page)
 
 This page is the central administrative view for all SLA policies of a selected class. The main area is rendered by the `SlaViewFragment` (toggle group), which hosts the `SlaViewTableFragment`. Quick-filter chips ("Active", "Draft", "Inactive", "Critical") sit in the header along with an advanced-search input backed by the SLA WQL endpoint. New policies are created via the "New policy" button.

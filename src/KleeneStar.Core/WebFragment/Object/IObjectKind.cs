@@ -84,6 +84,21 @@ namespace KleeneStar.Core.WebFragment.Object
         IEnumerable<string> Renderers => [];
 
         /// <summary>
+        /// Gets whether the objects of this kind are measured against service levels - the
+        /// SLA policies of their class and the calendars whose business hours those policies
+        /// count in.
+        /// </summary>
+        /// <remarks>
+        /// An SLA times the response to and the resolution of a piece of work, and only a kind
+        /// whose objects are work waits on anybody. A page, a post or an inventory item is
+        /// never overdue, so the document, blog and asset kinds answer
+        /// <see langword="false"/> and the class administration of their classes does not
+        /// offer the two surfaces (<see cref="WebFragment.Class.ClassServiceLevelCondition"/>). The
+        /// default keeps what an add-on kind had before the question was asked.
+        /// </remarks>
+        bool ServiceLevels => true;
+
+        /// <summary>
         /// Gets the unbound route of the kind's overview page. The route carries the
         /// workspace-key segment, so callers bind the current request (or an explicit
         /// workspace-key parameter) before navigating.

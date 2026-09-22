@@ -41,6 +41,12 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
         public string DefaultRenderer => Model.Entities.ObjectRenderer.Prose;
 
         /// <summary>
+        /// Gets <see langword="false"/>: a page is never overdue, whichever renderer it is
+        /// read through, so no SLA times it.
+        /// </summary>
+        public bool ServiceLevels => false;
+
+        /// <summary>
         /// Gets the unbound route of the document overview page (the document tree).
         /// </summary>
         public IUri OverviewUri => CoreHub.GetUri<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>();
