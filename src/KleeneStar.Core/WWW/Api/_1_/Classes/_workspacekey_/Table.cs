@@ -228,6 +228,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
         /// </returns>
         protected override IQuery<Model.Entities.Class> Filter(IEnumerable<string> filters, IQuery<Model.Entities.Class> query, IRequest request)
         {
+            // the object type the sidebar picked
+            query = ClassKindFilter.Apply(filters, query);
+
             foreach (var filter in filters.Where(f => f.StartsWith("qf_", StringComparison.OrdinalIgnoreCase)))
             {
                 var key = filter[3..];

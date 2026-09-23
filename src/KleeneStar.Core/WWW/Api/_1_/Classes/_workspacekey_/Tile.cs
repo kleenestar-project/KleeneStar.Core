@@ -1,6 +1,7 @@
 ﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
+using KleeneStar.Core.WebRestApi;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -124,6 +125,34 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
             //        category.Value
             //    );
             //}
+
+            return query;
+        }
+
+        /// <summary>
+        /// Applies the quickfilter identifiers the view's filter binding carries - the object
+        /// type the sidebar picked and the state quick filters.
+        /// </summary>
+        /// <param name="filters">
+        /// A collection of filter identifiers.
+        /// </param>
+        /// <param name="query">
+        /// The query object to which the filters will be applied.
+        /// </param>
+        /// <param name="request">
+        /// The request that provides the operational context.
+        /// </param>
+        /// <returns>
+        /// A query representing the filtered set of classes.
+        /// </returns>
+        protected override IQuery<Model.Entities.Class> Filter(IEnumerable<string> filters, IQuery<Model.Entities.Class> query, IRequest request)
+        {
+            query = ClassKindFilter.Apply(filters, query);
+
+            if (filters?.Any(f => string.Equals(f, "qf_active", StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                query = query.Where(x => x.State == Model.Entities.ClassState.Active);
+            }
 
             return query;
         }

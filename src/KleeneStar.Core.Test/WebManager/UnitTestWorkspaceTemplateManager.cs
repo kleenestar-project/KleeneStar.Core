@@ -29,6 +29,9 @@ namespace KleeneStar.Core.Test.WebManager
         private static readonly Guid WorkspaceId = Guid.Parse("B7C8D9E0-1111-4111-8111-111111111111");
         private static readonly Guid OtherWorkspaceId = Guid.Parse("B7C8D9E0-2222-4222-8222-222222222222");
         private static readonly Guid AuthorId = Guid.Parse("B7C8D9E0-3333-4333-8333-333333333333");
+        private static readonly Guid ToDoCategoryId = Guid.Parse("B7C8D9E0-4444-4444-8444-444444444441");
+        private static readonly Guid WaitingCategoryId = Guid.Parse("B7C8D9E0-4444-4444-8444-444444444442");
+        private static readonly Guid DoneCategoryId = Guid.Parse("B7C8D9E0-4444-4444-8444-444444444443");
 
         /// <summary>
         /// A template with two classes, one of them a document, standing in for the ones a plugin
@@ -57,7 +60,67 @@ namespace KleeneStar.Core.Test.WebManager
                     Name = "Ticket",
                     Description = "Requests as they arrive.",
                     Icon = "/kleenestar/assets/icons/ticket.svg",
-                    PortalVisible = true
+                    PortalVisible = true,
+                    Fields =
+                    [
+                        new WorkspaceTemplateField { Name = "Description", Type = FieldType.Text, Portal = true },
+                        new WorkspaceTemplateField { Name = "Status", Type = FieldType.Workflow },
+                        new WorkspaceTemplateField { Name = "Priority", Type = FieldType.Priority },
+                        new WorkspaceTemplateField { Name = "Urgency", Type = FieldType.Selection, Options = ["High", "Low"], Required = true, Portal = true },
+                        new WorkspaceTemplateField { Name = "Resolution", Type = FieldType.Multiline, Tab = WorkspaceTemplateField.DetailsTab, OnCreate = false }
+                    ],
+                    Priorities =
+                    [
+                        new WorkspaceTemplatePriority { Name = "P1" },
+                        new WorkspaceTemplatePriority { Name = "P2" }
+                    ],
+                    Workflow = new WorkspaceTemplateWorkflow
+                    {
+                        Name = "Ticket flow",
+                        Statuses =
+                        [
+                            new WorkspaceTemplateStatus { Name = "Open", Category = WorkspaceTemplateStatus.ToDo },
+                            new WorkspaceTemplateStatus { Name = "Waiting", Category = WorkspaceTemplateStatus.Waiting },
+                            new WorkspaceTemplateStatus { Name = "Done", Category = WorkspaceTemplateStatus.Done, IsEnd = true }
+                        ],
+                        Transitions =
+                        [
+                            new WorkspaceTemplateTransition { Name = "Wait", From = "Open", To = "Waiting" },
+                            new WorkspaceTemplateTransition { Name = "Resume", From = "Waiting", To = "Open" },
+                            new WorkspaceTemplateTransition { Name = "Close", From = "Open", To = "Done" },
+                            // names a state that is not declared, and connects nothing
+                            new WorkspaceTemplateTransition { Name = "Vanish", From = "Open", To = "Nowhere" }
+                        ]
+                    },
+                    Calendars =
+                    [
+                        new WorkspaceTemplateCalendar
+                        {
+                            Name = "Office",
+                            TimeZone = "Europe/Berlin",
+                            IsDefault = true,
+                            BusinessHours = [new WorkspaceTemplateBusinessHours(DayOfWeek.Monday, new TimeOnly(8, 0), new TimeOnly(18, 0))],
+                            Holidays = [new WorkspaceTemplateHoliday(new DateOnly(2026, 12, 25), "Christmas Day")]
+                        }
+                    ],
+                    Slas =
+                    [
+                        new WorkspaceTemplateSla
+                        {
+                            Name = "Standard",
+                            Calendar = "Office",
+                            PauseOn = ["Waiting"],
+                            Targets = [new WorkspaceTemplateSlaTarget("First response", SlaTargetKind.Response, 4, SlaTargetUnit.Hours)],
+                            Scope = [new WorkspaceTemplateSlaScope(SlaScopeRuleType.Priority, "P1")]
+                        },
+                        new WorkspaceTemplateSla
+                        {
+                            // names a calendar the class does not have, and runs in the default one
+                            Name = "Elsewhere",
+                            Calendar = "Mars",
+                            Targets = [new WorkspaceTemplateSlaTarget("Resolution", SlaTargetKind.Resolution, 2, SlaTargetUnit.BusinessDays)]
+                        }
+                    ]
                 },
                 new WorkspaceTemplateClass
                 {
@@ -78,6 +141,11 @@ namespace KleeneStar.Core.Test.WebManager
             CoreHubFixture.Initialize(connectionString);
 
             using var db = CoreHubFixture.CreateDbContext(connectionString);
+
+            // the installation's status categories, which a template's states name by name
+            db.StatusCategories.Add(new StatusCategory { Id = ToDoCategoryId, Name = "ToDo", IsDefault = true });
+            db.StatusCategories.Add(new StatusCategory { Id = WaitingCategoryId, Name = "Waiting" });
+            db.StatusCategories.Add(new StatusCategory { Id = DoneCategoryId, Name = "Done" });
 
             db.Workspaces.Add(new Workspace { Id = WorkspaceId, Key = "ws-tpl", Name = "templated" });
             db.Workspaces.Add(new Workspace { Id = OtherWorkspaceId, Key = "ws-oth", Name = "other" });
@@ -331,6 +399,13 @@ namespace KleeneStar.Core.Test.WebManager
             var second = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
 
             Assert.Empty(second.Classes);
+            Assert.Empty(second.Fields);
+            Assert.Empty(second.Priorities);
+            Assert.Empty(second.Statuses);
+            Assert.Empty(second.Workflows);
+            Assert.Empty(second.Forms);
+            Assert.Empty(second.Calendars);
+            Assert.Empty(second.Slas);
             Assert.Empty(second.Views);
             Assert.Null(second.Home);
             Assert.Null(second.OpeningPost);
@@ -346,6 +421,191 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Equal(2, CoreHub.ObjectManager
                 .GetObjects(new Query<ObjectEntity>().WhereEquals(x => x.WorkspaceId, WorkspaceId))
                 .Count());
+        }
+
+        /// <summary>
+        /// Applying a template writes the structure it declares into the class it creates: the
+        /// priority scale in order, the states with their categories, the workflow placing them
+        /// with a start and an end, and the fields - the status field bound to that workflow.
+        /// </summary>
+        /// <remarks>
+        /// A transition naming a state the template does not declare connects nothing and is
+        /// dropped rather than stored with a dangling end.
+        /// </remarks>
+        [Fact]
+        public void ApplyWritesTheStructure()
+        {
+            Seed(nameof(ApplyWritesTheStructure));
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+            var ticket = result.Classes.Single(x => x.Name == "Ticket");
+
+            Assert.Equal(["P1", "P2"], CoreHub.PriorityManager
+                .GetPriorities(new Query<Priority>().WhereEquals(x => x.ClassId, ticket.Id))
+                .OrderBy(x => x.Order)
+                .Select(x => x.Name));
+
+            var statuses = CoreHub.StatusManager
+                .GetStatuses(new Query<Status>().WhereEquals(x => x.ClassId, ticket.Id))
+                .ToDictionary(x => x.Name);
+
+            Assert.Equal(ToDoCategoryId, statuses["Open"].CategoryId);
+            Assert.Equal(WaitingCategoryId, statuses["Waiting"].CategoryId);
+            Assert.Equal(DoneCategoryId, statuses["Done"].CategoryId);
+
+            var workflow = CoreHub.WorkflowManager.GetWorkflowWithStructure(Assert.Single(result.Workflows).Id);
+
+            Assert.Equal(ticket.Id, workflow.ClassId);
+            Assert.Equal(3, workflow.WorkflowStatuses.Count);
+            Assert.True(workflow.WorkflowStatuses.Single(x => x.StatusId == statuses["Open"].Id).IsStart);
+            Assert.True(workflow.WorkflowStatuses.Single(x => x.StatusId == statuses["Done"].Id).IsEnd);
+            Assert.Equal(["Close", "Resume", "Wait"], workflow.Transitions.Select(x => x.Name).Order());
+
+            var fields = CoreHub.FieldManager
+                .GetFields(new Query<Field>().WhereEquals(x => x.ClassId, ticket.Id))
+                .ToDictionary(x => x.Name);
+
+            Assert.Equal(5, fields.Count);
+            Assert.Equal(workflow.Id, fields["Status"].WorkflowId);
+            Assert.Null(fields["Urgency"].WorkflowId);
+            Assert.True(fields["Urgency"].Required);
+            Assert.Equal(["High", "Low"], fields["Urgency"].Options);
+        }
+
+        /// <summary>
+        /// The create, edit and view forms are derived from the fields - each field on the tab it
+        /// names, the create form without what only the team fills in later - and a
+        /// portal-visible class gets the self-service form of its portal fields, flagged as the
+        /// portal's request template.
+        /// </summary>
+        [Fact]
+        public void ApplyDerivesTheForms()
+        {
+            Seed(nameof(ApplyDerivesTheForms));
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+            var ticket = result.Classes.Single(x => x.Name == "Ticket");
+
+            var fields = CoreHub.FieldManager
+                .GetFields(new Query<Field>().WhereEquals(x => x.ClassId, ticket.Id))
+                .ToDictionary(x => x.Id, x => x.Name);
+
+            List<(string Tab, string[] Fields)> Layout(FormType type, bool portal = false)
+            {
+                var form = result.Forms.Single(x => x.ClassId == ticket.Id && x.FormType == type && x.PortalTemplate == portal);
+
+                Assert.True(form.PortalTemplate == portal);
+                var structure = CoreHub.FormManager.GetFormWithStructure(form.Id);
+
+                return [.. structure.Tabs
+                    .OrderBy(t => t.Position)
+                    .Select(t => (t.Name, t.Elements
+                        .OfType<FormFieldRefElement>()
+                        .OrderBy(e => e.Position)
+                        .Select(e => fields[e.FieldId])
+                        .ToArray()))];
+            }
+
+            // the standard forms the class was born with are filled, not doubled
+            Assert.Single(CoreHub.FormManager.GetForms(new Query<Form>().WhereEquals(x => x.ClassId, ticket.Id)), x => x.FormType == FormType.Edit);
+
+            var edit = Layout(FormType.Edit);
+
+            Assert.Equal(2, edit.Count);
+            Assert.Equal(WorkspaceTemplateField.GeneralTab, edit[0].Tab);
+            Assert.Equal(["Description", "Status", "Priority", "Urgency"], edit[0].Fields);
+            Assert.Equal(WorkspaceTemplateField.DetailsTab, edit[1].Tab);
+            Assert.Equal(["Resolution"], edit[1].Fields);
+
+            Assert.Equal(edit.SelectMany(x => x.Fields), Layout(FormType.View).SelectMany(x => x.Fields));
+
+            var create = Layout(FormType.Create);
+
+            Assert.DoesNotContain("Resolution", create.SelectMany(x => x.Fields));
+
+            var portal = Assert.Single(Layout(FormType.Default, portal: true));
+
+            Assert.Equal(["Description", "Urgency"], portal.Fields);
+        }
+
+        /// <summary>
+        /// Calendars and agreements are written with their children, each agreement running in
+        /// the calendar it names - or in the class's default calendar when it names one the
+        /// class does not have - and pausing in the states it names.
+        /// </summary>
+        [Fact]
+        public void ApplyWritesCalendarsAndAgreements()
+        {
+            Seed(nameof(ApplyWritesCalendarsAndAgreements));
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+            var calendar = CoreHub.CalendarManager.GetCalendar(Assert.Single(result.Calendars).Id);
+
+            Assert.Equal("Office", calendar.Name);
+            Assert.True(calendar.IsDefault);
+
+            // every weekday is written, the unworked ones disabled
+            Assert.Equal(7, calendar.BusinessHours.Count);
+            Assert.Single(calendar.BusinessHours, x => x.Enabled);
+            Assert.Single(calendar.Holidays);
+
+            var slas = result.Slas.ToDictionary(x => x.Name, x => CoreHub.SlaManager.GetSla(x.Id));
+
+            Assert.Equal(calendar.Id, slas["Standard"].CalendarId);
+            Assert.Equal(calendar.Id, slas["Elsewhere"].CalendarId);
+            Assert.Equal("Waiting", slas["Standard"].PauseOn);
+            Assert.Single(slas["Standard"].Targets);
+            Assert.Equal("P1", Assert.Single(slas["Standard"].Scope).Value);
+        }
+
+        /// <summary>
+        /// A class that declares no structure gets none - the core adds nothing of its own. The
+        /// probe's knowledge base is prose and declares nothing; the prose class the manager
+        /// creates for the opening post declares nothing either. The empty standard forms every
+        /// class is born with stay empty.
+        /// </summary>
+        [Fact]
+        public void ApplyAddsNoStructureOfItsOwn()
+        {
+            Seed(nameof(ApplyAddsNoStructureOfItsOwn));
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+            var ticket = result.Classes.Single(x => x.Name == "Ticket");
+
+            foreach (var @class in result.Classes.Where(x => x.Id != ticket.Id))
+            {
+                Assert.Empty(CoreHub.FieldManager.GetFields(new Query<Field>().WhereEquals(x => x.ClassId, @class.Id)));
+                Assert.All(CoreHub.FormManager.GetForms(new Query<Form>().WhereEquals(x => x.ClassId, @class.Id)),
+                    x => Assert.Empty(CoreHub.FormManager.GetFormWithStructure(x.Id).Tabs));
+                Assert.Empty(CoreHub.WorkflowManager.GetWorkflows(new Query<Workflow>().WhereEquals(x => x.ClassId, @class.Id)));
+            }
+        }
+
+        /// <summary>
+        /// A class the workspace already carried keeps its shape: the structure is written only
+        /// into classes the application created, never beside what an administrator built.
+        /// </summary>
+        [Fact]
+        public void ApplyLeavesAnExistingClassAlone()
+        {
+            Seed(nameof(ApplyLeavesAnExistingClassAlone));
+
+            var existing = new ClassEntity
+            {
+                Id = Guid.NewGuid(),
+                Name = "Ticket",
+                WorkspaceId = WorkspaceId,
+                Kind = ObjectKind.Issue,
+                State = ClassState.Active
+            };
+
+            CoreHub.ClassManager.Add(existing);
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+
+            Assert.DoesNotContain(result.Classes, x => x.Name == "Ticket");
+            Assert.Empty(result.Fields);
+            Assert.Empty(CoreHub.FieldManager.GetFields(new Query<Field>().WhereEquals(x => x.ClassId, existing.Id)));
         }
 
         /// <summary>
@@ -393,6 +653,9 @@ namespace KleeneStar.Core.Test.WebManager
         private static void AssertNothingCreated(WorkspaceTemplateResult result)
         {
             Assert.Empty(result.Classes);
+            Assert.Empty(result.Fields);
+            Assert.Empty(result.Forms);
+            Assert.Empty(result.Workflows);
             Assert.Empty(result.Views);
             Assert.Null(result.Home);
             Assert.Null(result.OpeningPost);

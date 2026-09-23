@@ -1,4 +1,5 @@
 using KleeneStar.Model.Entities;
+using System.Collections.Generic;
 
 namespace KleeneStar.Core.WebWorkspaceTemplate
 {
@@ -65,5 +66,37 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// Gets who may see the class.
         /// </summary>
         public AccessModifier AccessModifier { get; init; } = AccessModifier.Public;
+
+        /// <summary>
+        /// Gets the fields the class is created with, in the order its forms show them. The
+        /// create, edit and view forms are derived from them.
+        /// </summary>
+        /// <remarks>
+        /// Everything below describes the <em>structure</em> of the class, and all of it is
+        /// the template's to decide - the core applies what is declared and adds nothing of
+        /// its own. What is left empty is not created, so a prose class that declares no
+        /// fields gets no forms either, which is right: prose has no fields.
+        /// </remarks>
+        public IReadOnlyList<WorkspaceTemplateField> Fields { get; init; } = [];
+
+        /// <summary>
+        /// Gets the priority scale of the class, most pressing first.
+        /// </summary>
+        public IReadOnlyList<WorkspaceTemplatePriority> Priorities { get; init; } = [];
+
+        /// <summary>
+        /// Gets the lifecycle of the class, or null for a class without one.
+        /// </summary>
+        public WorkspaceTemplateWorkflow Workflow { get; init; }
+
+        /// <summary>
+        /// Gets the calendars the service-level clocks of the class run in.
+        /// </summary>
+        public IReadOnlyList<WorkspaceTemplateCalendar> Calendars { get; init; } = [];
+
+        /// <summary>
+        /// Gets the service-level agreements of the class.
+        /// </summary>
+        public IReadOnlyList<WorkspaceTemplateSla> Slas { get; init; } = [];
     }
 }

@@ -279,7 +279,8 @@ namespace KleeneStar.Core.WebManager
                 return WorkspaceTemplateResult.Empty;
             }
 
-            var classes = new List<Class>(ApplyClasses(template, workspaceId, culture));
+            var structure = new WorkspaceTemplateStructureResult();
+            var classes = new List<Class>(ApplyClasses(template, workspaceId, culture, structure));
             var views = ApplyViews(workspaceId);
 
             // the pages describe the workspace as it now stands, so they are written from every
@@ -313,6 +314,13 @@ namespace KleeneStar.Core.WebManager
             return new WorkspaceTemplateResult
             {
                 Classes = classes,
+                Fields = structure.Fields,
+                Priorities = structure.Priorities,
+                Statuses = structure.Statuses,
+                Workflows = structure.Workflows,
+                Forms = structure.Forms,
+                Calendars = structure.Calendars,
+                Slas = structure.Slas,
                 Views = views,
                 Home = ApplyProse(workspace, template, all, ObjectKind.Document, identityId, culture),
                 OpeningPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture)
@@ -320,18 +328,30 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Creates the classes the template describes.
+        /// Creates the classes the template describes, each with the structure the template
+        /// declares for it.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// A name the workspace already carries is skipped rather than duplicated. The name is
         /// what is compared, not the descriptor: a class an administrator renamed is a different
         /// class, and one they kept is the same one however it was created.
+        /// </para>
+        /// <para>
+        /// The structure - fields, forms, priorities, workflow, calendars, agreements - is
+        /// written only into a class created here. A class the workspace already carried is
+        /// left as it is: its administrator has shaped it, and a second priority scale or
+        /// workflow beside theirs would be the destructive kind of help. Writing it raises no
+        /// notification per record (<see cref="CoreHub.BeginSilentNotifications"/>); the class
+        /// itself is still announced, and the audit log still records every record.
+        /// </para>
         /// </remarks>
         /// <param name="template">The template being applied.</param>
         /// <param name="workspaceId">The workspace the classes are created in.</param>
         /// <param name="culture">The language the descriptions are written in.</param>
+        /// <param name="structure">Collects the structure written into the classes.</param>
         /// <returns>The classes created.</returns>
-        private static IReadOnlyList<Class> ApplyClasses(IWorkspaceTemplate template, Guid workspaceId, CultureInfo culture)
+        private static IReadOnlyList<Class> ApplyClasses(IWorkspaceTemplate template, Guid workspaceId, CultureInfo culture, WorkspaceTemplateStructureResult structure)
         {
             var existing = CoreHub.ClassManager
                 .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
@@ -347,7 +367,7 @@ namespace KleeneStar.Core.WebManager
                     continue;
                 }
 
-                created.Add(CreateClass
+                var @class = CreateClass
                 (
                     workspaceId,
                     descriptor.Name,
@@ -358,7 +378,14 @@ namespace KleeneStar.Core.WebManager
                     descriptor.PortalVisible,
                     descriptor.Sealed,
                     descriptor.AccessModifier
-                ));
+                );
+
+                created.Add(@class);
+
+                using (CoreHub.BeginSilentNotifications())
+                {
+                    WorkspaceTemplateStructure.Apply(@class, descriptor, culture, structure);
+                }
             }
 
             return created;

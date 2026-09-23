@@ -128,6 +128,15 @@ workspace.table.header=My Workspaces
 # when the template names none, and the text of the two pages themselves
 workspace.template.class.page=Pages written about this workspace, starting with its home page.
 workspace.template.class.news=What happens in this workspace, newest first.
+workspace.template.workflow.name=Lifecycle
+workspace.template.tab.general=General
+workspace.template.tab.details=Details
+workspace.template.form.create.description=Form asked when an object of the class is created.
+workspace.template.form.edit.description=Form an object of the class is edited in.
+workspace.template.form.view.description=Form an object of the class is read in.
+workspace.template.form.selfservice.name=Self-Service
+workspace.template.form.selfservice.description=Simplified form customers file a request through in the portal.
+workspace.template.form.selfservice.tab=Request
 workspace.template.home.summary=Welcome to {0}
 workspace.template.home.banner=Home
 workspace.template.home.lead=This is the home page of {0}. It was created together with the workspace and is yours to rewrite — everything below is a starting point, not a fixture.

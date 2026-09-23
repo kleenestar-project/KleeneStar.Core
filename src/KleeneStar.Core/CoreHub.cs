@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using WebExpress.WebCore;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebApplication;
@@ -448,8 +449,58 @@ namespace KleeneStar.Core
             return AddNotification(header, message, durability, subject?.Label, subject?.TargetUri, subject?.IconUri);
         }
 
+        /// <summary>
+        /// Opens a scope in which no notification is raised - neither the toast nor the entry in
+        /// the notification center.
+        /// </summary>
+        /// <remarks>
+        /// For a single act that writes many records at once, where one notification per record
+        /// would bury the reader: a workspace created from a template writes the fields,
+        /// priorities, states, workflow, forms, calendars and agreements of every class it
+        /// starts with, and each of those managers announces what it adds. The act is announced
+        /// once, by the records that stand for it (the workspace, its classes). Only the
+        /// notifications are silenced - the managers' events still fire, so the audit log keeps
+        /// recording every record. Scopes nest; disposing one restores the state before it.
+        /// </remarks>
+        /// <returns>The scope; dispose it to raise notifications again.</returns>
+        public static IDisposable BeginSilentNotifications()
+        {
+            _silentNotifications.Value++;
+
+            return new SilentNotificationsScope();
+        }
+
+        /// <summary>
+        /// The depth of the <see cref="BeginSilentNotifications"/> scopes on this call chain.
+        /// </summary>
+        private static readonly AsyncLocal<int> _silentNotifications = new();
+
+        /// <summary>
+        /// The scope handed out by <see cref="BeginSilentNotifications"/>.
+        /// </summary>
+        private sealed class SilentNotificationsScope : IDisposable
+        {
+            private bool _disposed;
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _silentNotifications.Value = Math.Max(0, _silentNotifications.Value - 1);
+            }
+        }
+
         public static INotification AddNotification(string header, string message, int durability = -1, string subject = null, string targetUri = null, string subjectIcon = null)
         {
+            if (_silentNotifications.Value > 0)
+            {
+                return null;
+            }
+
             // best-effort: callers (manager Add/Update/Remove) rely on this returning
             // null silently when the host is not fully initialized (e.g. in unit tests
             // where CoreHub is wired without a real component hub), rather than NREing.

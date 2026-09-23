@@ -129,6 +129,15 @@ workspace.table.header=Meine Arbeitsbereiche
 # Prosaseite braucht, wenn die Vorlage keine nennt, und der Text der beiden Seiten selbst
 workspace.template.class.page=Seiten über diesen Arbeitsbereich, beginnend mit seiner Startseite.
 workspace.template.class.news=Was in diesem Arbeitsbereich geschieht, neueste zuerst.
+workspace.template.workflow.name=Lebenszyklus
+workspace.template.tab.general=Allgemein
+workspace.template.tab.details=Details
+workspace.template.form.create.description=Formular, das beim Anlegen eines Objekts der Klasse abgefragt wird.
+workspace.template.form.edit.description=Formular, in dem ein Objekt der Klasse bearbeitet wird.
+workspace.template.form.view.description=Formular, in dem ein Objekt der Klasse gelesen wird.
+workspace.template.form.selfservice.name=Self-Service
+workspace.template.form.selfservice.description=Vereinfachtes Formular, über das Kunden im Portal eine Anfrage stellen.
+workspace.template.form.selfservice.tab=Anfrage
 workspace.template.home.summary=Willkommen in {0}
 workspace.template.home.banner=Startseite
 workspace.template.home.lead=Dies ist die Startseite von {0}. Sie wurde zusammen mit dem Arbeitsbereich angelegt und darf umgeschrieben werden — alles Folgende ist ein Anfang, keine Vorgabe.
