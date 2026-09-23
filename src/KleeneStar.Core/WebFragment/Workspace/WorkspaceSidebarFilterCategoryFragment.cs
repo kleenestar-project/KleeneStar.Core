@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// </summary>
     [Section<SectionSidebarPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class WorkspaceSidebarFilterCategoryFragment : FragmentControlSidebarItemLink
     {

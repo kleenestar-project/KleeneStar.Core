@@ -27,7 +27,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class WorkspaceSidebarSettingFragment : FragmentControlToolbarItemDropdown
     {

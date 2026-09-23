@@ -61,6 +61,15 @@ namespace KleeneStar.Core.WebManager
         Identity GetIdentityByLogin(string name);
 
         /// <summary>
+        /// Returns the account an external source knows by the supplied subject, whatever its
+        /// state - the caller decides what an inactive one means.
+        /// </summary>
+        /// <param name="source">The key of the source.</param>
+        /// <param name="subject">The identifier the source knows the account by.</param>
+        /// <returns>The identity, or <see langword="null"/>.</returns>
+        Identity GetIdentityBySource(string source, string subject);
+
+        /// <summary>
         /// Returns the identity the given request is served for — the account whose profile
         /// settings the profile pages read and write.
         /// </summary>

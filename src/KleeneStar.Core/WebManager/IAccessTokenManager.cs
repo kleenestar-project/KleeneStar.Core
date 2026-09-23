@@ -85,5 +85,14 @@ namespace KleeneStar.Core.WebManager
         /// <param name="tokenId">The id of the token to delete.</param>
         /// <returns>The current instance for method chaining.</returns>
         IAccessTokenManager Remove(Guid tokenId);
+
+        /// <summary>
+        /// Decides whether a personal access token may act for its owner on this request: it
+        /// is one the profile lists, active, and its scopes allow the request.
+        /// </summary>
+        /// <param name="credential">The verified personal token.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the token may act.</returns>
+        bool Accepts(WebIdentity.SessionCredential credential, IRequest request);
     }
 }

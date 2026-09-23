@@ -37,7 +37,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </remarks>
     [Section<SectionContentSecondary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.HistoryDetail>]
-    [Policy<ObjectEditPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<ObjectEditPolicy>>]
     [Cache]
     public sealed class ObjectHistoryRestoreFragment : FragmentControlPanel
     {

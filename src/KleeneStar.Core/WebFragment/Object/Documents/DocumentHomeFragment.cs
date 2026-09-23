@@ -44,7 +44,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class DocumentHomeFragment : FragmentControlPanel
     {

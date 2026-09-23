@@ -20,6 +20,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// minute, and the invitation closes the column.
     /// </remarks>
     [Section<SectionContentPrimary>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
     [Scope<global::KleeneStar.Core.WWW.Index>]
     [Order(40)]
     public sealed class LandingSideColumnFragment : FragmentControlPanel

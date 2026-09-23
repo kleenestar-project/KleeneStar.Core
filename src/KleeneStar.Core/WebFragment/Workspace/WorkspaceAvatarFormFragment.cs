@@ -15,7 +15,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// Represents a avatar form fragment for a workspace.
     /// </summary>
     [Section<SectionContentPreferences>]
-    [Policy<WorkspaceAdminPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Avatar>]
     [Cache]
     public sealed class WorkspaceAvatarFormFragment : FragmentControlDataFormEdit

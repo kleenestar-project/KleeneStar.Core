@@ -168,6 +168,27 @@ namespace KleeneStar.Core.WebManager
             CoreHub.AccessTokenManager.AccessTokenRemoved += (_, x) => RecordChange(AuditCategory.Security, AuditAction.TokenRevoked, x, AuditSeverity.Notice);
 
             CoreHub.IdentitySessionManager.IdentitySessionRemoved += (_, x) => RecordChange(AuditCategory.Security, AuditAction.SessionRevoked, x, AuditSeverity.Notice);
+
+            // the password itself reaches the log in no form; the actor says who set it - the
+            // owner, or nobody when a reset link did - and the target says whose it is
+            CoreHub.CredentialManager.PasswordChanged += (_, x) => Record
+            (
+                AuditCategory.Security,
+                AuditAction.PasswordChanged,
+                new AuditTarget(AuditTargetType.Identity, x.Id, x.UserName ?? x.Name),
+                [],
+                AuditOutcome.Succeeded,
+                AuditSeverity.Notice
+            );
+            CoreHub.CredentialManager.PasswordResetIssued += (_, x) => Record
+            (
+                AuditCategory.Security,
+                AuditAction.PasswordResetIssued,
+                new AuditTarget(AuditTargetType.Identity, x.IdentityId),
+                [AuditDelta.Added("expires", x.Expires.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), AuditValueKind.Timestamp)],
+                AuditOutcome.Succeeded,
+                AuditSeverity.Notice
+            );
         }
 
         /// <summary>

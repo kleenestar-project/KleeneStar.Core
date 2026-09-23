@@ -50,6 +50,11 @@ namespace KleeneStar.Core
             // the built-in sqlite defaults
             ModelHub.DatabaseSettings = DatabaseSettings.From(applicationContext.PluginContext?.Settings);
 
+            // the external sources an administrator configured (Authentication:OpenIdConnect in
+            // the same section); a source that cannot be built is logged and skipped, and its
+            // accounts cannot sign in until it is fixed
+            WebIdentity.OpenIdConnectAuthenticationSource.RegisterConfigured(applicationContext.PluginContext?.Settings, applicationContext, componentHub);
+
             try
             {
                 using var db = ModelHub.CreateDbContext();

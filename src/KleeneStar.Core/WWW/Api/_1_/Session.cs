@@ -17,16 +17,14 @@ namespace KleeneStar.Core.WWW.Api._1_
     /// Represents a session that manages authentication and credential validation for REST API requests.
     /// </summary>
     /// <remarks>
-    /// <b>The password is not verified yet.</b> A name that belongs to an active account signs
-    /// that account in, whatever password is offered with it. The check is missing rather than
-    /// weak: <see cref="Model.Entities.Identity.PasswordHash"/> is seeded with opaque
-    /// <c>$seed$</c> placeholders that no password produces, and nothing in the application can
-    /// set a real one - so a verification added today would lock every account out for good,
-    /// with no way back in. What belongs here is a hash scheme plus the surfaces that set and
-    /// reset a password; until then the sign-in identifies, and does not authenticate.
+    /// The password is checked by the source the account names
+    /// (<see cref="WebManager.ICredentialManager.Authenticate"/>): the stored hash for an
+    /// internal account, the directory for an external one that takes passwords. An account of
+    /// an identity provider the browser is sent to (OpenID Connect) is refused here - its
+    /// password is not this form's to receive.
     /// <para>
-    /// It does now identify the <em>stored</em> account rather than a fabricated one, which is
-    /// what everything per-user reads back off the session
+    /// The answer is the <em>stored</em> account rather than a fabricated one, which is what
+    /// everything per-user reads back off the session
     /// (<see cref="WebManager.ISessionManager.GetCurrentIdentityId"/>): the author of a comment,
     /// the owner of a like, the addressee of a notification, the actor of an audit event.
     /// </para>
@@ -58,9 +56,10 @@ namespace KleeneStar.Core.WWW.Api._1_
             // the stored account is what is answered, because it is what the session then
             // carries: everything per-user in the application reads the signed-in identity back
             // off the session, so a fabricated one would sign every comment, like and
-            // preference of the session with a person who does not exist. An unknown name is
-            // refused, which is also what makes the framework's lockout counting mean anything.
-            var identity = Resolve(username);
+            // preference of the session with a person who does not exist. An unknown name and a
+            // wrong password are refused alike, which is also what makes the framework's lockout
+            // counting mean anything.
+            var identity = Authenticate(username, password);
 
             RecordSignIn(username, identity);
 
@@ -107,9 +106,16 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// A sign-out is worth recording for the same reason a sign-in is: it bounds the window
         /// during which actions could be attributed to that session. Without it, the log says
         /// when somebody arrived and never says when they left.
+        /// <para>
+        /// The <c>DELETE</c> attribute has to be repeated here: the framework routes a verb to the
+        /// method that declares it, and an override that does not declare it again leaves the
+        /// endpoint answering "The method 'DELETE' is not supported" - the sign-out button then
+        /// redirects as though it worked, and the caller stays signed in.
+        /// </para>
         /// </remarks>
         /// <param name="request">The request that ends the session.</param>
         /// <returns>The response of the base implementation.</returns>
+        [Method(RequestMethod.DELETE)]
         public override IResponse Logout(IRequest request)
         {
             var identityId = ResolveIdentityId(request);
@@ -127,7 +133,14 @@ namespace KleeneStar.Core.WWW.Api._1_
                 );
             }
 
-            return base.Logout(request);
+            // the framework revokes the grant; the session list forgets it, so the device does
+            // not linger on the profile as though it were still signed in
+            var grant = CoreHub.SessionManager?.GetCurrentCredential(request)?.GrantId;
+            var response = base.Logout(request);
+
+            CoreHub.IdentitySessionManager?.End(grant);
+
+            return response;
         }
 
         /// <summary>
@@ -196,16 +209,18 @@ namespace KleeneStar.Core.WWW.Api._1_
         }
 
         /// <summary>
-        /// Resolves the stored identity a username names, so a successful sign-in is attributed
-        /// to a durable id rather than to a string.
+        /// Authenticates the stored account a username names, so a successful sign-in is
+        /// attributed to a durable id rather than to a string.
         /// </summary>
         /// <param name="username">The username.</param>
-        /// <returns>The identity, or <see langword="null"/> when none carries that name.</returns>
-        private static IdentityEntity Resolve(string username)
+        /// <param name="password">The password.</param>
+        /// <returns>The identity, or <see langword="null"/> when the name names none or the
+        /// password does not authenticate it.</returns>
+        private static IdentityEntity Authenticate(string username, string password)
         {
             try
             {
-                return CoreHub.IdentityManager?.GetIdentityByLogin(username);
+                return CoreHub.CredentialManager?.Authenticate(username, password);
             }
             catch (Exception)
             {

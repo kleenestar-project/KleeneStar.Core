@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Classes._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class WorkspaceSidebarIconFragment : FragmentControlSidebarItemIcon
     {

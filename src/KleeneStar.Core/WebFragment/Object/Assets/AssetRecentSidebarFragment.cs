@@ -14,7 +14,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Order(20)]
     [Cache]
     public sealed class AssetRecentSidebarFragment : ObjectRecentSidebarFragment

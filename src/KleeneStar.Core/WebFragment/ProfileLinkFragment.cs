@@ -1,4 +1,3 @@
-using WebExpress.WebApp.WebCondition;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -19,7 +18,7 @@ namespace KleeneStar.Core.WebFragment
     [Section<SectionAppAvatarPrimary>]
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
-    [Condition<ConditionLogin>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
     [Cache]
     public sealed class ProfileLinkFragment : FragmentControlDropdownItemLink
     {

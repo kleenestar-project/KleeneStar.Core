@@ -55,7 +55,9 @@ namespace KleeneStar.Core.WebFragment.Identity
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            if (!FragmentContext.Conditions.Check(renderContext?.Request))
+            // only an account administrator can add an account, so nobody else is offered it
+            if (!FragmentContext.Conditions.Check(renderContext?.Request)
+                || !WebRestApi.AccountAuthorization.IsAdministrator(renderContext?.Request))
             {
                 return null;
             }

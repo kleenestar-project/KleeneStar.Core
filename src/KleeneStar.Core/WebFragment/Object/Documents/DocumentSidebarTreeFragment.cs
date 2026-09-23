@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
     [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Edit>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Order(10)]
     [Cache]
     public sealed class DocumentSidebarTreeFragment : FragmentControlSidebarItemLink

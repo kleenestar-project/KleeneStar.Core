@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebIdentity;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -12,6 +13,7 @@ using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebIcon;
 
 namespace KleeneStar.Core.WWW.Api._1_.Identities
 {
@@ -25,6 +27,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
         private readonly IUri _editFormUri;
         private readonly IUri _cloneFormUri;
         private readonly IUri _deleteFormUri;
+        private readonly IUri _passwordFormUri;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -34,6 +37,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
             _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Identity._identityid_.Edit>();
             _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Identity._identityid_.Clone>();
             _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Identity._identityid_.Delete>();
+            _passwordFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Identity._identityid_.Password>();
         }
 
         /// <summary>
@@ -69,6 +73,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
                 Label = I18N.Translate(request, "kleenestar.core:setting.identity.state.label"),
                 Visible = false
             };
+
+            yield return new RestApiTableColumn()
+            {
+                Id = "source",
+                Label = I18N.Translate(request, "kleenestar.core:setting.identity.source.label"),
+                Visible = true
+            };
         }
 
         /// <summary>
@@ -90,6 +101,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
                         },
                         new() {
                             Content = x.State.ToString()
+                        },
+                        new() {
+                            Content = SourceName(x, request)
                         }
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
@@ -165,11 +179,42 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
                 PrimaryAction = new ActionModal("modal-form", cloneUri, TypeModalSize.ExtraLarge)
             };
 
+            // a reset link is offered only where it can set something: an internal account
+            if (AuthenticationSourceCatalog.ManagesPassword(row))
+            {
+                var passwordUri = _passwordFormUri?
+                    .BindParameters(request)
+                    .BindParameters(new IdentityIdParameter(row.Id));
+
+                yield return new RestApiOptionCustom(request)
+                {
+                    Text = I18N.Translate(request, "kleenestar.core:setting.identity.password.title"),
+                    Icon = new IconKey(),
+                    PrimaryAction = new ActionModal("modal-form", passwordUri, TypeModalSize.Default)
+                };
+            }
+
             yield return new RestApiOptionSeparator(request);
             yield return new RestApiOptionDelete(request)
             {
                 PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
             };
+        }
+
+        /// <summary>
+        /// Names the source that authenticates an account, or its stored key when the source
+        /// is not installed.
+        /// </summary>
+        /// <param name="row">The account.</param>
+        /// <param name="request">The request whose language the name is given in.</param>
+        /// <returns>The name.</returns>
+        private static string SourceName(Model.Entities.Identity row, IRequest request)
+        {
+            var source = AuthenticationSourceCatalog.Resolve(row);
+
+            return source is null
+                ? row.AuthenticationSource
+                : I18N.Translate(request, source.Name);
         }
 
         /// <summary>

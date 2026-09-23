@@ -52,6 +52,20 @@ namespace KleeneStar.Core.WebFragment.Branding
         };
 
         /// <summary>
+        /// Gets the prose editor for the text a visitor who is not signed in reads on the start
+        /// page, beside the sign-in.
+        /// </summary>
+        public ControlFormItemInputText WelcomeText { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Branding.WelcomeText),
+            Label = _ => "kleenestar.core:setting.branding.welcome.label",
+            Placeholder = _ => "kleenestar.core:setting.branding.welcome.placeholder",
+            Help = _ => "kleenestar.core:setting.branding.welcome.help",
+            Format = _ => TypeEditTextFormat.Wysiwyg,
+            Required = _ => false
+        };
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="fragmentContext">The context of the fragment.</param>
@@ -60,6 +74,7 @@ namespace KleeneStar.Core.WebFragment.Branding
         {
             Add(Icon);
             Add(Title);
+            Add(WelcomeText);
 
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Branding.Index>();
 

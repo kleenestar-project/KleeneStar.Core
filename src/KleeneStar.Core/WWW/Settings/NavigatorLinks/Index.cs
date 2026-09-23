@@ -18,6 +18,7 @@ namespace KleeneStar.Core.WWW.Settings.NavigatorLinks
     [WebIcon<IconLink>]
     [SettingGroup<SettingGroupGeneralGeneral>()]
     [SettingSection(SettingSection.Primary)]
+    [Policy<global::WebExpress.WebCore.WebPolicies.AuthenticatedAccessPolicy>]
     [Scope<IScopeAdmin>]
     public sealed class Index : ISettingPage<VisualTreeWebAppSetting>, IScopeAdmin
     {

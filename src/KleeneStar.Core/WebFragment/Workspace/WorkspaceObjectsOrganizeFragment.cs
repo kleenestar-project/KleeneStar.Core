@@ -37,7 +37,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Title("kleenestar.core:workspace.organize.title")]
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Issues._workspacekey_.Organize>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class WorkspaceObjectsOrganizeFragment : FragmentControlPanel
     {

@@ -11,6 +11,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// Links back to the landing page from the entry-path pages.
     /// </summary>
     [Section<SectionSidebarPrimary>]
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
     [Scope<global::KleeneStar.Core.WWW.Index>]
     [Scope<global::KleeneStar.Core.WWW.Mine.Index>]
     [Scope<global::KleeneStar.Core.WWW.Shared.Index>]

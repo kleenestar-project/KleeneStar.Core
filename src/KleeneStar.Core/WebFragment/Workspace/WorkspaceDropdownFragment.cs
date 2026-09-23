@@ -19,7 +19,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Order(0)]
     [Cache]
     public sealed class WorkspaceDropdownFragment : WorkspaceDropdownControl, IFragmentControl<WorkspaceDropdownControl>, IFragmentControlNavigationItem

@@ -83,6 +83,40 @@ namespace KleeneStar.Core.WebControl
         }
 
         /// <summary>
+        /// Renders a stored text as markup that is safe to put in front of anybody: an editor
+        /// document as the markup the editor's own reader produces, anything else encoded.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="ToHtml"/> answers a value that is no document as it stands, which is right
+        /// for a caller that searches the markup and wrong for one that puts it on a page - a
+        /// plain value would be interpreted as markup there. A page an anonymous visitor reads
+        /// takes this one.
+        /// </remarks>
+        /// <param name="value">The stored text: an editor document or plain text.</param>
+        /// <returns>The markup, or <see langword="null"/> for a blank value.</returns>
+        public static string ToSafeHtml(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (EditorState.IsState(value))
+            {
+                try
+                {
+                    return EditorState.ToHtml(value);
+                }
+                catch (JsonException)
+                {
+                    // a document that does not parse is shown as the text it is
+                }
+            }
+
+            return WebUtility.HtmlEncode(value).Replace("\n", "<br/>");
+        }
+
+        /// <summary>
         /// Decides whether a description says nothing.
         /// </summary>
         /// <remarks>

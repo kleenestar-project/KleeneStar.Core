@@ -37,6 +37,32 @@ The grid is attached in `Assets/css/kleenestar.css` through `div:has(> .ks-landi
 
 The page itself contributes nothing — not even the headline, which is hidden on this page because the head carries a kicker above the title and actions beside it, neither of which the headline control expresses.
 
+## Signed out
+
+A visitor who is not signed in sees none of the above. The organization's figures, news and
+activity are nothing to show somebody the installation does not know yet, so every landing
+fragment - head, figures, both columns and the sidebar links - is gated on `SignedInCondition`,
+and `LandingWelcomeFragment` on its complement: the page shows exactly one of the two.
+
+The signed-out page is the installation's greeting beside the sign-in, and nothing else:
+
+- The greeting is `Branding.WelcomeText`, written with the prose editor on the branding page
+  (*Settings -> Branding*). It is rendered through `ProseText.ToSafeHtml` - the editor's own
+  reader for a document, encoded text for anything else - because the reader is anybody. Without
+  one, a built-in sentence names the installation.
+- The sign-in is the framework's login control on the session endpoint; a successful sign-in
+  reloads the page into the signed-in one.
+- The frame's sidebar, headline, breadcrumb and the header's navigation, search and
+  notifications are hidden by `kleenestar.css` on this page only (`body:has(.ks-welcome)`);
+  they belong to the frame, not to fragments a condition could withhold. "Create" and the
+  settings gear are gone for a signed-out visitor everywhere (a fragment condition and the
+  settings pages' `AuthenticatedAccessPolicy`). The application title, the help and the avatar
+  stay.
+
+Only the account administrators may change the branding record (`/api/1/branding` `PUT`,
+`AccountAuthorization`): what a visitor reads before signing in must not be writable by that
+visitor.
+
 ## Head
 
 The greeting follows the time of day and addresses the reader by their first name. On a page everybody shares, that one personal line is what tells a reader the figures below are the organization's and not theirs. The two actions are the ones that belong to arriving: *Choose start page*, which leads to the dashboards — the page says itself that it can be replaced — and *New issue*, which opens the same creation modal as everywhere else.

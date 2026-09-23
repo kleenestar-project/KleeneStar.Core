@@ -21,6 +21,7 @@ namespace KleeneStar.Core.WWW.Settings
     [WebIcon<IconDatabase>]
     [SettingGroup<SettingGroupSystemGeneral>()]
     [SettingSection(SettingSection.Secondary)]
+    [Policy<global::WebExpress.WebCore.WebPolicies.AuthenticatedAccessPolicy>]
     [Scope<IScopeAdmin>]
     public sealed class DB : ISettingPage<VisualTreeWebAppSetting>, IScopeAdmin
     {

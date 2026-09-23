@@ -19,7 +19,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// </summary>
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Edit>]
-    [Policy<WorkspaceAdminPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Cache]
     public sealed class WorkspaceEditFormFragment : FragmentControlDataFormEdit
     {

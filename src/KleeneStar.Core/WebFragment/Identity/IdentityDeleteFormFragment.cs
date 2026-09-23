@@ -47,7 +47,10 @@ namespace KleeneStar.Core.WebFragment.Identity
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
-            return base.Render(renderContext, visualTree);
+            // a caller who does not administer the accounts gets the reason, not a form whose
+            // load the endpoint refuses
+            return IdentityFormGuard.Refuse(renderContext, visualTree)
+                ?? base.Render(renderContext, visualTree);
         }
     }
 }

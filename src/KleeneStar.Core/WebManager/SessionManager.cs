@@ -53,12 +53,26 @@ namespace KleeneStar.Core.WebManager
         /// <remarks>
         /// A page asks this several times - every fragment that greets the user, checks a
         /// favourite or reads a preference - and the answer depends on nothing but the request,
-        /// while finding it costs a session lookup and a row read. The table holds no request
-        /// alive, so an entry dies when the request does. The box is a one-element array
-        /// because "resolved to nobody" has to be storable and distinguishable from "not
+        /// while finding it costs a token check, a row read and a look into the token store. The
+        /// table holds no request alive, so an entry dies when the request does; "resolved to
+        /// nobody" is stored as <see cref="ResolvedCaller.Nobody"/>, distinguishable from "not
         /// resolved yet".
         /// </remarks>
-        private static readonly ConditionalWeakTable<IRequest, Guid[]> _resolved = new();
+        private static readonly ConditionalWeakTable<IRequest, ResolvedCaller> _resolved = new();
+
+        /// <summary>
+        /// The caller of a request as it was resolved: the identity, and the credential it was
+        /// resolved from.
+        /// </summary>
+        /// <param name="IdentityId">The identity, or <see cref="Guid.Empty"/> for nobody.</param>
+        /// <param name="Credential">The credential, or <see langword="null"/> for nobody.</param>
+        private sealed record ResolvedCaller(Guid IdentityId, WebIdentity.SessionCredential Credential)
+        {
+            /// <summary>
+            /// The answer for a request nobody is signed in to.
+            /// </summary>
+            public static readonly ResolvedCaller Nobody = new(Guid.Empty, null);
+        }
 
         /// <summary>
         /// Shared JSON serializer options for round-tripping the opaque payloads
@@ -89,9 +103,9 @@ namespace KleeneStar.Core.WebManager
         /// signed-in user.
         /// </summary>
         /// <remarks>
-        /// The session is where the framework keeps who signed in - <c>IdentityManager.Login</c>
-        /// binds the identity to <c>request.Session</c> and <c>GetCurrentIdentity</c> reads it
-        /// back - so this is one question asked of one place, and everything per-user in the
+        /// The framework carries who signed in in a signed token - an access cookie, or a
+        /// personal access token as a bearer - and <see cref="WebIdentity.SessionCredential"/>
+        /// reads it; this is one question asked of one place, and everything per-user in the
         /// application follows from it: who a comment is by, whose like it is, whose
         /// preferences a table layout belongs to, whom a notification is addressed to, which
         /// identity an audit event names.
@@ -126,16 +140,40 @@ namespace KleeneStar.Core.WebManager
                 return Guid.Empty;
             }
 
+            return ResolveCached(current).IdentityId;
+        }
+
+        /// <summary>
+        /// Returns the credential the request is authenticated by - the sign-in grant or the
+        /// personal access token behind <see cref="GetCurrentIdentityId"/>.
+        /// </summary>
+        /// <param name="request">The current HTTP request. May be null, which answers from the
+        /// request being served on this call chain.</param>
+        /// <returns>The credential, or <see langword="null"/> when nobody is signed in.</returns>
+        public WebIdentity.SessionCredential GetCurrentCredential(IRequest request)
+        {
+            var current = request ?? WebEx.CurrentRequest;
+
+            return current is null ? null : ResolveCached(current).Credential;
+        }
+
+        /// <summary>
+        /// Resolves the caller of a request once and keeps the answer beside the request.
+        /// </summary>
+        /// <param name="current">The request.</param>
+        /// <returns>The resolved caller.</returns>
+        private ResolvedCaller ResolveCached(IRequest current)
+        {
             if (_resolved.TryGetValue(current, out var cached))
             {
-                return cached[0];
+                return cached;
             }
 
-            var identityId = Resolve(current);
+            var caller = Resolve(current);
 
-            _resolved.AddOrUpdate(current, [identityId]);
+            _resolved.AddOrUpdate(current, caller);
 
-            return identityId;
+            return caller;
         }
 
         /// <summary>
@@ -153,37 +191,54 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Reads the signed-in identity off the request's session and answers the stored
-        /// identity it stands for.
+        /// Reads the request's credential and answers the stored account it stands for - when
+        /// that account may still act, and the credential is still good.
         /// </summary>
         /// <remarks>
-        /// The identity in the session is usually one of ours - the sign-in endpoint answers
-        /// with the row it authenticated - and then its id is the answer. It need not be: the
-        /// framework takes identities from every registered provider, so one that names itself
-        /// rather than carrying our id is matched to a stored account by user name, e-mail or
-        /// display name. An identity that matches no account is <em>not</em> invented as one:
-        /// it may sign in and read, and everything that would have to record an author refuses
-        /// instead of attributing the act to somebody else.
+        /// The token is one of ours or it names nobody: the sign-in answers with the row it
+        /// authenticated and an external source answers with the stored account its subject is
+        /// linked to, so the token's id is the answer and nothing is matched by name - a
+        /// directory entry calling itself <c>admin</c> would otherwise be handed the internal
+        /// administrator.
+        /// <para>
+        /// A token is a snapshot, valid until it expires whatever happened since, so three
+        /// questions are asked of every request that the framework does not ask:
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Is the account still <see cref="Model.Entities.IdentityState.Active"/>? A locked
+        /// or disabled account stops acting at once, not when its token runs out.</item>
+        /// <item>For a sign-in: has its grant been revoked - by signing out, or by ending the
+        /// session from the profile? The framework revokes grants in its token store but only
+        /// checks the store when a token is <em>refreshed</em>
+        /// (<see cref="IIdentitySessionManager.Accepts"/>).</item>
+        /// <item>For a personal access token: is it one the profile issued, not revoked, and does
+        /// its scope allow the request (<see cref="IAccessTokenManager.Accepts"/>)?</item>
+        /// </list>
         /// </remarks>
         /// <param name="request">The current HTTP request.</param>
-        /// <returns>The identity id, or <see cref="Guid.Empty"/>.</returns>
-        private Guid Resolve(IRequest request)
+        /// <returns>The resolved caller.</returns>
+        private ResolvedCaller Resolve(IRequest request)
         {
-            var identity = _componentHub?.IdentityManager?.GetCurrentIdentity(request);
+            var credential = WebIdentity.SessionCredential.Read(request, _componentHub);
+            var identityId = credential?.Identity?.Id ?? Guid.Empty;
 
-            if (identity is null)
+            if (identityId == Guid.Empty)
             {
-                return Guid.Empty;
+                return ResolvedCaller.Nobody;
             }
 
-            if (identity.Id != Guid.Empty && CoreHub.IdentityManager?.GetIdentity(identity.Id) is not null)
+            var account = CoreHub.IdentityManager?.GetIdentity(identityId);
+
+            if (account is null || account.State != Model.Entities.IdentityState.Active)
             {
-                return identity.Id;
+                return ResolvedCaller.Nobody;
             }
 
-            return CoreHub.IdentityManager?.GetIdentityByLogin(identity.Name)?.Id
-                ?? CoreHub.IdentityManager?.GetIdentityByLogin(identity.Email)?.Id
-                ?? Guid.Empty;
+            var accepted = credential.Personal
+                ? CoreHub.AccessTokenManager?.Accepts(credential, request) ?? false
+                : CoreHub.IdentitySessionManager?.Accepts(credential, request) ?? false;
+
+            return accepted ? new ResolvedCaller(identityId, credential) : ResolvedCaller.Nobody;
         }
 
         /// <summary>

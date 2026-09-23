@@ -22,6 +22,7 @@ namespace KleeneStar.Core.WWW.Settings
     [WebIcon<IconWindowMaximize>]
     [SettingGroup<SettingGroupGeneralGeneral>()]
     [SettingSection(SettingSection.Primary)]
+    [Policy<global::WebExpress.WebCore.WebPolicies.AuthenticatedAccessPolicy>]
     [Scope<IScopeAdmin>]
     public sealed class Branding : ISettingPage<VisualTreeWebAppSetting>, IScopeAdmin
     {

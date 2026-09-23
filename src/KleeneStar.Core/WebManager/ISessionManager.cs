@@ -36,6 +36,15 @@ namespace KleeneStar.Core.WebManager
         Guid GetCurrentIdentityId(IRequest request);
 
         /// <summary>
+        /// Returns the credential the request is authenticated by: the sign-in grant or the
+        /// personal access token behind <see cref="GetCurrentIdentityId"/>.
+        /// </summary>
+        /// <param name="request">The current HTTP request. May be null, which answers from the
+        /// request being served on this call chain.</param>
+        /// <returns>The credential, or <see langword="null"/> when nobody is signed in.</returns>
+        WebIdentity.SessionCredential GetCurrentCredential(IRequest request);
+
+        /// <summary>
         /// Acts as the supplied identity for the life of the returned scope: everything asking
         /// <see cref="GetCurrentIdentityId"/> without a request answers it until the scope is
         /// closed.

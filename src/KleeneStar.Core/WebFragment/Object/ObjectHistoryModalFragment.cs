@@ -30,7 +30,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
-    [Policy<ObjectViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<ObjectViewPolicy>>]
     [Cache]
     public sealed class ObjectHistoryModalFragment : ControlModalRemotePage, IFragmentControl<ControlModalRemotePage>
     {

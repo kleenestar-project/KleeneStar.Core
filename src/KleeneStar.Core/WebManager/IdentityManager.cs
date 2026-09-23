@@ -112,6 +112,30 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the account an external source knows by the supplied subject, whatever its
+        /// state.
+        /// </summary>
+        /// <param name="source">The key of the source.</param>
+        /// <param name="subject">The identifier the source knows the account by.</param>
+        /// <returns>The identity, or <see langword="null"/>.</returns>
+        public Identity GetIdentityBySource(string source, string subject)
+        {
+            var key = IdentitySource.Normalize(source);
+
+            // the internal source has no subjects: an internal account is never found this way
+            if (key is null || string.IsNullOrEmpty(subject))
+            {
+                return null;
+            }
+
+            var query = new Query<Identity>()
+                .Where(x => x.AuthenticationSource == key && x.ExternalSubject == subject)
+                .WithPaging(0, 1);
+
+            return ModelHub.GetIdentities(query).FirstOrDefault();
+        }
+
+        /// <summary>
         /// Returns the identity the given request is served for — the account whose profile
         /// settings the profile pages read and write.
         /// </summary>
@@ -176,6 +200,9 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(identityEntity);
 
+            // one spelling of "internal" in the data, see IdentitySource
+            identityEntity.AuthenticationSource = IdentitySource.Normalize(identityEntity.AuthenticationSource);
+
             ModelHub.Add(identityEntity);
 
             IdentityAdded?.Invoke(this, identityEntity);
@@ -190,9 +217,26 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="identityEntity">The identity to update.</param>
         /// <returns>The current instance for method chaining.</returns>
+        /// <remarks>
+        /// Moving an account to another authentication source drops the credentials it had
+        /// with the old one - the password hash and the external subject - because they prove
+        /// nothing to the new source: an account moved to an external source must not keep a
+        /// password that still signs it in here, and one moved back must get a password of its
+        /// own through a reset link.
+        /// </remarks>
         public IIdentityManager Update(Identity identityEntity)
         {
             ArgumentNullException.ThrowIfNull(identityEntity);
+
+            identityEntity.AuthenticationSource = IdentitySource.Normalize(identityEntity.AuthenticationSource);
+
+            var stored = GetIdentity(identityEntity.Id);
+
+            if (stored is not null && !IdentitySource.AreEqual(stored.AuthenticationSource, identityEntity.AuthenticationSource))
+            {
+                ModelHub.SetPasswordHash(identityEntity.Id, null, null);
+                ModelHub.SetExternalSubject(identityEntity.Id, null);
+            }
 
             ModelHub.Update(identityEntity);
 

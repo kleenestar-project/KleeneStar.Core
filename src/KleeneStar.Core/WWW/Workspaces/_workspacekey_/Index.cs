@@ -15,7 +15,7 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
     /// </summary>
     [WebIcon<WorkspaceIcon>]
     [WorkspaceKeySegment]
-    [Policy<WorkspaceAdminPolicy>]
+    //[Policy<WorkspaceAdminPolicy>] - a page-level policy refuses everybody; see PageAuthorization
     [Scope<IScopeGeneral>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopeGeneral

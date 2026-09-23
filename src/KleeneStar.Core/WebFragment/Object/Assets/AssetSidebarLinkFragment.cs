@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Edit>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Edit>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Condition<AssetKindConfiguredCondition>]
     [Order(4)]
     [Cache]

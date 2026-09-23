@@ -32,7 +32,7 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Blogs._workspacekey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class BlogStreamFragment : FragmentControlPanel
     {

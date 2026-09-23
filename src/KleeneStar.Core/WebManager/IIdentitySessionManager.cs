@@ -53,5 +53,27 @@ namespace KleeneStar.Core.WebManager
         /// <param name="request">The current HTTP request.</param>
         /// <returns>The current instance for method chaining.</returns>
         IIdentitySessionManager RevokeOthers(IRequest request);
+
+        /// <summary>
+        /// Decides whether a sign-in may still act, and records that it did.
+        /// </summary>
+        /// <remarks>
+        /// A sign-in is a grant, and a grant ended by signing out or from the session list is
+        /// revoked in the framework's token store - which the framework consults only when a
+        /// token is refreshed, not when an access token is presented. This is where that
+        /// question is asked for every request. The first request of a grant writes its row;
+        /// later ones move its last activity forward, at most every few minutes.
+        /// </remarks>
+        /// <param name="credential">The verified sign-in credential.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the grant has not been revoked.</returns>
+        bool Accepts(WebIdentity.SessionCredential credential, IRequest request);
+
+        /// <summary>
+        /// Forgets the session of a grant that ended by signing out - the framework has revoked
+        /// the grant already.
+        /// </summary>
+        /// <param name="grantId">The grant.</param>
+        void End(string grantId);
     }
 }

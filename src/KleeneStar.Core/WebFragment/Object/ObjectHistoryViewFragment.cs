@@ -23,7 +23,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.History>]
-    [Policy<ObjectViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<ObjectViewPolicy>>]
     [Cache]
     public sealed class ObjectHistoryViewFragment : FragmentControlView, IScope
     {

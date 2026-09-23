@@ -20,7 +20,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Permissions>]
-    [Policy<WorkspaceAdminPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Cache]
     public sealed class WorkspacePermissionFragment : FragmentControlDataPermission
     {

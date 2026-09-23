@@ -24,6 +24,7 @@ namespace KleeneStar.Core.WWW.Settings.Audit
     [WebIcon<IconShieldHalved>]
     [SettingGroup<SettingGroupSystemGeneral>()]
     [SettingSection(SettingSection.Primary)]
+    [Policy<global::WebExpress.WebCore.WebPolicies.AuthenticatedAccessPolicy>]
     [Scope<IScopeAdmin>]
     public sealed class Index : ISettingPage<VisualTreeWebAppSetting>, IScopeAdmin, IScope
     {

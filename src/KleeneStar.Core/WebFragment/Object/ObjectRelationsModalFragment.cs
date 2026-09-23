@@ -28,7 +28,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionBodySecondary>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
-    [Policy<ObjectViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<ObjectViewPolicy>>]
     [Cache]
     public sealed class ObjectRelationsModalFragment : ControlModalRemotePage, IFragmentControl<ControlModalRemotePage>
     {

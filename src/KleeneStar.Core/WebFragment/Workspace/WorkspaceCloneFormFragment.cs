@@ -17,7 +17,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// Represents a clone form fragment for a workspace.
     /// </summary>
     [Section<SectionContentPreferences>]
-    [Policy<WorkspaceAdminPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Clone>]
     [Cache]
     public sealed class WorkspaceCloneFormFragment : FragmentControlDataFormClone

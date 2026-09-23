@@ -56,6 +56,20 @@ namespace KleeneStar.Core.WebFragment.Identity
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Identities.State>().ToString())};
 
         /// <summary>
+        /// Gets the selection of the source that authenticates the account: the installation
+        /// itself, or an external source a plugin registered. Moving an account to another
+        /// source drops the credentials it had with the old one.
+        /// </summary>
+        public ControlDataFormItemInputSelection AuthenticationSource { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Identity.AuthenticationSource),
+            Label = _ => "kleenestar.core:setting.identity.source.label",
+            Help = _ => "kleenestar.core:setting.identity.source.help",
+            StickySelection = _ => true,
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Identities.Sources>().ToString())
+        };
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="fragmentContext">The context of the fragment.</param>
@@ -65,6 +79,7 @@ namespace KleeneStar.Core.WebFragment.Identity
             Add(IdentityName);
             Add(Email);
             Add(IdentityState);
+            Add(AuthenticationSource);
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Identities.Index>();
             ItemId = renderContext =>
             {
@@ -87,7 +102,10 @@ namespace KleeneStar.Core.WebFragment.Identity
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
-            return base.Render(renderContext, visualTree);
+            // a caller who does not administer the accounts gets the reason, not a form whose
+            // load the endpoint refuses
+            return IdentityFormGuard.Refuse(renderContext, visualTree)
+                ?? base.Render(renderContext, visualTree);
         }
     }
 }

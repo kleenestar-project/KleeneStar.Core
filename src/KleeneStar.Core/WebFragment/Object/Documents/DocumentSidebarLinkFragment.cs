@@ -23,7 +23,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Edit>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Edit>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Condition<DocumentKindConfiguredCondition>]
     [Order(1)]
     [Cache]

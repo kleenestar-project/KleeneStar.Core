@@ -67,6 +67,7 @@ namespace KleeneStar.Core
         private static NotificationCenterManager _notificationCenterManager;
         private static IdentitySessionManager _identitySessionManager;
         private static AccessTokenManager _accessTokenManager;
+        private static CredentialManager _credentialManager;
         private static SavedSearchManager _savedSearchManager;
         private static SprintManager _sprintManager;
         private static AuditManager _auditManager;
@@ -349,6 +350,13 @@ namespace KleeneStar.Core
         /// identity created for API access and integrations.
         /// </summary>
         public static IAccessTokenManager AccessTokenManager => _accessTokenManager ??= ComponentHub.GetComponentManager<AccessTokenManager>();
+
+        /// <summary>
+        /// Gets the credential manager responsible for the passwords of internal accounts, the
+        /// one-time links that set them, and the link between an account and the external
+        /// source that authenticates it.
+        /// </summary>
+        public static ICredentialManager CredentialManager => _credentialManager ??= ComponentHub.GetComponentManager<CredentialManager>();
 
         /// <summary>
         /// Gets the saved-search manager responsible for the per-identity saved searches

@@ -31,6 +31,30 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         /// Creates a new instance of an object that implements the IQueryContext interface.
         /// </summary>
         /// <returns>An IQueryContext instance that can be used to execute queries.</returns>
+        /// <summary>
+        /// Changes the installation's identity, once the caller administers the installation.
+        /// </summary>
+        /// <remarks>
+        /// The record is what the application is presented under and what a visitor who is not
+        /// signed in reads on the start page - a write open to anybody is a defacement open to
+        /// anybody. The administrators are those of the accounts (<see cref="AccountAuthorization"/>),
+        /// the only installation-wide administration there is.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates a new instance of an object that implements the IQueryContext interface.
+        /// </summary>
+        /// <returns>An IQueryContext instance.</returns>
         protected override IQueryContext CreateContext()
         {
             return ModelHub.CreateDbContext();

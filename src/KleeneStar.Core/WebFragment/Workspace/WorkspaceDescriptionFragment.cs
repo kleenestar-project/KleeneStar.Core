@@ -14,7 +14,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// workspace management interface.
     /// </summary>
     [Section<SectionContentPreferences>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces.Index>]
     [Cache]
     public sealed class WorkspaceDescriptionFragment : FragmentControlText

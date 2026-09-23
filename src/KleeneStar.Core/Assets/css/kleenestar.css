@@ -618,3 +618,56 @@ form > header > .wx-modal-title-input.form-control::placeholder {
     color: inherit;
     opacity: 0.5;
 }
+
+/* ================================================================ start page, signed out */
+
+/* A visitor who is not signed in reads the installation's greeting beside the sign-in and
+   nothing else (LandingWelcomeFragment). The two sit side by side on a wide screen, the greeting
+   first, and follow each other below 900px.
+
+   "Nothing else" includes the frame: the sidebar, the headline, the breadcrumb and the header's
+   navigation, search and notifications are the frame's, not fragments a
+   condition could withhold, so they are hidden from here - on this page only, identified by the
+   greeting it carries, the way the signed-in start page hides its headline. The application
+   title, the help and the avatar (with its sign-in) stay. */
+body:has(.ks-welcome) #wx-sidebar,
+body:has(.ks-welcome) #wx-content-main-headline,
+body:has(.ks-welcome) #wx-breadcrumb,
+body:has(.ks-welcome) #wx-header-appnavigation,
+body:has(.ks-welcome) #wx-header-search,
+body:has(.ks-welcome) #wx-header-notifications {
+    display: none !important;
+}
+
+.ks-welcome {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+    gap: 2.5rem;
+    align-items: start;
+    max-width: 68rem;
+    margin: 3rem auto;
+    padding: 0 1rem;
+}
+
+.ks-welcome-text {
+    line-height: 1.6;
+}
+
+.ks-welcome-text img {
+    max-width: 100%;
+    height: auto;
+}
+
+.ks-welcome-login {
+    border: 1px solid var(--wx-border-color);
+    border-radius: 0.5rem;
+    background: var(--wx-body-bg);
+}
+
+@media (max-width: 900px) {
+    .ks-welcome {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+}

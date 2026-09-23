@@ -33,7 +33,7 @@ namespace KleeneStar.Core.WebFragment.Template
     /// </remarks>
     [Section<SectionSidebarSecondary>]
     [Scope<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Cache]
     public sealed class TemplateSidebarCategoryFragment : FragmentControlSidebarItemLink
     {
