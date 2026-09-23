@@ -87,12 +87,20 @@ namespace KleeneStar.Core.WWW.Api._1_.SlaClocks._objectkey_
                 return Error($"The query parameter '{SlaTargetIdParameter.Key}' is missing or is not a valid id.");
             }
 
-            // the lookup runs over the active policies of the object's class, so a target of
-            // a draft, retired or foreign policy is not reachable through this route
-            var policy = CoreHub.SlaManager
-                .GetSlas(@object.ClassId)
-                .FirstOrDefault(p => p.State == SlaPolicyState.Active
-                    && (p.Targets ?? []).Any(t => t.Id == targetId));
+            // the lookup runs over the active policies of the object's class that cover the
+            // object, so a target of a draft, retired or foreign policy - or of one whose scope
+            // leaves this object out - is not reachable through this route
+            var policy = SlaScope
+                .Select
+                (
+                    CoreHub.SlaManager.GetSlas(@object.ClassId).Where(p => p.State == SlaPolicyState.Active),
+                    @object,
+                    CoreHub.FieldManager,
+                    CoreHub.ValueManager,
+                    CoreHub.PriorityManager,
+                    CoreHub.ObjectTagManager
+                )
+                .FirstOrDefault(p => (p.Targets ?? []).Any(t => t.Id == targetId));
 
             var target = policy?.Targets.FirstOrDefault(t => t.Id == targetId);
 

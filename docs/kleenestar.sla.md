@@ -44,7 +44,7 @@ SLA management follows a default lifecycle with the states draft, active, inacti
 
 ## Data Model and Relationships
 
-A policy is uniquely bound to a class. It aggregates a list of targets (`SlaTarget`), a list of scope rules (`SlaScopeRule` — combined with logical AND), and a list of escalation levels (`SlaEscalationLevel`). It references one optional working-hours `Calendar` from the same class (foreign key, set to `null` if the calendar is deleted) and one optional owner identity.
+A policy is uniquely bound to a class. It aggregates a list of targets (`SlaTarget`), a list of scope rules (`SlaScopeRule` — AND across rule types, OR within one type; see *Which Agreements Apply*), and a list of escalation levels (`SlaEscalationLevel`). It references one optional working-hours `Calendar` from the same class (foreign key, set to `null` if the calendar is deleted) and one optional owner identity.
 
 - Key attributes: id (stable Guid), name (unique per class), description, state, priority bucket, calendar reference, notification channels (flags enum), pause-on statuses (comma-separated), icon.
 - Targets: list of `SlaTarget` entries describing one measurable milestone each (response, resolution, update, approval, implementation, fulfillment, or custom).
@@ -146,7 +146,7 @@ A single measurable target on a policy, e.g. "first response within 30 minutes" 
 
 ### SlaScopeRule
 
-A single filter rule that contributes to the scope of a policy. Multiple rules on the same policy are combined with logical AND when matching a ticket.
+A single filter rule that contributes to the scope of a policy. Rules of **different** types are combined with logical AND, rules of the **same** type with OR - a ticket has one priority, so "priority P4 AND priority P5" could never hold, while "P4 or P5" is what such a policy means. See *Which Agreements Apply* for how and which rule types are evaluated.
 
 |Attribute   |Type                |Notes
 |------------|--------------------|-----
@@ -272,9 +272,21 @@ Cloning a policy reuses targets, scope rules, and escalations of an existing ent
 
 Deleting a policy is irreversible. The modal warns that the policy and all its children (`SlaTarget`, `SlaScopeRule`, `SlaEscalationLevel`) will be removed in a single cascade.
 
+### Which Agreements Apply
+
+A ticket is held to the active policies of its class **whose scope covers it** (`WebManager/SlaScope`, 2026-09-23). Before that every active policy ran on every ticket of the class, so an incident showed the clocks of all four priority agreements instead of the one its priority selects. The decision is KleeneStar's, not the framework's: WebExpress times one agreement (`SlaDefinition`, `SlaEvaluator`), and `SlaScope.Select` is called by both surfaces that show or serve a clock - the card and `/api/1/slaclocks/{objectKey}`, which answers `404` for a target of a policy whose scope leaves the ticket out.
+
+|Rule type   |Evaluated against
+|------------|-----------------------------------------------------------------------------
+|`Priority`  |The value of the class's priority fields - the priority's **name**, which is what the field stores (an id is resolved too). Compared ignoring case. A rule naming no priority of the class can never be satisfied and is **skipped** rather than switching its policy off.
+|`Tag`       |The ticket's tags (`ObjectTag.Name`), ignoring case.
+|all others  |Not evaluated - `Contract`, `Customer`, `Catalog`, `System`, `Site`, `Category`, `Source` and `Type` name attributes no ticket carries, so they do not restrict. Treating them as "never" would silently retire every policy that states one; the seeded catalogue does.
+
+A policy without rules covers every ticket of its class, and a ticket without a priority is held to no priority-scoped policy.
+
 ### SLA Display on the Ticket (Card)
 
-The ticket detail page (`/issue/{objectKey}`) carries an "Service Level Agreement" card rendered by the `IssueSlaCardFragment`. Every active policy of the ticket's class becomes one agreement group carrying its name, its severity bucket and the summary of how its targets are doing; every `SlaTarget` inside it becomes one `ControlDataSla` tile — a coloured status, a meter of the consumed budget and the time left until the deadline.
+The ticket detail page (`/issue/{objectKey}`) carries an "Service Level Agreement" card rendered by the `IssueSlaCardFragment`. Every active policy of the ticket's class whose scope covers the ticket becomes one agreement group carrying its name, its severity bucket and the summary of how its targets are doing; every `SlaTarget` inside it becomes one `ControlDataSla` tile — a coloured status, a meter of the consumed budget and the time left until the deadline.
 
 The tiles are rendered complete: the clock is derived and evaluated server-side and seeded into the markup, so the card is correct in the first paint and stays readable without JavaScript. The client then counts on its own and re-reads the state from `/api/1/slaclocks/{objectKey}` once a minute, which keeps a tile in step with a colleague who moved the ticket in another tab.
 

@@ -23,12 +23,13 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
     using Status = KleeneStar.Model.Entities.Status;
 
     /// <summary>
-    /// The service-level section of the reference zone, showing every SLA policy attached to the
-    /// current object's class as running agreements on
+    /// The service-level section of the reference zone, showing the SLA policies of the current
+    /// object's class whose scope covers the object as running agreements on
     /// <see cref="WWW.Issue._objectkey_.Index"/>.
     /// </summary>
     /// <remarks>
-    /// Each active <see cref="SlaPolicy"/> of the class becomes one <see cref="ControlSla"/>
+    /// Each active <see cref="SlaPolicy"/> of the class that <see cref="SlaScope"/> finds
+    /// applicable - its priority and tag rules hold for the object - becomes one <see cref="ControlSla"/>
     /// group carrying its name, its severity bucket and the summary of how its targets are
     /// doing; each <see cref="SlaTarget"/> inside it becomes one
     /// <see cref="ControlDataSla"/> tile - a coloured status, a meter of the consumed budget
@@ -66,6 +67,8 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         private readonly IFieldManager _fieldManager;
         private readonly IValueManager _valueManager;
         private readonly IWorkflowManager _workflowManager;
+        private readonly IPriorityManager _priorityManager;
+        private readonly IObjectTagManager _tagManager;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -80,6 +83,10 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         /// <param name="valueManager">The value manager used to read those field values.</param>
         /// <param name="workflowManager">The workflow manager used to resolve a value against
         /// the states of its workflow.</param>
+        /// <param name="priorityManager">The priority manager used to read the priorities a
+        /// scope rule may name.</param>
+        /// <param name="tagManager">The tag manager used to read the tags a scope rule may
+        /// name.</param>
         public IssueSlaCardFragment
         (
             IFragmentContext fragmentContext,
@@ -87,10 +94,14 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
             ISlaManager slaManager,
             IFieldManager fieldManager,
             IValueManager valueManager,
-            IWorkflowManager workflowManager
+            IWorkflowManager workflowManager,
+            IPriorityManager priorityManager,
+            IObjectTagManager tagManager
         )
             : base(fragmentContext)
         {
+            _priorityManager = priorityManager;
+            _tagManager = tagManager;
             _objectManager = objectManager;
             _slaManager = slaManager;
             _fieldManager = fieldManager;
@@ -127,9 +138,18 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
                 Layout = _ => TypeLayoutSection.Rule
             };
 
-            var policies = _slaManager
-                .GetSlas(@object.ClassId)
-                .Where(p => p.State == SlaPolicyState.Active)
+            // only the agreements whose scope covers this object: an incident of priority P1 is
+            // held to the P1 agreement, not to every agreement its class carries
+            var policies = SlaScope
+                .Select
+                (
+                    _slaManager.GetSlas(@object.ClassId).Where(p => p.State == SlaPolicyState.Active),
+                    @object,
+                    _fieldManager,
+                    _valueManager,
+                    _priorityManager,
+                    _tagManager
+                )
                 .OrderBy(p => p.Priority)
                 .ThenBy(p => p.Name)
                 .ToList();

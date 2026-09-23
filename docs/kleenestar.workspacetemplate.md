@@ -125,6 +125,8 @@ The `KleeneStar.Templates` plugin declares, per template, classes that belong to
 A template names only what is particular to a class: its fields are **merged** into the kind's base fields (a declared field of the same name takes the base field's place), the status field exists exactly when there is a lifecycle, and the priority field exactly when there is a scale. An agreement whose target measures an approval names its pause states itself - the default would stop its clock in the very state the approval is awaited in, and a test holds that.
 The templates are **written in English and shipped as keys**. Hundreds of names and sentences written as keys would be unreviewable, and written as English they would give a German service desk English states. `TemplateText.Key` derives the key from the text, gettext-style (`kleenestar.templates:text.in_progress`; a long sentence keeps its first words and a hash), as the last step of `TemplateStructure.Resolve`. The plugin's English language file carries the text as its own translation and the German one the translation; the tests hold code and English file in step, require both files to carry every key, and refuse two different texts folding into one key and two names of one class translating to the same word.
 
+The scope rules a template declares decide which agreement an object is held to (`SlaScope`, see [SLA management](kleenestar.sla.md)): an incident of priority P1 shows the P1 agreement only. Priority and tag rules are evaluated; the other rule types restrict nothing until objects carry the attribute they name.
+
 ## The Creation Wizard
 
 The "new workspace" dialog is a two-step wizard, in the same shape as the object wizard:
