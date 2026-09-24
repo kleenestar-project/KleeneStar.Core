@@ -20,6 +20,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboard._dashboardid_
         protected override string Scope => PermissionScope.Dashboard;
 
         /// <summary>
+        /// Determines whether the caller may administer who may do what with the dashboard.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><see langword="true"/> when the request may proceed.</returns>
+        protected override bool Authorized(IRequest request)
+        {
+            var id = request?.GetParameter<DashboardIdParameter>()?.Value;
+
+            return ContentAuthorization.MayUseDashboard(
+                Guid.TryParse(id, out var dashboardId) ? dashboardId : null,
+                request,
+                typeof(WebPermissions.DashboardManageProfilesPermission));
+        }
+
+        /// <summary>
         /// Returns the dashboard the request addresses.
         /// </summary>
         /// <param name="request">The request whose route names the dashboard.</param>

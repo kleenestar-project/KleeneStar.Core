@@ -78,7 +78,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IEnumerable<RestApiTileItem> RetrieveItems(IQuery<Model.Entities.Workspace> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.WorkspaceManager.GetWorkspaces(query, context)
+            return CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                 .Select(x => new RestApiTileItem()
                 {
                     Id = x.Id.ToString(),

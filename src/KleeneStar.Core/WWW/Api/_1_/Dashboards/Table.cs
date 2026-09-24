@@ -112,7 +112,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboards
         /// </returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Dashboard> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
-            return CoreHub.DashboardManager.GetDashboards(query, context)
+            return CoreHub.DashboardManager.GetDashboards(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                 .Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),

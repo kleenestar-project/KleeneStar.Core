@@ -128,6 +128,11 @@ namespace KleeneStar.Core.WWW.Api._1_.History._objectkey_
                 return new ResponseNotFound();
             }
 
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectRestoreStatePermission)))
+            {
+                return new ResponseForbidden();
+            }
+
             var segments = GetRelativeSegments(request, @object.Key);
 
             if (segments.Count != 2 || !Matches(segments[1], "restore"))

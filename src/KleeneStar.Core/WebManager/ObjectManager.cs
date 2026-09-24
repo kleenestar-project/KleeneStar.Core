@@ -216,11 +216,19 @@ namespace KleeneStar.Core.WebManager
         /// The narrowing is a predicate rather than a filter over the result, so it lands
         /// before paging and a page of hidden records does not come back short.
         /// </para>
+        /// <para>
+        /// The same predicate carries the permissions: an object of a class whose chain does not
+        /// grant the caller <c>ObjectReadPermission</c> is not answered either
+        /// (<see cref="WebPermission.ContentVisibility"/>), lifted by the same unrestricted
+        /// scope.
+        /// </para>
         /// </remarks>
         /// <param name="query">The query to narrow.</param>
         /// <returns>The narrowed query.</returns>
         private static IQuery<Model.Entities.Object> Restrict(IQuery<Model.Entities.Object> query)
         {
+            query = WebPermission.ContentVisibility.Restrict(query);
+
             var securityLevelManager = CoreHub.SecurityLevelManager;
 
             if (securityLevelManager is null)

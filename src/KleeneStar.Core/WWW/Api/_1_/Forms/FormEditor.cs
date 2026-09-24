@@ -136,6 +136,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Forms
             var form = CoreHub.FormManager.GetFormWithStructure(guid)
                 ?? throw new InvalidOperationException($"Form '{guid}' not found.");
 
+            // the framework's save entry point is not virtual, so a refusal travels as the
+            // failure the editor already reports: a 400 naming the reason
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(form.ClassId, request))
+            {
+                throw new UnauthorizedAccessException($"Form '{guid}' may be changed by the administrators of its class only.");
+            }
+
             var snapshot = ToSnapshot(item, form);
 
             CoreHub.FormManager.SaveFormStructure(guid, snapshot, item.Version);

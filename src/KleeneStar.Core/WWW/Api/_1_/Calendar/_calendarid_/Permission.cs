@@ -32,5 +32,19 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendar._calendarid_
                 ? CoreHub.CalendarManager.GetCalendar(calendarId)?.Id.ToString()
                 : null;
         }
+
+        /// <summary>
+        /// Determines whether the caller may administer who may do what with the calendar - the
+        /// administrators of the class it belongs to.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><see langword="true"/> when the request may proceed.</returns>
+        protected override bool Authorized(IRequest request)
+        {
+            var id = request?.GetParameter<CalendarIdParameter>()?.Value;
+            var classId = Guid.TryParse(id, out var calendarId) ? CoreHub.CalendarManager.GetCalendar(calendarId)?.ClassId : null;
+
+            return ContentAuthorization.MayAdminister(classId, request);
+        }
     }
 }

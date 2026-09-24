@@ -28,6 +28,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
     /// </remarks>
     [Section<SectionHeadlineMorePrimary>]
     [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<global::KleeneStar.Core.WebPolicies.WorkspaceAdminPolicy>>]
     [Cache]
     public sealed class DocumentHomeMoreFragment : FragmentControlDropdownItemLink
     {

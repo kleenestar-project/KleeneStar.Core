@@ -49,6 +49,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities
                 return new ResponseBadRequest(new StatusMessage("The direction must be 'up' or 'down'."));
             }
 
+            // reordering a scale is administering the class it belongs to
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(CoreHub.PriorityManager.GetPriority(priorityId)?.ClassId, request))
+            {
+                return new ResponseForbidden();
+            }
+
             CoreHub.PriorityManager.Move(priorityId, up);
 
             return new ResponseOK();

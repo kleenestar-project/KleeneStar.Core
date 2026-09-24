@@ -1797,3 +1797,4 @@ landing.welcome.text=Melde dich an, um mit deinen Arbeitsbereichen weiterzuarbei
 setting.branding.welcome.label=Willkommenstext
 setting.branding.welcome.placeholder=Was Besucher vor der Anmeldung auf der Startseite lesen.
 setting.branding.welcome.help=Wird auf der Startseite neben der Anmeldung gezeigt, solange niemand angemeldet ist. Leer lassen für den eingebauten Gruß.
+object.tags.placeholder=Label hinzufügen…

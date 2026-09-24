@@ -17,7 +17,9 @@ namespace KleeneStar.Core.WebFragment.Workspace
     internal class WorkspaceEmptyStateCondition : ICondition
     {
         /// <summary>
-        /// Determines whether no workspace exists.
+        /// Determines whether no workspace exists that the caller may read - the overview lists
+        /// only those (<see cref="WebPermission.ContentVisibility"/>), so an installation full
+        /// of workspaces the caller may not see is empty for them.
         /// </summary>
         /// <param name="request">The request the condition is evaluated for.</param>
         /// <returns>True when the overview has no workspace to list.</returns>
@@ -28,7 +30,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
                 .WithPaging(0, 1);
 
             return !CoreHub.WorkspaceManager
-                .GetWorkspaces(query)
+                .GetWorkspaces(WebPermission.ContentVisibility.Restrict(query))
                 .Any();
         }
     }

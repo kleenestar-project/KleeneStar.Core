@@ -159,7 +159,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Workspace> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
-            return CoreHub.WorkspaceManager.GetWorkspaces(query, context)
+            return CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                 .Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),

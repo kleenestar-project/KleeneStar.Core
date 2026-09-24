@@ -1,4 +1,5 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebRestApi;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -37,7 +38,58 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboards
         [Method(RequestMethod.GET)]
         public override IResponse Retrieve(IRequest request)
         {
-            return base.Retrieve(request);
+            var id = ContentAuthorization.ReadId(request);
+
+            var authorized = request?.GetParameter("mode")?.Value switch
+            {
+                "edit" => ContentAuthorization.MayUseDashboard(id, request, typeof(WebPermissions.DashboardUpdatePermission)),
+                "delete" => ContentAuthorization.MayUseDashboard(id, request, typeof(WebPermissions.DashboardDeletePermission)),
+                "clone" or "new" => ContentAuthorization.MayUseDashboard(id, request, typeof(WebPermissions.DashboardClonePermission)),
+                _ => true
+            };
+
+            // a plain read is narrowed by the list itself (ContentVisibility)
+            return authorized ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates a dashboard for a signed-in caller, or clones one they may clone.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return ContentAuthorization.MayUseDashboard(ContentAuthorization.ReadId(request), request, typeof(WebPermissions.DashboardClonePermission))
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes a dashboard, once the caller may.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return ContentAuthorization.MayUseDashboard(ContentAuthorization.ReadId(request), request, typeof(WebPermissions.DashboardUpdatePermission))
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes a dashboard, once the caller may.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return ContentAuthorization.MayUseDashboard(ContentAuthorization.ReadId(request), request, typeof(WebPermissions.DashboardDeletePermission))
+                ? base.Delete(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>
@@ -71,7 +123,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboards
         /// </returns>
         protected override IEnumerable<Model.Entities.Dashboard> Retrieve(IQuery<Model.Entities.Dashboard> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.DashboardManager.GetDashboards(query, context);
+            return CoreHub.DashboardManager.GetDashboards(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context);
         }
 
         /// <summary>

@@ -108,7 +108,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
 
             // a comment is somebody's word, so it is not written when nobody can be named for
             // it - the alternative is to sign it with an account that did not write it
-            if (objectId == Guid.Empty || authorId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body))
+            if (objectId == Guid.Empty || authorId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body)
+                || !MayCommentOn(objectId, request))
             {
                 return null;
             }
@@ -149,7 +150,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null)
+            if (existing is null || !MayCommentOn(existing.ObjectId, request))
             {
                 return null;
             }
@@ -180,7 +181,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null)
+            if (existing is null || !MayCommentOn(existing.ObjectId, request))
             {
                 return false;
             }
@@ -208,7 +209,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             var authorId = ResolveAuthorId(request);
             var parent = CoreHub.CommentManager.GetComment(parentId);
 
-            if (parent is null || authorId == Guid.Empty)
+            if (parent is null || authorId == Guid.Empty || !MayCommentOn(parent.ObjectId, request))
             {
                 return null;
             }
@@ -259,7 +260,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         {
             var authorId = ResolveAuthorId(request);
 
-            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty)
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return [];
             }
@@ -281,7 +282,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             // a pin carries no author of its own, but it is still somebody's act: the identity
             // is resolved here so the notification and the audit event the manager raises are
             // attributed to whoever pinned, and so an anonymous caller cannot pin at all
-            if (!Guid.TryParse(commentId, out var id) || ResolveAuthorId(request) == Guid.Empty)
+            if (!Guid.TryParse(commentId, out var id) || ResolveAuthorId(request) == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return null;
             }
@@ -307,7 +308,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         {
             var authorId = ResolveAuthorId(request);
 
-            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty)
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return new Dictionary<string, IEnumerable<string>>();
             }
@@ -330,9 +331,35 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return Guid.Empty;
             }
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == keyParam.Value);
-            return obj?.Id ?? Guid.Empty;
+            // through the object manager, so an object the caller may not read - by its
+            // permissions or its security level - has no thread to show either
+            return CoreHub.ObjectManager.GetObjectByKey(keyParam.Value)?.Id ?? Guid.Empty;
+        }
+
+        /// <summary>
+        /// Determines whether the caller may take part in the discussion of an object - write,
+        /// edit, delete, reply, pin, like and react.
+        /// </summary>
+        /// <param name="objectId">The object the comment hangs on.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns><see langword="true"/> when the caller may comment on it.</returns>
+        private static bool MayCommentOn(Guid objectId, IRequest request)
+        {
+            var @object = CoreHub.ObjectManager.GetObject(objectId);
+
+            return @object is not null
+                && global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectCommentPermission));
+        }
+
+        /// <summary>
+        /// Determines whether the caller may take part in the discussion a comment belongs to.
+        /// </summary>
+        /// <param name="commentId">The comment.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns><see langword="true"/> when the caller may comment on its object.</returns>
+        private static bool MayCommentOnComment(Guid commentId, IRequest request)
+        {
+            return CoreHub.CommentManager.GetComment(commentId) is { } comment && MayCommentOn(comment.ObjectId, request);
         }
 
         /// <summary>

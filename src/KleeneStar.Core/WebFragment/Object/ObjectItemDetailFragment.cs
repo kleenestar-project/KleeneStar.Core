@@ -34,8 +34,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// The field structure is hosted inside a single <see cref="ControlSection"/>, so it
     /// folds away as a whole; the object description, the comment thread, and the comment
     /// composer are surfaced separately by <see cref="ObjectDescriptionCardFragment"/>,
-    /// <see cref="ObjectCommentCardFragment"/>, and
-    /// <see cref="ObjectCommentComposerCardFragment"/>.
+    /// and <see cref="ObjectCommentDockFragment"/>.
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]

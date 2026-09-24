@@ -22,10 +22,12 @@ namespace KleeneStar.Core.WebPermission
     /// <para>
     /// A page cannot answer a status of its own - its result is what its visual tree renders,
     /// and the fragments scoped to it render regardless of what its <c>Process</c> did - so a
-    /// refusal is a redirect to <see cref="WWW.Forbidden.Index"/>: nothing of the refused page
-    /// renders, which is what an action page needs (the restore that must not happen) and what
-    /// a dialog page needs (the form that must not be offered). The form dialog shows the
-    /// redirected page's content in place of the form it did not get.
+    /// refusal is WebExpress's <see cref="ForbiddenException"/>: it ends the page, nothing of it
+    /// is sent, and the server answers <em>at the address that was asked for</em> the way it
+    /// answers a refused page policy - the forbidden page for a signed-in caller, the sign-in
+    /// prompt for one who is not. (It used to redirect to <see cref="WWW.Forbidden.Index"/>,
+    /// which lost the address.) An action page gets what it needs (the restore that must not
+    /// happen does not) and so does a dialog page (the form that must not be offered is not).
     /// </para>
     /// </remarks>
     public static class PageAuthorization
@@ -51,8 +53,8 @@ namespace KleeneStar.Core.WebPermission
         /// <param name="request">The request being answered.</param>
         /// <param name="permission">The permission type required.</param>
         /// <param name="resources">The resource and the resources that contain it, most specific first.</param>
-        /// <exception cref="RedirectException">The caller is refused; the exception carries the
-        /// forbidden page and ends the page's processing.</exception>
+        /// <exception cref="ForbiddenException">The caller is refused; the exception ends the
+        /// page's processing and is answered in place.</exception>
         public static void Demand(IRequest request, Type permission, params PermissionResource[] resources)
         {
             if (!IsGranted(request, permission, resources))
@@ -62,16 +64,12 @@ namespace KleeneStar.Core.WebPermission
         }
 
         /// <summary>
-        /// Builds the refusal of a page: a redirect to the forbidden page.
+        /// Builds the refusal of a page, answered in place at the refused address.
         /// </summary>
         /// <returns>The exception to throw.</returns>
-        public static RedirectException Refuse()
+        public static ForbiddenException Refuse()
         {
-            // resolved through the sitemap of the running host; a test fixture wires none, and
-            // a refusal must still be a refusal there
-            var uri = CoreHub.ComponentHub?.SitemapManager?.GetUri<WWW.Forbidden.Index>(CoreHub.ApplicationContext);
-
-            return new RedirectException(uri);
+            return new ForbiddenException("The caller holds no permission on the resource the route names.");
         }
 
         /// <summary>
@@ -84,6 +82,22 @@ namespace KleeneStar.Core.WebPermission
             return workspace is null
                 ? []
                 : [new PermissionResource(PermissionScope.Workspace, workspace.Id.ToString())];
+        }
+
+        /// <summary>
+        /// The chain a class is administered on: the class, then its workspace.
+        /// </summary>
+        /// <param name="class">The class, may be absent.</param>
+        /// <returns>The chain; empty when there is no class.</returns>
+        public static PermissionResource[] ChainOf(Class @class)
+        {
+            return @class is null
+                ? []
+                :
+                [
+                    new PermissionResource(PermissionScope.Class, @class.Id.ToString()),
+                    new PermissionResource(PermissionScope.Workspace, @class.WorkspaceId.ToString())
+                ];
         }
 
         /// <summary>

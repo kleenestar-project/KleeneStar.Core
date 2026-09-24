@@ -141,9 +141,14 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Removes a group.
         /// </summary>
+        /// <remarks>
+        /// The built-in groups whose membership is implicit (<see cref="Group.IsImplicit"/>) are
+        /// not removed: every workspace a template set up grants its everyday access to one of
+        /// them, and the store re-creates them on the next start anyway.
+        /// </remarks>
         public IGroupManager Remove(Guid groupId)
         {
-            var groupEntry = GetGroup(groupId);
+            var groupEntry = Group.IsImplicit(groupId) ? null : GetGroup(groupId);
 
             if (groupEntry is not null)
             {

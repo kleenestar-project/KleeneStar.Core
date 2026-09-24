@@ -87,7 +87,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
         protected override RestApiWatcherItem AddWatcher(string userId, IQueryContext context, IRequest request)
         {
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId))
+            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId) || !MayChangeWatchers(objectId, identityId, request))
             {
                 return null;
             }
@@ -116,7 +116,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
         protected override bool RemoveWatcher(string userId, IQueryContext context, IRequest request)
         {
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId))
+            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId) || !MayChangeWatchers(objectId, identityId, request))
             {
                 return false;
             }
@@ -139,9 +139,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
                 return Guid.Empty;
             }
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == keyParam.Value);
-            return obj?.Id ?? Guid.Empty;
+            // through the object manager, so an object the caller may not read has no watchers
+            // to show or change either
+            return CoreHub.ObjectManager.GetObjectByKey(keyParam.Value)?.Id ?? Guid.Empty;
+        }
+
+        /// <summary>
+        /// Determines whether the caller may add or remove a watcher: themselves whenever they
+        /// may read the object (the resolve above already asked), somebody else only when they
+        /// may change the object.
+        /// </summary>
+        /// <param name="objectId">The object.</param>
+        /// <param name="identityId">The watcher being added or removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns><see langword="true"/> when the change may proceed.</returns>
+        private static bool MayChangeWatchers(Guid objectId, Guid identityId, IRequest request)
+        {
+            return identityId == CoreHub.SessionManager.GetCurrentIdentityId(request)
+                || global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(CoreHub.ObjectManager.GetObject(objectId), request);
         }
 
         /// <summary>

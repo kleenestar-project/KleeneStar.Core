@@ -21,6 +21,8 @@ namespace KleeneStar.Core.Test.WWW.Api.Forms
         private static readonly Guid FormId = Guid.Parse("F0E10000-0000-0000-0000-000000000003");
         private static readonly Guid TitleFieldId = Guid.Parse("F0E10000-0000-0000-0000-000000000004");
         private static readonly Guid PriorityFieldId = Guid.Parse("F0E10000-0000-0000-0000-000000000005");
+        private static readonly Guid AdministratorId = Guid.Parse("F0E10000-0000-0000-0000-000000000006");
+        private static readonly Guid OutsiderId = Guid.Parse("F0E10000-0000-0000-0000-000000000007");
 
         /// <summary>
         /// Seeds a class with two fields and an empty form on it.
@@ -45,6 +47,22 @@ namespace KleeneStar.Core.Test.WWW.Api.Forms
                 new Field { Id = TitleFieldId, Name = "Title", FieldType = FieldType.Text, ClassId = ClassId, State = FieldState.Active },
                 new Field { Id = PriorityFieldId, Name = "Priority", FieldType = FieldType.Priority, ClassId = ClassId, State = FieldState.Active }
             );
+
+            // the workspace is unadministered, so its structure is the installation's
+            // administrators' to change - the saves below act as one of them
+            var administrators = new Group { Id = Group.AdministratorsId, Name = "Admin" };
+            db.Groups.Add(administrators);
+            db.Identities.Add(new Identity
+            {
+                Id = AdministratorId,
+                Name = "Administrator",
+                UserName = "administrator",
+                Email = "administrator@example.com",
+                PasswordHash = "x",
+                GroupMemberships = [new IdentityGroupMembership { Group = administrators }]
+            });
+            db.Identities.Add(new Identity { Id = OutsiderId, Name = "Outsider", UserName = "outsider", Email = "outsider@example.com", PasswordHash = "x" });
+
             db.SaveChanges();
         }
 
@@ -55,7 +73,10 @@ namespace KleeneStar.Core.Test.WWW.Api.Forms
         /// <returns>The structure the endpoint answers.</returns>
         private static RestApiFormEditorItem Update(RestApiFormEditorItem item)
         {
-            return Invoke<RestApiFormEditorItem>("UpdateItem", [FormId.ToString(), item, null, null]);
+            using (CoreHub.SessionManager.BeginIdentity(AdministratorId))
+            {
+                return Invoke<RestApiFormEditorItem>("UpdateItem", [FormId.ToString(), item, null, null]);
+            }
         }
 
         /// <summary>
@@ -305,6 +326,28 @@ namespace KleeneStar.Core.Test.WWW.Api.Forms
 
             Assert.Throws<ArgumentException>(() =>
                 Invoke<RestApiFormEditorItem>("UpdateItem", ["not-a-guid", new RestApiFormEditorItem { Tabs = [] }, null, null]));
+        }
+
+        /// <summary>
+        /// A form is part of its class's structure, so a caller who may not administer the class
+        /// - here an account outside the administrators on an unadministered workspace, and a
+        /// caller who is not signed in - cannot save it; the stored version does not move.
+        /// </summary>
+        [Fact]
+        public void UpdateItem_RefusesACallerWhoMayNotAdministerTheClass()
+        {
+            Seed(nameof(UpdateItem_RefusesACallerWhoMayNotAdministerTheClass));
+
+            foreach (var caller in new[] { OutsiderId, Guid.Empty })
+            {
+                using (CoreHub.SessionManager.BeginIdentity(caller))
+                {
+                    Assert.Throws<UnauthorizedAccessException>(() =>
+                        Invoke<RestApiFormEditorItem>("UpdateItem", [FormId.ToString(), new RestApiFormEditorItem { FormName = "Standard", Version = 0, Tabs = [] }, null, null]));
+                }
+            }
+
+            Assert.Equal(0, Retrieve().Version);
         }
     }
 }

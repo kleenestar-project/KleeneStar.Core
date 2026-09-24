@@ -15,6 +15,8 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// </summary>
     [Section<SectionHeadlinePrimary>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces.Index>]
+    // creating a workspace needs a signed-in caller, so the button is not offered to anybody else
+    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
     [Cache]
     public sealed class WorkspaceAddButtonFragment : FragmentControlButtonLink
     {

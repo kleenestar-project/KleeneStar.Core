@@ -31,6 +31,100 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Answers the dialog reads (<c>mode=new|clone|edit|delete</c>) only to a caller who may
+        /// make the change the dialog is for.
+        /// </summary>
+        /// <remarks>
+        /// A plain read needs no gate here: the object manager already leaves out what the caller
+        /// may not read, so such an object is answered as not found.
+        /// </remarks>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            var id = ContentAuthorization.ReadId(request);
+
+            var authorized = request?.GetParameter("mode")?.Value switch
+            {
+                "edit" or "delete" or "clone" => ContentAuthorization.MayWrite(Resolve(id), request),
+                "new" => id is null
+                    ? ContentAuthorization.MayCreateIn(ClassOfCreate(request), request)
+                    : ContentAuthorization.MayWrite(Resolve(id), request),
+                _ => true
+            };
+
+            return authorized ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates an object in a class the caller may write in, or clones one they may change.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            var id = ContentAuthorization.ReadId(request);
+            var authorized = id is null
+                ? ContentAuthorization.MayCreateIn(ClassOfCreate(request), request)
+                : ContentAuthorization.MayWrite(Resolve(id), request);
+
+            return authorized ? base.Create(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes an object, once the caller may.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return ContentAuthorization.MayWrite(Resolve(ContentAuthorization.ReadId(request)), request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes an object, once the caller may change it.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return ContentAuthorization.MayWrite(Resolve(ContentAuthorization.ReadId(request)), request)
+                ? base.Delete(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Returns the class a create is made in: the one the payload names, else the one of
+        /// the template it names - the wizard sends a template, not always a class.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The class id, or <see langword="null"/>.</returns>
+        private static Guid? ClassOfCreate(IRequest request)
+        {
+            return ContentAuthorization.ReadPayloadGuid(request, "classid")
+                ?? (ContentAuthorization.ReadPayloadGuid(request, "templateid") is { } templateId
+                    ? CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId
+                    : null);
+        }
+
+        /// <summary>
+        /// Resolves the object an id addresses, as the caller may see it.
+        /// </summary>
+        /// <param name="id">The id, may be absent.</param>
+        /// <returns>The object, or <see langword="null"/>.</returns>
+        private static Model.Entities.Object Resolve(Guid? id)
+        {
+            return id is { } objectId ? CoreHub.ObjectManager.GetObject(objectId) : null;
+        }
+
+        /// <summary>
         /// Creates a new instance of an object that implements the IQueryContext interface.
         /// </summary>
         /// <returns>
@@ -357,6 +451,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             fieldMap.BindTo(newItem);
 
             DeriveReferences(fieldMap, newItem);
+            PlaceBelowOpenDocument(fieldMap, newItem);
             EnsureKey(newItem);
             ApplyDefaultSecurityLevel(fieldMap, newItem, currentUser);
 
@@ -387,7 +482,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 }
             }
 
-            return new RestApiCrudResultCreate();
+            return Created(newItem);
         }
 
         /// <summary>
@@ -445,7 +540,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 UpsertFieldValues(newItem, fieldMap);
             }
 
-            return new RestApiCrudResultCreate();
+            return Created(newItem);
         }
 
         /// <summary>
@@ -547,6 +642,69 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             if (@object.WorkspaceId == Guid.Empty)
             {
                 @object.WorkspaceId = CoreHub.ClassManager.GetClass(@object.ClassId)?.WorkspaceId ?? Guid.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Answers a create with what the page needs to open the new object.
+        /// </summary>
+        /// <remarks>
+        /// The pages around the create dialog are rendered once - the sidebar's page tree, the
+        /// recent lists - and nothing re-renders them, so a new object would appear only after a
+        /// reload. <c>objectcreated.js</c> reads this answer and opens the new object instead,
+        /// which renders the page anew with the object in its place. <c>created</c> marks the
+        /// answer as one of this endpoint; there is no <c>message</c>, which would keep the
+        /// dialog open to show it.
+        /// </remarks>
+        /// <param name="object">The object that was created.</param>
+        /// <returns>The create result.</returns>
+        private static RestApiCrudResultCreate Created(Model.Entities.Object @object)
+        {
+            return new RestApiCrudResultCreate
+            {
+                Data = new
+                {
+                    created = true,
+                    id = @object.Id,
+                    key = @object.Key,
+                    uri = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog.ResolveDetailUri(@object)?.ToString()
+                }
+            };
+        }
+
+        /// <summary>
+        /// Places a new document below the document the create wizard was opened from.
+        /// </summary>
+        /// <remarks>
+        /// The header's create button names the open document
+        /// (<c>ObjectAddFormFragment.ParentKeyField</c>) whatever is created from it, so the
+        /// rule is decided here: the new object goes below it only when it is a document
+        /// itself and lives in the same workspace - an issue created while reading a page
+        /// stays a root, and a page tree does not reach across workspaces. The document is
+        /// read through the object manager, so one the caller may not read places nothing.
+        /// A <c>ParentId</c> the payload names itself (an API client) is left as it was bound.
+        /// </remarks>
+        /// <param name="fieldMap">The payload, which may name the open document.</param>
+        /// <param name="object">The object being created.</param>
+        private static void PlaceBelowOpenDocument(RestApiCrudFormData fieldMap, Model.Entities.Object @object)
+        {
+            var key = fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.ParentKeyField, StringComparison.OrdinalIgnoreCase))
+                .Value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            var parent = CoreHub.ObjectManager.GetObjectByKey(key);
+            var kind = CoreHub.ClassManager.GetClass(@object.ClassId)?.Kind;
+
+            if (parent is not null
+                && parent.WorkspaceId == @object.WorkspaceId
+                && string.Equals(ObjectKind.Normalize(parent.Kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ObjectKind.Normalize(kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
+            {
+                @object.ParentId = parent.Id;
             }
         }
 

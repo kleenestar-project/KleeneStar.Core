@@ -10,6 +10,7 @@ using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
+using WebExpress.WebCore.WebRestApi;
 using WebExpress.WebIndex.Queries;
 
 namespace KleeneStar.Core.WWW.Api._1_.Workflows
@@ -38,6 +39,22 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         /// </summary>
         public WorkflowEditor()
         {
+        }
+
+        /// <summary>
+        /// Saves a workflow, once the caller may administer the class it belongs to.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.PUT)]
+        public override IResponse Update(IRequest request)
+        {
+            var workflowId = global::KleeneStar.Core.WebRestApi.ContentAuthorization.ReadId(request);
+            var classId = workflowId is { } id ? CoreHub.WorkflowManager.GetWorkflow(id)?.ClassId : null;
+
+            return global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(classId, request)
+                ? base.Update(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>

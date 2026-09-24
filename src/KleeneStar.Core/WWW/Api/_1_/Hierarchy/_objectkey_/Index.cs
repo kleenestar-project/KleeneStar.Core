@@ -97,6 +97,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Hierarchy._objectkey_
                 return new ResponseNotFound();
             }
 
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(entity, request))
+            {
+                return new ResponseForbidden();
+            }
+
             HierarchyUpdatePayload payload;
 
             try

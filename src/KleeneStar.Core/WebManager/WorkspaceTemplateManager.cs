@@ -1,4 +1,6 @@
-﻿using KleeneStar.Core.WebWorkspaceTemplate;
+﻿using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebWorkspaceTemplate;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Concurrent;
@@ -311,6 +313,9 @@ namespace KleeneStar.Core.WebManager
 
             all = [.. all.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)];
 
+            var home = ApplyProse(workspace, template, all, ObjectKind.Document, identityId, culture);
+            var openingPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture);
+
             return new WorkspaceTemplateResult
             {
                 Classes = classes,
@@ -322,9 +327,40 @@ namespace KleeneStar.Core.WebManager
                 Calendars = structure.Calendars,
                 Slas = structure.Slas,
                 Views = views,
-                Home = ApplyProse(workspace, template, all, ObjectKind.Document, identityId, culture),
-                OpeningPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture)
+                Home = home,
+                OpeningPost = openingPost,
+                // last, so everything above was set up while the workspace was still the
+                // creator's alone to shape, and the grants describe the finished workspace
+                Permissions = ApplyPermissions(workspaceId)
             };
+        }
+
+        /// <summary>
+        /// Grants the workspace its default permissions (<see cref="WorkspacePermissionDefaults"/>):
+        /// the installation's administrators administer it, every signed-in account works in it,
+        /// and a visitor who is not signed in - granted nothing - is left out.
+        /// </summary>
+        /// <remarks>
+        /// Skipped where the workspace already carries any grant: somebody administered it, and
+        /// adding "every signed-in account may edit" on top of their choice would undo it. A
+        /// default naming a group the store does not carry is not granted (the permission
+        /// manager refuses it); the built-in groups are ensured at start-up, so that is a store
+        /// nobody has started since.
+        /// </remarks>
+        /// <param name="workspaceId">The workspace.</param>
+        /// <returns>The grants written.</returns>
+        private static IReadOnlyList<PermissionAssignment> ApplyPermissions(Guid workspaceId)
+        {
+            var scopeId = workspaceId.ToString();
+
+            if (CoreHub.PermissionManager.GetAssignments(PermissionScope.Workspace, scopeId).Any())
+            {
+                return [];
+            }
+
+            return [.. WorkspacePermissionDefaults.Grants
+                .Select(x => CoreHub.PermissionManager.Assign(PermissionScope.Workspace, scopeId, x.GroupId, x.Policy))
+                .Where(x => x is not null)];
         }
 
         /// <summary>

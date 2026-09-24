@@ -39,11 +39,20 @@ namespace KleeneStar.Core.WebManager
         /// groups were granted anywhere on the chain, and whether any of those policies carries
         /// the permission.
         /// <para>
-        /// <b>An unadministered resource is not a forbidden one.</b> When no grant exists anywhere
-        /// on the chain, the answer is <see langword="true"/>: the installation has never
+        /// <b>An unadministered resource is not a forbidden one - to use.</b> When no grant exists
+        /// anywhere on the chain, the answer is <see langword="true"/>: the installation has never
         /// expressed a restriction, and reading "nobody said yes" as "everybody is refused" would
         /// make every record unreachable the moment a guard is added to it. As soon as a single
         /// grant exists on the chain, the chain is administered and the permission is enforced.
+        /// An <em>administrative</em> permission is the exception
+        /// (<see cref="PermissionImplication.IsAdministrative"/>): on an unadministered chain it
+        /// is granted to the members of <c>Group.AdministratorsId</c> alone.
+        /// </para>
+        /// <para>
+        /// Every caller is a member of the built-in <c>Group.AnonymousId</c>, every caller that
+        /// resolves to an account also of <c>Group.AuthenticatedId</c>; a grant to either reaches
+        /// its members without any stored membership. A workspace grant reaches beneath the
+        /// workspace as <see cref="PermissionImplication"/> describes.
         /// </para>
         /// </remarks>
         /// <param name="identityId">The identity performing the action.</param>
@@ -51,6 +60,35 @@ namespace KleeneStar.Core.WebManager
         /// <param name="resources">The resource and the resources that contain it, most specific first.</param>
         /// <returns><see langword="true"/> when the action may proceed.</returns>
         bool IsGranted(Guid identityId, Type permission, params PermissionResource[] resources);
+
+        /// <summary>
+        /// Returns the classes on whose chain (class, workspace) an identity does <em>not</em>
+        /// hold a permission - <see cref="IsGranted"/> answered for every class at once, for a
+        /// caller that narrows a query rather than judging one record.
+        /// </summary>
+        /// <param name="identityId">The identity performing the action.</param>
+        /// <param name="permission">The permission type required.</param>
+        /// <returns>The ids of the refused classes.</returns>
+        IReadOnlySet<Guid> GetRefusedClassIds(Guid identityId, Type permission);
+
+        /// <summary>
+        /// Returns the workspaces on whose chain an identity does <em>not</em> hold a permission,
+        /// for a caller that narrows a list of workspaces.
+        /// </summary>
+        /// <param name="identityId">The identity performing the action.</param>
+        /// <param name="permission">The permission type required.</param>
+        /// <returns>The ids of the refused workspaces.</returns>
+        IReadOnlySet<Guid> GetRefusedWorkspaceIds(Guid identityId, Type permission);
+
+        /// <summary>
+        /// Returns the resources of one scope - each its own whole chain, such as a dashboard -
+        /// on which an identity does <em>not</em> hold a non-administrative permission.
+        /// </summary>
+        /// <param name="scope">The kind of resource, as named in <see cref="PermissionScope"/>.</param>
+        /// <param name="identityId">The identity performing the action.</param>
+        /// <param name="permission">The permission type required.</param>
+        /// <returns>The ids of the refused resources.</returns>
+        IReadOnlySet<Guid> GetRefusedIds(string scope, Guid identityId, Type permission);
 
         /// <summary>
         /// Grants a group a policy on a resource.

@@ -107,6 +107,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_
                 return new ResponseNotFound();
             }
 
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request))
+            {
+                return new ResponseForbidden();
+            }
+
             DraftPayload payload;
 
             try
@@ -158,6 +163,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_
             if (@object is null)
             {
                 return new ResponseNotFound();
+            }
+
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request))
+            {
+                return new ResponseForbidden();
             }
 
             CoreHub.ObjectDraftManager.Discard(@object.Id);

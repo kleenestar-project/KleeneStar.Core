@@ -104,6 +104,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Prose
         /// <returns>The update result.</returns>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // publishing is changing the object; the framework's entry point takes a refusal
+            // thrown from here as the failure the editor already reports
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(existingItem, request))
+            {
+                throw new UnauthorizedAccessException("The object may be published by those who may change it only.");
+            }
+
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
 
             var summary = ReadText(payload, nameof(Model.Entities.Object.Summary));

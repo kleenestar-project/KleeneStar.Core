@@ -191,6 +191,11 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Gets a value indicating whether anybody is acting on this call chain.
+        /// </summary>
+        public bool HasCaller => _actingIdentityId.Value.HasValue || WebEx.CurrentRequest is not null;
+
+        /// <summary>
         /// Reads the request's credential and answers the stored account it stands for - when
         /// that account may still act, and the credential is still good.
         /// </summary>

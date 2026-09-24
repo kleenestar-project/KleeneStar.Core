@@ -81,5 +81,11 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// already had one.
         /// </summary>
         public Model.Entities.Object OpeningPost { get; init; }
+
+        /// <summary>
+        /// Gets the grants the workspace was given. Empty when it already carried grants of its
+        /// own, which are left as they are.
+        /// </summary>
+        public IReadOnlyList<PermissionAssignment> Permissions { get; init; } = [];
     }
 }

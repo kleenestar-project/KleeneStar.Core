@@ -57,7 +57,9 @@ namespace KleeneStar.Core.WebFragment.Workspace
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            if (!FragmentContext.Conditions.Check(renderContext?.Request))
+            // a caller who may neither read a workspace nor create one would open an empty menu
+            if (!FragmentContext.Conditions.Check(renderContext?.Request)
+                || !global::KleeneStar.Core.WebPermission.RouteAuthorization.MayListWorkspaces(renderContext?.Request))
             {
                 return null;
             }

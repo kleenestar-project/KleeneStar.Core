@@ -28,6 +28,7 @@ namespace KleeneStar.Core.Test.WebPermission
         private static readonly Guid MemberId = Guid.Parse("A0700000-0000-0000-0000-000000000004");
         private static readonly Guid OutsiderId = Guid.Parse("A0700000-0000-0000-0000-000000000005");
         private static readonly Guid GroupId = Guid.Parse("A0700000-0000-0000-0000-000000000006");
+        private static readonly Guid AdministratorId = Guid.Parse("A0700000-0000-0000-0000-000000000007");
 
         /// <summary>
         /// Seeds a workspace with a class and an object, a group, a member of it and an outsider.
@@ -61,6 +62,19 @@ namespace KleeneStar.Core.Test.WebPermission
                 GroupMemberships = [new IdentityGroupMembership { Group = group }]
             });
             db.Identities.Add(new Identity { Id = OutsiderId, Name = "Outsider", UserName = "outsider", Email = "outsider@example.com", PasswordHash = "x" });
+
+            // the installation's administrators, who administer what nobody administered
+            var administrators = new Group { Id = Group.AdministratorsId, Name = "Admin" };
+            db.Groups.Add(administrators);
+            db.Identities.Add(new Identity
+            {
+                Id = AdministratorId,
+                Name = "Administrator",
+                UserName = "administrator",
+                Email = "administrator@example.com",
+                PasswordHash = "x",
+                GroupMemberships = [new IdentityGroupMembership { Group = administrators }]
+            });
 
             db.SaveChanges();
         }
@@ -113,37 +127,54 @@ namespace KleeneStar.Core.Test.WebPermission
                 @object
             );
 
+            Assert.Equal(@object, PageAuthorization.ChainOf(new Class { Id = ClassId, WorkspaceId = WorkspaceId }));
+
             Assert.Empty(PageAuthorization.ChainOf((Workspace)null));
+            Assert.Empty(PageAuthorization.ChainOf((Class)null));
             Assert.Empty(PageAuthorization.ChainOf((ObjectEntity)null));
         }
 
         /// <summary>
         /// A fresh installation has granted nothing, and a page on such an installation refuses
-        /// nobody - not even a caller who is not signed in - because nothing was restricted.
+        /// nobody its content - not even a caller who is not signed in - because nothing was
+        /// restricted. Administering it is different: until a grant says whose job that is, it
+        /// is the installation's administrators', and nobody else's (fail closed).
         /// </summary>
         [Fact]
-        public void Demand_OnAnUnadministeredChain_LetsEveryoneThrough()
+        public void Demand_OnAnUnadministeredChain_LetsEveryoneUseItAndOnlyTheAdministratorsAdministerIt()
         {
-            Seed(nameof(Demand_OnAnUnadministeredChain_LetsEveryoneThrough));
+            Seed(nameof(Demand_OnAnUnadministeredChain_LetsEveryoneUseItAndOnlyTheAdministratorsAdministerIt));
 
             var chain = PageAuthorization.ChainOf(GuardedObject());
+            var workspace = PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId });
 
             using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
             {
                 Assert.True(PageAuthorization.IsGranted(null, typeof(ObjectRestoreStatePermission), chain));
                 PageAuthorization.Demand(null, typeof(ObjectRestoreStatePermission), chain);
+
+                Assert.False(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), workspace));
+                Assert.False(PageAuthorization.IsGranted(null, typeof(ClassUpdatePermission), chain));
             }
 
             using (CoreHub.SessionManager.BeginIdentity(OutsiderId))
             {
-                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId })));
+                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceReadContentPermission), workspace));
+                Assert.False(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), workspace));
+                Assert.False(PageAuthorization.IsGranted(null, typeof(ClassUpdatePermission), chain));
+            }
+
+            using (CoreHub.SessionManager.BeginIdentity(AdministratorId))
+            {
+                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), workspace));
+                Assert.True(PageAuthorization.IsGranted(null, typeof(ClassUpdatePermission), chain));
             }
         }
 
         /// <summary>
         /// One grant on the workspace makes the whole chain administered: a caller outside every
         /// granted group is refused on the object's page as well, and so is an anonymous one.
-        /// The refusal is the redirect that ends the page.
+        /// The refusal is the exception that ends the page.
         /// </summary>
         [Fact]
         public void Demand_OnAnAdministeredChain_RefusesTheOutsiderAndTheAnonymous()
@@ -156,12 +187,12 @@ namespace KleeneStar.Core.Test.WebPermission
             using (CoreHub.SessionManager.BeginIdentity(OutsiderId))
             {
                 Assert.False(PageAuthorization.IsGranted(null, typeof(ObjectRestoreStatePermission), chain));
-                Assert.Throws<RedirectException>(() => PageAuthorization.Demand(null, typeof(ObjectRestoreStatePermission), chain));
+                Assert.Throws<ForbiddenException>(() => PageAuthorization.Demand(null, typeof(ObjectRestoreStatePermission), chain));
             }
 
             using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
             {
-                Assert.Throws<RedirectException>(() => PageAuthorization.Demand(null, typeof(ObjectRestoreStatePermission), chain));
+                Assert.Throws<ForbiddenException>(() => PageAuthorization.Demand(null, typeof(ObjectRestoreStatePermission), chain));
             }
         }
 
@@ -180,7 +211,7 @@ namespace KleeneStar.Core.Test.WebPermission
                 Assert.False(PageAuthorization.IsGranted(null, typeof(ObjectRestoreStatePermission), PageAuthorization.ChainOf(GuardedObject())));
 
                 // the workspace's own page is still unadministered
-                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId })));
+                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceReadContentPermission), PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId })));
             }
         }
 
@@ -198,24 +229,25 @@ namespace KleeneStar.Core.Test.WebPermission
 
             using (CoreHub.SessionManager.BeginIdentity(OutsiderId))
             {
-                Assert.False(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId })));
-                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceUpdatePermission), PageAuthorization.ChainOf(other)));
+                Assert.False(PageAuthorization.IsGranted(null, typeof(WorkspaceReadContentPermission), PageAuthorization.ChainOf(new Workspace { Id = WorkspaceId })));
+                Assert.True(PageAuthorization.IsGranted(null, typeof(WorkspaceReadContentPermission), PageAuthorization.ChainOf(other)));
             }
         }
 
         /// <summary>
-        /// The refusal is a redirect, and it carries no message of its own that a status page
-        /// could leak; the page it goes to is the forbidden page.
+        /// The refusal is answered in place, not redirected: it is WebExpress's forbidden
+        /// exception, which the server turns into the forbidden page or the sign-in prompt at the
+        /// address that was asked for.
         /// </summary>
         [Fact]
-        public void Refuse_IsARedirect()
+        public void Refuse_IsAnsweredInPlace()
         {
-            Seed(nameof(Refuse_IsARedirect));
+            Seed(nameof(Refuse_IsAnsweredInPlace));
 
             var refusal = PageAuthorization.Refuse();
 
-            Assert.NotNull(refusal);
-            Assert.False(refusal.Permanet);
+            Assert.IsType<ForbiddenException>(refusal);
+            Assert.IsNotType<RedirectException>(refusal);
         }
     }
 }

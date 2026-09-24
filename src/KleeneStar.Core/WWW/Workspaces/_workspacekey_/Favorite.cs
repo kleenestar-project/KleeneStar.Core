@@ -45,6 +45,9 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            // the page acts and redirects before the page guard renders, so it asks itself
+            WebPermission.RouteAuthorization.Demand(renderContext);
+
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _workspaceManager.GetWorkspaceByKey(keyParameter?.Value);
 

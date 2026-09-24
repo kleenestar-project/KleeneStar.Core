@@ -56,7 +56,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Dashboards
         /// </returns>
         protected override IEnumerable<RestApiDropdownItem> RetrieveItems(IQuery<Model.Entities.Dashboard> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.DashboardManager?.GetDashboards(query, context)
+            return CoreHub.DashboardManager?.GetDashboards(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                 .Select(x => new RestApiDropdownItem()
                 {
                     Id = x.Id,

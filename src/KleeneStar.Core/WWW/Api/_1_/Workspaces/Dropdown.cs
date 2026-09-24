@@ -77,7 +77,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // when the user is searching, keep the full searchable list across all workspaces
             if (!string.IsNullOrWhiteSpace(filter) && filter != "null")
             {
-                return CoreHub.WorkspaceManager?.GetWorkspaces(query, context)
+                return CoreHub.WorkspaceManager?.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                     .Select(x => ToItem(x, request));
             }
 
@@ -92,7 +92,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             foreach (var recent in CoreHub.WorkspaceManager.GetRecentWorkspaces(ownerId, MaxRecent))
             {
-                if (recent is not null && seen.Add(recent.Id))
+                if (recent is not null && global::KleeneStar.Core.WebPermission.ContentVisibility.MayRead(recent.Id) && seen.Add(recent.Id))
                 {
                     items.Add(ToItem(recent, request, pinned: favoriteIds.Contains(recent.Id)));
                 }
@@ -100,7 +100,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             foreach (var favorite in favorites)
             {
-                if (favorite is not null && seen.Add(favorite.Id))
+                if (favorite is not null && global::KleeneStar.Core.WebPermission.ContentVisibility.MayRead(favorite.Id) && seen.Add(favorite.Id))
                 {
                     items.Add(ToItem(favorite, request, pinned: true));
                 }
@@ -110,7 +110,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // dropdown is never empty on first use
             if (items.Count == 0)
             {
-                return CoreHub.WorkspaceManager?.GetWorkspaces(query, context)
+                return CoreHub.WorkspaceManager?.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                     .Select(x => ToItem(x, request));
             }
 

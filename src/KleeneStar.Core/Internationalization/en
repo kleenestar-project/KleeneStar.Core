@@ -1796,3 +1796,4 @@ landing.welcome.text=Sign in to continue with your workspaces.
 setting.branding.welcome.label=Welcome text
 setting.branding.welcome.placeholder=What visitors read on the start page before signing in.
 setting.branding.welcome.help=Shown on the start page beside the sign-in while nobody is signed in. Leave empty for the built-in greeting.
+object.tags.placeholder=Add label…

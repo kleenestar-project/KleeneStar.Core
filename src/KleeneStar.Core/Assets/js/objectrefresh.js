@@ -47,6 +47,12 @@
             return false;
         }
 
+        // a clone created a new object, which objectcreated.js opens; reloading the original
+        // here would race that navigation
+        if (event?.detail?.response?.data?.created === true) {
+            return false;
+        }
+
         // a form that is not in a dialog reports its outcome where it stands. The nesting
         // runs both ways: the modal form controller puts the served form inside its dialog,
         // the editor dialog puts its dialog inside the form

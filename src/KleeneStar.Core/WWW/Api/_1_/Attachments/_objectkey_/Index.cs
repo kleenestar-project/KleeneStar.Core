@@ -121,6 +121,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Attachments._objectkey_
                 throw new InvalidOperationException($"'{id}' is not a file of this object.");
             }
 
+            // the framework's entry point is not virtual; a refusal travels as the failure it
+            // already reports
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(ResolveObject(request), request, typeof(global::KleeneStar.Core.WebPermissions.ObjectAttachPermission)))
+            {
+                throw new UnauthorizedAccessException("The files of this object may be changed by those who may attach to it only.");
+            }
+
             CoreHub.AttachmentManager.SetDescription(attachmentId, description);
         }
 

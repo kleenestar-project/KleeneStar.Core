@@ -12,7 +12,8 @@ namespace KleeneStar.Core.Test.WWW.Api.Workspaces
     /// Tests that <c>/api/1/workspaces</c> and its permission surface ask the same question the
     /// workspace dialog pages demand an answer to: a mutation on an administered workspace is
     /// refused to a caller outside every granted group with <c>403</c>, an unadministered
-    /// workspace refuses nobody, and a plain create - which is on no chain - is never refused.
+    /// workspace is administered by the installation's administrators alone (fail closed), and a
+    /// plain create - which is on no chain - is refused only to a caller who is not signed in.
     /// </summary>
     /// <remarks>
     /// The requests are built by hand and carry no body, so a request the gate lets through
@@ -145,35 +146,35 @@ namespace KleeneStar.Core.Test.WWW.Api.Workspaces
         }
 
         /// <summary>
-        /// A workspace nobody administered refuses nobody: the requests reach the base and are
-        /// answered by it - as a bad payload, since the hand-built request carries none.
+        /// A workspace nobody administered is not administered by everybody: changing it, its
+        /// dialogs and its permission surface are the installation's administrators' until a
+        /// grant says otherwise, so a caller outside that group - here the hand-built request,
+        /// which names nobody - is refused. Reading it is not what the grants administer.
         /// </summary>
         [Fact]
-        public void UnadministeredWorkspace_LetsEveryoneThrough()
+        public void UnadministeredWorkspace_IsAdministeredByTheAdministratorsAlone()
         {
-            Seed(nameof(UnadministeredWorkspace_LetsEveryoneThrough), administered: false);
+            Seed(nameof(UnadministeredWorkspace_IsAdministeredByTheAdministratorsAlone), administered: false);
 
             var endpoint = new global::KleeneStar.Core.WWW.Api._1_.Workspaces.Index();
             var permissions = new global::KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_.Permission();
 
             using (CoreHub.SessionManager.BeginIdentity(OutsiderId))
             {
-                Assert.IsType<ResponseBadRequest>(endpoint.Update(CreateRequest("PUT", WorkspaceId)));
-                Assert.IsType<ResponseBadRequest>(endpoint.Create(CreateRequest("POST", WorkspaceId)));
-                Assert.IsNotType<ResponseForbidden>(endpoint.Retrieve(CreateRequest("GET", WorkspaceId, "edit")));
-                Assert.IsNotType<ResponseForbidden>(permissions.Retrieve(CreateRequest("GET")));
-            }
+                Assert.IsType<ResponseForbidden>(endpoint.Update(CreateRequest("PUT", WorkspaceId)));
+                Assert.IsType<ResponseForbidden>(endpoint.Create(CreateRequest("POST", WorkspaceId)));
+                Assert.IsType<ResponseForbidden>(endpoint.Retrieve(CreateRequest("GET", WorkspaceId, "edit")));
+                Assert.IsType<ResponseForbidden>(permissions.Retrieve(CreateRequest("GET")));
 
-            using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
-            {
-                Assert.IsType<ResponseBadRequest>(endpoint.Update(CreateRequest("PUT", WorkspaceId)));
+                Assert.IsNotType<ResponseForbidden>(endpoint.Retrieve(CreateRequest("GET", WorkspaceId)));
             }
         }
 
         /// <summary>
-        /// A workspace created from nothing is on no chain and is never refused, whatever the
-        /// caller holds; and an id that names no workspace is not an authorization question
-        /// either - the base answers it as not found.
+        /// A workspace created from nothing is on no chain, so no grant decides it - but a caller
+        /// who is not signed in (the hand-built request names nobody) may not create one. An id
+        /// that names no workspace is not an authorization question either - the base answers
+        /// it as not found.
         /// </summary>
         [Fact]
         public void CreateAndUnknownId_AreNotAuthorizationQuestions()
@@ -184,7 +185,7 @@ namespace KleeneStar.Core.Test.WWW.Api.Workspaces
 
             using (CoreHub.SessionManager.BeginIdentity(OutsiderId))
             {
-                Assert.IsType<ResponseBadRequest>(endpoint.Create(CreateRequest("POST")));
+                Assert.IsType<ResponseForbidden>(endpoint.Create(CreateRequest("POST")));
                 Assert.IsType<ResponseNotFound>(endpoint.Update(CreateRequest("PUT", Guid.NewGuid())));
                 Assert.IsType<ResponseNotFound>(endpoint.Delete(CreateRequest("DELETE", Guid.NewGuid())));
             }

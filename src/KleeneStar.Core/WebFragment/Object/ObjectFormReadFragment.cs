@@ -127,12 +127,8 @@ namespace KleeneStar.Core.WebFragment.Object
 
             body.Add(sheet);
 
-            var tags = BuildTagRow(@object, id);
-
-            if (tags is not null)
-            {
-                body.Add(tags);
-            }
+            // the labels and the likes close the sheet off in a fragment of their own
+            // (ObjectEngagementFragment), shared with the prose renderer
 
             return body.Render(renderContext, visualTree);
         }
@@ -520,36 +516,6 @@ namespace KleeneStar.Core.WebFragment.Object
             }
 
             return classes;
-        }
-
-        /// <summary>
-        /// Builds the row of tag badges that closes the sheet off, or <see langword="null"/>
-        /// when the object carries no tags. The prose reading view of the same kinds ends the
-        /// same way, so switching a class between the two renderers does not lose the tags.
-        /// </summary>
-        /// <param name="object">The object whose tags are shown.</param>
-        /// <param name="id">The object id, already formatted for use in element ids.</param>
-        /// <returns>The tag row, or <see langword="null"/>.</returns>
-        private IControl BuildTagRow(Model.Entities.Object @object, string id)
-        {
-            var tags = _tagManager.GetTags(@object.Id).ToList();
-
-            if (tags.Count == 0)
-            {
-                return null;
-            }
-
-            var row = new ControlPanel("object-form-view-tags-" + id)
-            {
-                Classes = ["ks-prose-tags"]
-            };
-
-            foreach (var tag in tags)
-            {
-                row.Add(ObjectTagBadge.Create(tag, "object-form-view-tag-"));
-            }
-
-            return row;
         }
     }
 }

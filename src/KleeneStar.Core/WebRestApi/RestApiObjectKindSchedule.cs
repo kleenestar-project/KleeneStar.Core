@@ -166,6 +166,12 @@ namespace KleeneStar.Core.WebRestApi
                     return new ResponseNotFound(new StatusMessage($"No item found for id '{item.Id}'."));
                 }
 
+                // moving a plan is changing the object
+                if (!ContentAuthorization.MayWrite(entity, request))
+                {
+                    return new ResponseForbidden();
+                }
+
                 var cls = CoreHub.ClassManager.GetClass(entity.ClassId);
                 var context = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
 

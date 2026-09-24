@@ -67,6 +67,18 @@ namespace KleeneStar.Core.WebManager
         IDisposable BeginIdentity(Guid identityId);
 
         /// <summary>
+        /// Gets a value indicating whether anybody is acting on this call chain - a request is
+        /// being answered, or a <see cref="BeginIdentity"/> scope says on whose behalf this runs.
+        /// </summary>
+        /// <remarks>
+        /// Without either, the system acts on its own behalf - a background job, the start-up,
+        /// the seeder - and a caller-shaped narrowing such as the permission filter of the object
+        /// reads has nobody to narrow for. <see cref="GetCurrentIdentityId"/> alone cannot tell
+        /// that apart from an anonymous caller: both answer <see cref="Guid.Empty"/>.
+        /// </remarks>
+        bool HasCaller { get; }
+
+        /// <summary>
         /// Returns the value stored under (owner, scope, key), or
         /// <see langword="null"/> if no entry exists.
         /// </summary>

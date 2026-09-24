@@ -54,7 +54,9 @@ namespace KleeneStar.Core.WebFragment.Dashboard
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            if (!FragmentContext.Conditions.Check(renderContext?.Request))
+            // dashboards are for signed-in callers; anybody else would open a menu of nothing
+            if (!FragmentContext.Conditions.Check(renderContext?.Request)
+                || !global::KleeneStar.Core.WebPermission.ContentVisibility.MayUseDashboards())
             {
                 return null;
             }

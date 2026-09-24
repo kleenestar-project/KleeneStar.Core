@@ -87,6 +87,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 return new ResponseNotFound();
             }
 
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(node, request))
+            {
+                return new ResponseForbidden();
+            }
+
             Guid? parentId = null;
 
             if (!string.IsNullOrWhiteSpace(payload.Parent))

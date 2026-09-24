@@ -21,13 +21,23 @@ namespace KleeneStar.Core.WWW.Api._1_.SecurityLevels
     /// Provides CRUD operations for security level items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<SecurityLevelEntity>
+    public sealed class Index : global::KleeneStar.Core.WebRestApi.RestApiCrudClassStructure<SecurityLevelEntity>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to, which decides who may change it.
+        /// </summary>
+        /// <param name="item">The record.</param>
+        /// <returns>The class id.</returns>
+        protected override System.Guid? ClassOf(SecurityLevelEntity item)
+        {
+            return item?.ClassId;
         }
 
         /// <summary>

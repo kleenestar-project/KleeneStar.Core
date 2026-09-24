@@ -36,5 +36,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Class._classid_
                 ? CoreHub.ClassManager.GetClass(classId)?.Id.ToString()
                 : null;
         }
+
+        /// <summary>
+        /// Determines whether the caller may administer who may do what with the class - its
+        /// administrators, which includes the administrators of its workspace.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><see langword="true"/> when the request may proceed.</returns>
+        protected override bool Authorized(IRequest request)
+        {
+            var id = request?.GetParameter<ClassIdParameter>()?.Value;
+            var @class = Guid.TryParse(id, out var classId) ? CoreHub.ClassManager.GetClass(classId) : null;
+
+            return @class is null
+                || PageAuthorization.IsGranted(request, typeof(WebPermissions.ClassManagePermissionsPermission), PageAuthorization.ChainOf(@class));
+        }
     }
 }

@@ -49,7 +49,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
             var keyParameter = request?.GetParameter<ObjectKeyParameter>();
             var @object = CoreHub.ObjectManager.GetObjectByKey(keyParameter?.Value);
 
+            // a caller who may not move the object is sent back to it unchanged, the silence a
+            // refused move leaves anyway
             if (@object is not null &&
+                global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request, typeof(global::KleeneStar.Core.WebPermissions.TransitionExecutePermission)) &&
                 Guid.TryParse(request?.GetParameter<FieldIdParameter>()?.Value, out var fieldId) &&
                 Guid.TryParse(request?.GetParameter<WorkflowStateIdParameter>()?.Value, out var stateId))
             {

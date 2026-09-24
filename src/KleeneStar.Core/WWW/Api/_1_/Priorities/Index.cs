@@ -16,13 +16,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities
     /// Provides CRUD operations for priority items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Priority>
+    public sealed class Index : global::KleeneStar.Core.WebRestApi.RestApiCrudClassStructure<Model.Entities.Priority>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to, which decides who may change it.
+        /// </summary>
+        /// <param name="item">The record.</param>
+        /// <returns>The class id.</returns>
+        protected override System.Guid? ClassOf(Model.Entities.Priority item)
+        {
+            return item?.ClassId;
         }
 
         /// <summary>

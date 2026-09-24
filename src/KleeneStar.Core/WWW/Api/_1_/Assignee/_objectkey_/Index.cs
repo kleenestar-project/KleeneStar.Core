@@ -49,7 +49,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_
             var keyParameter = request?.GetParameter<ObjectKeyParameter>();
             var @object = CoreHub.ObjectManager.GetObjectByKey(keyParameter?.Value);
 
-            if (@object is not null)
+            if (@object is not null && global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request))
             {
                 var clear = string.Equals(request?.GetParameter("clear")?.Value, "1", StringComparison.OrdinalIgnoreCase);
 

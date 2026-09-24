@@ -78,17 +78,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// Creates a workspace, or clones one when the request names an original.
         /// </summary>
         /// <remarks>
-        /// Only the clone is guarded, and on the original: the copy does not exist yet and is
-        /// on no chain, and neither is a workspace created from nothing - see
-        /// <see cref="WorkspaceAuthorization"/> for why that gap is stated rather than closed
-        /// here.
+        /// The clone is guarded on the original: the copy does not exist yet and is on no chain.
+        /// Neither is a workspace created from nothing, so no grant can say who may create one -
+        /// but a caller who is not signed in may not (the add page refuses them too), because the
+        /// workspace a template sets up is set up for whoever creates it.
         /// </remarks>
         /// <param name="request">The incoming request.</param>
         /// <returns>The HTTP response.</returns>
         [Method(RequestMethod.POST)]
         public override IResponse Create(IRequest request)
         {
-            return WorkspaceAuthorization.MayClone(WorkspaceAuthorization.ResolveById(request), request)
+            var original = WorkspaceAuthorization.ResolveById(request);
+
+            if (original is null && !WebPermission.RouteAuthorization.IsSignedIn(request))
+            {
+                return new ResponseForbidden();
+            }
+
+            return WorkspaceAuthorization.MayClone(original, request)
                 ? base.Create(request)
                 : new ResponseForbidden();
         }
@@ -151,7 +158,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IEnumerable<Workspace> Retrieve(IQuery<Workspace> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.WorkspaceManager.GetWorkspaces(query, context);
+            // a list shows only the workspaces the caller may read
+            return CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context);
         }
 
         /// <summary>

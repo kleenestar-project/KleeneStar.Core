@@ -136,48 +136,10 @@ namespace KleeneStar.Core.WebFragment.Object
                 Classes = ["ks-prose-content"]
             });
 
-            var tags = BuildTagRow(@object, id);
-
-            if (tags is not null)
-            {
-                body.Add(tags);
-            }
+            // the labels and the likes close the text off in a fragment of their own
+            // (ObjectEngagementFragment), shared with the form renderer
 
             return body.Render(renderContext, visualTree);
-        }
-
-        /// <summary>
-        /// Builds the row of tag badges that closes the text off, or <see langword="null"/> when
-        /// the object carries no tags.
-        /// </summary>
-        /// <remarks>
-        /// The tags sit under the text rather than in the reference column beside it, because on
-        /// a document they read as what the piece is about - the last line of the article, the
-        /// way a post ends on its labels - and not as one more property of a record.
-        /// </remarks>
-        /// <param name="object">The object whose tags are shown.</param>
-        /// <param name="id">The object id, already formatted for use in element ids.</param>
-        /// <returns>The tag row, or <see langword="null"/>.</returns>
-        private IControl BuildTagRow(Model.Entities.Object @object, string id)
-        {
-            var tags = _tagManager.GetTags(@object.Id).ToList();
-
-            if (tags.Count == 0)
-            {
-                return null;
-            }
-
-            var row = new ControlPanel("object-prose-tags-" + id)
-            {
-                Classes = ["ks-prose-tags"]
-            };
-
-            foreach (var tag in tags)
-            {
-                row.Add(ObjectTagBadge.Create(tag, "object-prose-tag-"));
-            }
-
-            return row;
         }
 
         /// <summary>

@@ -67,6 +67,41 @@ namespace KleeneStar.Core.WebFragment.Object
         private const string NoTemplate = "none";
 
         /// <summary>
+        /// The query parameter the create button names the open document with, so a document
+        /// created from it lands below it in the page tree.
+        /// </summary>
+        public const string ParentParameter = "parent";
+
+        /// <summary>
+        /// The payload field that carries the key of that document to the create endpoint.
+        /// </summary>
+        /// <remarks>
+        /// A key rather than <c>ParentId</c>: the wizard fills its fields from the data it loads,
+        /// and a field named after a property of the object would be emptied by the
+        /// <c>parentId: null</c> of a new one.
+        /// </remarks>
+        public const string ParentKeyField = "ParentKey";
+
+        /// <summary>
+        /// Gets the hidden input carrying the document the wizard was opened from - only a
+        /// document the caller may read; the endpoint decides whether the new object goes
+        /// below it.
+        /// </summary>
+        public PresetHiddenInput ParentKey { get; } = new()
+        {
+            Name = _ => ParentKeyField,
+            Value = ctx =>
+            {
+                var key = ctx?.Request?.GetParameter(ParentParameter)?.Value;
+                var parent = string.IsNullOrWhiteSpace(key) ? null : CoreHub.ObjectManager.GetObjectByKey(key);
+
+                return string.Equals(parent?.Kind, Model.Entities.ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
+                    ? parent.Key
+                    : null;
+            }
+        };
+
+        /// <summary>
         /// Gets the tile control for selecting the workspace the object is created in.
         /// </summary>
         public ControlFormItemInputTile WorkspaceSelection { get; } = new()
@@ -130,7 +165,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 Subtitle = _ => "kleenestar.core:object.add.step.workspace.subtitle",
                 SummarySource = _ => nameof(ObjectEntity.WorkspaceId)
             };
-            step1.Add(WorkspaceSelection);
+            step1.Add(WorkspaceSelection, ParentKey);
 
             var step2 = new ControlDataWizardPage(StepClass)
             {
@@ -465,9 +500,17 @@ namespace KleeneStar.Core.WebFragment.Object
             /// <returns>The catalog.</returns>
             public static Catalog Load()
             {
+                // the wizard offers only what the caller may create: a class whose chain refuses
+                // them object writes is left out, and so is a workspace they may not read
+                var refused = CoreHub.SessionManager.HasCaller
+                    ? CoreHub.PermissionManager.GetRefusedClassIds(
+                        CoreHub.SessionManager.GetCurrentIdentityId(null),
+                        typeof(global::KleeneStar.Core.WebPermissions.ObjectUpdatePermission))
+                    : new HashSet<Guid>();
+
                 var classes = CoreHub.ClassManager
                     .GetClasses(new Query<ClassEntity>())
-                    .Where(x => !x.IsAbstract && x.State == ClassState.Active)
+                    .Where(x => !x.IsAbstract && x.State == ClassState.Active && !refused.Contains(x.Id))
                     .ToList();
 
                 var known = classes.Select(x => x.Id).ToHashSet();
@@ -475,7 +518,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 return new Catalog
                 {
                     Workspaces = [.. CoreHub.WorkspaceManager
-                        .GetWorkspaces(new Query<WorkspaceEntity>())
+                        .GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(new Query<WorkspaceEntity>()))
                         .Where(x => x.State == WorkspaceState.Active)
                         .OrderBy(x => x.Name)],
                     Classes = [.. classes.OrderBy(x => x.WorkspaceId).ThenBy(x => x.Name)],

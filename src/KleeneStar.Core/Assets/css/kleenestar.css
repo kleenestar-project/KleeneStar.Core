@@ -217,22 +217,37 @@
     background: transparent;
 }
 
-/* The composer stays in reach at the foot of the view rather than at the end of the thread.
-   A conversation grows downwards, so on an object with a long history the one thing a reader
-   came to do - reply - sits below everything they have to scroll past first.
+/* The conversation - the thread and the composer - is docked at the foot of the view rather
+   than following the text. A conversation grows downwards, so on a long object the one thing a
+   reader came to do - read the replies or reply - would sit below everything they have to
+   scroll past first; and a thread in the flow of the page pushed a short document long.
 
-   It is pinned to the bottom of the scrolling work zone and given the zone's own background,
-   so the comments pass behind it instead of showing through. The rule of the section becomes
-   its top edge, which is what tells the reader that the strip is the end of the page rather
-   than a floating panel. */
-#object-comment-composer-section {
+   The dock is pinned to the bottom of the scrolling work zone and given the zone's own
+   background, so the page passes behind it instead of showing through. Its top rule is what
+   tells the reader that the strip is the end of the page rather than a floating panel. Both
+   sections start folded (ObjectCommentDockFragment), so the dock is two header lines until one
+   is opened; an opened thread scrolls inside the dock instead of taking the page with it. */
+.ks-comment-dock {
     position: sticky;
     bottom: 0;
     z-index: 2;
     background: var(--wx-body-bg);
     border-top: 1px solid var(--wx-border-color);
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
+    padding-top: 0.25rem;
+}
+
+/* a sticky element cannot leave the box of its parent, and on a document the dock is the only
+   child of the secondary section's host - pinned inside a box exactly its own size, an opened
+   thread grew below the fold instead of upwards. dissolving the host makes the whole content
+   column the box the dock is pinned within */
+:has(> .ks-comment-dock) {
+    display: contents;
+}
+
+.ks-comment-dock #object-comments-section > .wx-section-wrapper > .wx-section-body {
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 /* ================================================================ preview */
@@ -407,12 +422,27 @@
 /* -------------------------------------------------------- prose reading view */
 
 /* The reading view of a document is the document. The content control lays the stored value
-   out; what is set here is the measure it is read at - long enough to carry a paragraph, short
-   enough that the eye finds the next line - and the room it takes when the text is short, so a
-   half-page article does not leave the view looking unfinished. */
+   out; what is set here is the measure it is read at. The room a short text leaves is not
+   claimed by the text any more - a guessed min-height (100vh minus the chrome) never matched the
+   chrome exactly and left a strip under the comment dock; the page fills instead (below). */
 .wx-kleenestar-object-prose .ks-prose-content {
-    min-height: max(18rem, calc(100vh - 20rem));
     line-height: 1.65;
+}
+
+/* An object page fills its work zone exactly: every box between the scrolling region and the
+   comment dock or the closing line of labels and likes becomes a growing column, and those two
+   take the free space above them (margin-top: auto). A short text therefore ends with its labels
+   and the dock flush against the bottom edge, a long one scrolls with the dock pinned there. The
+   dock's own host is left out - it is dissolved (display: contents) so the dock can stick. */
+#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+}
+
+.ks-object-engagement,
+.ks-comment-dock {
+    margin-top: auto;
 }
 
 /* the tags end the piece rather than annotate it, so they sit under the text behind a rule,
@@ -670,4 +700,47 @@ body:has(.ks-welcome) #wx-header-notifications {
         gap: 1.5rem;
         margin-top: 1.5rem;
     }
+}
+
+/* ============================================================== engagement */
+
+/* the labels and the likes close a document or a post off: one line under the text, the labels
+   taking what the like leaves (ObjectEngagementFragment) */
+.ks-object-engagement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 1.5rem;
+}
+
+.ks-object-engagement .ks-object-tags-icon {
+    flex: none;
+    color: var(--wx-secondary-color);
+    margin-right: -0.4rem;
+}
+
+.ks-object-engagement .ks-object-tags {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* the dock is two folded header lines; the sections' own spacing would stack into a strip twice
+   that height */
+.ks-comment-dock > .wx-section,
+.ks-comment-dock > .wx-webui-section {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ================================================================ reading */
+
+/* a document or a post is read like a page, so in the light theme the work zone is paper-white
+   instead of the application's tinted gradient (webexpress.webapp.theme.css, #wx-split-p2). The
+   pages are told by what they contain - the reading view with its closing line, the document
+   overview's home page, the blog stream - which covers both renderers without a class of their
+   own on the page. The dark theme keeps its gradient; white there would be a lamp. */
+html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-object-prose, #blog-stream) #wx-split-p2 {
+    background: var(--wx-body-bg);
 }

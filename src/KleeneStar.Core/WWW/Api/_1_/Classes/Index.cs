@@ -18,13 +18,34 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
     /// Provides CRUD operations for class items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Class>
+    public sealed class Index : RestApiCrudClassStructure<Model.Entities.Class>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to - here, the class itself.
+        /// </summary>
+        /// <param name="item">The class.</param>
+        /// <returns>The class id.</returns>
+        protected override Guid? ClassOf(Model.Entities.Class item)
+        {
+            return item?.Id;
+        }
+
+        /// <summary>
+        /// A class is created beneath a workspace, so creating one is judged on the workspace
+        /// the payload names (<c>WorkspaceId</c>): only its administrators add classes to it.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the class may be created.</returns>
+        protected override bool MayCreate(IRequest request)
+        {
+            return ContentAuthorization.MayAdministerWorkspace(ContentAuthorization.ReadPayloadGuid(request, "workspaceid"), request);
         }
 
         /// <summary>

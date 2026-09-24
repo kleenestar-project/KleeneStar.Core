@@ -367,6 +367,13 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="request">The current HTTP request. Cannot be null.</param>
         protected override void UpdateSwimlanes(RestApiDashboardLayout layout, IRequest request)
         {
+            // the framework's save entry point is not virtual; a refusal travels as the failure
+            // the board already reports
+            if (!ContentAuthorization.MayWriteContent(request))
+            {
+                throw new UnauthorizedAccessException("The board may be arranged by those who may change the workspace's content only.");
+            }
+
             var workspace = GetWorkspace(request);
 
             if (workspace is null || layout?.Swimlanes is null)
@@ -436,6 +443,13 @@ namespace KleeneStar.Core.WebRestApi
         /// <exception cref="ArgumentException">The filter does not compile.</exception>
         protected override void UpdateSettings(RestApiDashboardLayout layout, IRequest request)
         {
+            // the framework's save entry point is not virtual; a refusal travels as the failure
+            // the board already reports
+            if (!ContentAuthorization.MayWriteContent(request))
+            {
+                throw new UnauthorizedAccessException("The board may be arranged by those who may change the workspace's content only.");
+            }
+
             var workspace = GetWorkspace(request);
 
             if (workspace is null)

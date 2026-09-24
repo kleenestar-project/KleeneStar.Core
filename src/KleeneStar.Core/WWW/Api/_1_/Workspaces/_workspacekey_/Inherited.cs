@@ -50,7 +50,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_
         {
             var key = request.GetParameter<WorkspaceKeyParameter>()?.Value;
             var current = CoreHub.WorkspaceManager.GetWorkspaceByKey(key);
-            var all = CoreHub.WorkspaceManager.GetWorkspaces(query, context).ToList();
+            var all = CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context).ToList();
 
             var invalidIds = new HashSet<Guid>();
             if (current != null)

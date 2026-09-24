@@ -85,6 +85,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <returns>The matching rows.</returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Object> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
+            // names only - the rows themselves are narrowed by the object manager
             var workspaceNames = CoreHub.WorkspaceManager
                 .GetWorkspaces(new Query<Workspace>())
                 .GroupBy(w => w.Id)

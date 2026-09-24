@@ -36,6 +36,41 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         }
 
         /// <summary>
+        /// Creates a sprint, once the caller may change the workspace's content.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return ContentAuthorization.MayWriteContent(request) ? base.Create(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes a sprint or moves, ranks and estimates an item, once the caller may change
+        /// the workspace's content.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return ContentAuthorization.MayWriteContent(request) ? base.Update(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes a sprint, once the caller may change the workspace's content.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return ContentAuthorization.MayWriteContent(request) ? base.Delete(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
         /// Returns the sprints of the workspace addressed by the request route.
         /// </summary>
         /// <param name="query">The query criteria (unused; the route scopes the set).</param>
