@@ -10,14 +10,15 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Landing
 {
     /// <summary>
-    /// The narrow column of the landing page: the content the organization keeps in sight, what
-    /// happened last, and the invitation to say what is missing.
+    /// The narrow column of the landing page: the content the organization keeps in sight, the
+    /// help, what people worked on last, and the invitation to say what is missing.
     /// </summary>
     /// <remarks>
-    /// The pinned content leads the column because it is the part a newcomer is sent to look
-    /// for - the org chart, the guidelines - and it stays at the top of the page next to the
-    /// news rather than below them. Beneath it the activity list carries what changes by the
-    /// minute, and the invitation closes the column.
+    /// Everything here is looked up rather than read, so every section is a short list of
+    /// <see cref="LandingRow"/>s. The pinned content leads because it is what a newcomer is
+    /// sent to look for - the org chart, the guidelines; the help follows (it used to take the
+    /// width of the wide column in three narrow columns), then the activity, and the invitation
+    /// closes the column.
     /// </remarks>
     [Section<SectionContentPrimary>]
     [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
@@ -72,8 +73,9 @@ namespace KleeneStar.Core.WebFragment.Landing
 
             column.Add
             (
-                LandingPinnedSection.Build(_tagManager, _objectManager, renderContext, visualTree),
-                LandingActivitySection.Build(_auditManager, renderContext, visualTree),
+                LandingPinnedSection.Build(_tagManager, _objectManager, renderContext),
+                LandingSupportSection.Build(_tagManager, _objectManager),
+                LandingActivitySection.Build(_auditManager, _objectManager, renderContext),
                 LandingFeedbackSection.Build(renderContext, visualTree)
             );
 

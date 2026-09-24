@@ -10,8 +10,8 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Landing
 {
     /// <summary>
-    /// The wide column of the landing page: what the organization has published lately, the
-    /// ways into the work, and the help.
+    /// The wide column of the landing page: what the organization has published lately, then
+    /// the reader's open work.
     /// </summary>
     /// <remarks>
     /// The two columns are one fragment each rather than one per section, because a column is
@@ -20,9 +20,10 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// (<c>Landing…Section</c>), so what a section shows and where a column puts it remain two
     /// different decisions.
     /// <para>
-    /// News leads here: it is the part of the page that changes between two visits, and the
-    /// wide column is where several entries can be read side by side. The pinned content, which
-    /// changes rarely and is looked up rather than read, sits in the side column opposite.
+    /// The news lead, in the form of the blog overview; the reader's own open work follows as a
+    /// list. The entry paths that used to stand here (mine, organization, shared,
+    /// watched) are gone - they repeated the sidebar links beside them - and the help moved to
+    /// the side column, where things that are looked up rather than read belong.
     /// </para>
     /// </remarks>
     [Section<SectionContentPrimary>]
@@ -32,36 +33,16 @@ namespace KleeneStar.Core.WebFragment.Landing
     public sealed class LandingMainColumnFragment : FragmentControlPanel
     {
         private readonly IObjectManager _objectManager;
-        private readonly IObjectTagManager _tagManager;
-        private readonly IWorkspaceManager _workspaceManager;
-        private readonly IShareManager _shareManager;
-        private readonly IWatcherManager _watcherManager;
 
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="fragmentContext">The fragment context.</param>
         /// <param name="objectManager">The object manager.</param>
-        /// <param name="tagManager">The tag manager holding the label rows.</param>
-        /// <param name="workspaceManager">The workspace manager.</param>
-        /// <param name="shareManager">The share manager.</param>
-        /// <param name="watcherManager">The watcher manager.</param>
-        public LandingMainColumnFragment
-        (
-            IFragmentContext fragmentContext,
-            IObjectManager objectManager,
-            IObjectTagManager tagManager,
-            IWorkspaceManager workspaceManager,
-            IShareManager shareManager,
-            IWatcherManager watcherManager
-        )
+        public LandingMainColumnFragment(IFragmentContext fragmentContext, IObjectManager objectManager)
             : base(fragmentContext)
         {
             _objectManager = objectManager;
-            _tagManager = tagManager;
-            _workspaceManager = workspaceManager;
-            _shareManager = shareManager;
-            _watcherManager = watcherManager;
         }
 
         /// <summary>
@@ -86,9 +67,8 @@ namespace KleeneStar.Core.WebFragment.Landing
 
             column.Add
             (
-                LandingNewsSection.Build(_objectManager, renderContext, visualTree),
-                LandingEntryPathSection.Build(_objectManager, _workspaceManager, _shareManager, _watcherManager, renderContext),
-                LandingSupportSection.Build(_tagManager, _objectManager, renderContext, visualTree)
+                LandingNewsSection.Build(renderContext),
+                LandingWorkSection.Build(_objectManager, renderContext)
             );
 
             return column.Render(renderContext, visualTree);

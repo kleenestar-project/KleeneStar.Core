@@ -56,7 +56,8 @@ namespace KleeneStar.Core.WebPermission
 
         /// <summary>
         /// Returns the resource chain the route names: the object's (class, workspace), else the
-        /// workspace's.
+        /// workspace's, else the class's (class, workspace) when the route names a class or a
+        /// record of its structure.
         /// </summary>
         /// <param name="request">The request.</param>
         /// <returns>The chain; empty when the route names no resource.</returns>
@@ -82,9 +83,15 @@ namespace KleeneStar.Core.WebPermission
 
             var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>();
 
-            return string.IsNullOrEmpty(workspaceKey?.Value)
-                ? []
-                : PageAuthorization.ChainOf(CoreHub.WorkspaceManager.GetWorkspaceByKey(workspaceKey.Value));
+            if (!string.IsNullOrEmpty(workspaceKey?.Value))
+            {
+                return PageAuthorization.ChainOf(CoreHub.WorkspaceManager.GetWorkspaceByKey(workspaceKey.Value));
+            }
+
+            // a class administration page names a class, or a record of its structure
+            var @class = request is null ? null : RouteAuthorization.ResolveClass(request);
+
+            return PageAuthorization.ChainOf(@class);
         }
 
         /// <summary>

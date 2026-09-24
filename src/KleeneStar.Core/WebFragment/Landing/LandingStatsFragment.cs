@@ -30,7 +30,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// The figures are counted, never loaded - each is a single <c>COUNT</c> against a filtered
     /// set - because the landing page is hit by everybody at the start of every session and
     /// must not drag a table across to print a number. They describe the organization rather
-    /// than the caller; the personal figures live on the entry-path cards.
+    /// than the caller; the caller's own work is the first section of the wide column.
     /// </para>
     /// </remarks>
     [Section<SectionContentPrimary>]
@@ -200,6 +200,12 @@ namespace KleeneStar.Core.WebFragment.Landing
         /// <summary>
         /// Builds the team field: the active groups, named as far as the line allows.
         /// </summary>
+        /// <remarks>
+        /// The implicit groups (<see cref="Model.Entities.Group.IsImplicit(Guid)"/> - everybody
+        /// signed in, everybody who is not) are rows of the group table so permissions can name
+        /// them, but they are no team anybody belongs to by choice, and counting them put
+        /// "Anonymous" among the teams of the organization.
+        /// </remarks>
         /// <param name="renderContext">The render context.</param>
         /// <returns>The tile.</returns>
         private ControlStat BuildTeams(IRenderControlContext renderContext)
@@ -208,7 +214,9 @@ namespace KleeneStar.Core.WebFragment.Landing
                 .Where(x => x.State == Model.Entities.GroupState.Active)
                 .OrderByAsc(x => x.Name);
 
-            var groups = _groupManager.GetGroups(query).ToList();
+            var groups = _groupManager.GetGroups(query)
+                .Where(x => !Model.Entities.Group.IsImplicit(x.Id))
+                .ToList();
             var names = groups.Take(TeamNames).Select(x => x.Name).ToArray();
 
             var note = string.Join(", ", names);
@@ -229,18 +237,23 @@ namespace KleeneStar.Core.WebFragment.Landing
         }
 
         /// <summary>
-        /// Builds the activity field: what was recorded today, and how long ago the last of it
-        /// was.
+        /// Builds the activity field: what people worked on today, and how long ago the last of
+        /// it was.
         /// </summary>
+        /// <remarks>
+        /// It counts the events the activity list shows (<see cref="LandingActivitySection.WorkQuery"/>),
+        /// not the whole audit log - that one is mostly the installation starting and people
+        /// signing in, and a figure of hundreds on a quiet day said nothing about the work.
+        /// </remarks>
         /// <param name="renderContext">The render context.</param>
         /// <returns>The tile.</returns>
         private ControlStat BuildActivity(IRenderControlContext renderContext)
         {
             var since = DateTime.UtcNow.Date;
-            var today = _auditManager.CountEvents(new Query<Model.Entities.AuditEvent>().Where(x => x.Timestamp >= since));
+            var today = _auditManager.CountEvents(LandingActivitySection.WorkQuery().Where(x => x.Timestamp >= since));
 
             var latest = _auditManager
-                .GetEvents(new Query<Model.Entities.AuditEvent>().OrderByDesc(x => x.Sequence).WithPaging(0, 1))
+                .GetEvents(LandingActivitySection.WorkQuery().WithPaging(0, 1))
                 .FirstOrDefault();
 
             var note = latest is null

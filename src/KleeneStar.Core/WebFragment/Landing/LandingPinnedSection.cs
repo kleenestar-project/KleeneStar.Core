@@ -1,9 +1,7 @@
-﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebManager;
-using System.Collections.Generic;
 using WebExpress.WebCore.Internationalization;
-using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -17,17 +15,22 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// </summary>
     /// <remarks>
     /// The area owns no content. What appears here is decided by the label on an object, so
-    /// pinning is done where the object lives - its tag card - rather than in a settings page
+    /// pinning is done where the object lives - its label line - rather than in a settings page
     /// for the landing page. Without any pinned object the area still renders its heading and
     /// says how something gets here: an empty area that explains itself is what a newcomer
     /// needs, an area that disappears teaches nothing.
+    /// <para>
+    /// An entry is a <see cref="LandingRow"/> - title, key and date - without its description:
+    /// in the narrow column the full descriptions made every entry a column of text, and a
+    /// pinned page is recognized by its title.
+    /// </para>
     /// </remarks>
     internal static class LandingPinnedSection
     {
         /// <summary>
         /// The maximum number of pinned objects shown.
         /// </summary>
-        private const int MaxItems = 6;
+        private const int MaxItems = 8;
 
         /// <summary>
         /// Builds the section.
@@ -35,15 +38,8 @@ namespace KleeneStar.Core.WebFragment.Landing
         /// <param name="tagManager">The tag manager holding the label rows.</param>
         /// <param name="objectManager">The object manager used to resolve the pinned objects.</param>
         /// <param name="renderContext">The render context.</param>
-        /// <param name="visualTree">The visual tree.</param>
-        /// <returns>The section control.</returns>
-        public static IControl Build
-        (
-            IObjectTagManager tagManager,
-            IObjectManager objectManager,
-            IRenderControlContext renderContext,
-            IVisualTreeControl visualTree
-        )
+        /// <returns>The section.</returns>
+        public static IControl Build(IObjectTagManager tagManager, IObjectManager objectManager, IRenderControlContext renderContext)
         {
             var pinned = LandingLabel.Resolve(tagManager, objectManager, LandingLabel.Pinned, MaxItems);
 
@@ -51,105 +47,42 @@ namespace KleeneStar.Core.WebFragment.Landing
             {
                 Header = _ => "kleenestar.core:landing.pinned.card",
                 HeaderIcon = _ => new IconThumbtack(),
-                Note = _ => "kleenestar.core:landing.pinned.hint",
                 Layout = _ => TypeLayoutSection.Rule
             };
 
-            if (pinned.Count > 0)
+            if (pinned.Count == 0)
             {
-                section.Badge = _ => LandingHtml.Number(pinned.Count, renderContext);
-                section.BadgeColor = _ => new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Secondary);
-                section.Add(BuildTiles(pinned, renderContext));
-            }
-            else
-            {
-                section.Add(new ControlText("landing-pinned-empty")
-                {
-                    Text = _ => "kleenestar.core:landing.pinned.empty",
-                    TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
-                });
+                section.Add(LandingRow.Empty("landing-pinned-empty", "kleenestar.core:landing.pinned.empty"));
+
+                return section;
             }
 
-            return section;
-        }
-
-        /// <summary>
-        /// Builds the tiles of the pinned entries.
-        /// </summary>
-        /// <param name="pinned">The pinned objects.</param>
-        /// <param name="renderContext">The render context.</param>
-        /// <returns>The tile control.</returns>
-        private static IControl BuildTiles(IReadOnlyList<Model.Entities.Object> pinned, IRenderControlContext renderContext)
-        {
-            // a grid of fields rather than a row of framed cards: what the organization keeps
-            // in sight is one set, and a frame around each entry would read as five unrelated
-            // documents that happen to sit next to each other
-            var grid = new ControlGroup("landing-pinned-grid")
-            {
-                Columns = _ => 2,
-                Spacing = _ => TypeSpacingGroup.Wide
-            };
+            var culture = LandingHtml.Culture(renderContext);
+            var list = LandingRow.List("landing-pinned-list");
 
             foreach (var entry in pinned)
             {
-                grid.Add(BuildEntry(entry, renderContext));
+                var kind = ObjectKindCatalog.GetKind(entry.Kind);
+                var updated = string.Format
+                (
+                    culture,
+                    I18N.Translate(renderContext, "kleenestar.core:landing.pinned.updated"),
+                    entry.Updated.ToString("d", culture)
+                );
+
+                list.Add(LandingRow.Build
+                (
+                    "landing-pinned-" + entry.Id.ToString("N"),
+                    ObjectIcon.Resolve(entry, kind?.Icon ?? new IconObject()),
+                    entry.Summary,
+                    ObjectKindCatalog.ResolveDetailUri(entry),
+                    meta: LandingHtml.Join(entry.Key, updated)
+                ));
             }
 
-            return grid;
-        }
+            section.Add(list);
 
-        /// <summary>
-        /// Builds one pinned entry: its icon, its summary as the link into it, the sentence
-        /// beneath, and the line saying how current it is.
-        /// </summary>
-        /// <remarks>
-        /// The route is resolved through <see cref="ObjectKindCatalog"/>, so a pinned document
-        /// opens in the document view and a pinned issue in the issue view without this section
-        /// knowing either kind.
-        /// </remarks>
-        /// <param name="entry">The pinned object.</param>
-        /// <param name="renderContext">The render context.</param>
-        /// <returns>The entry.</returns>
-        private static IControl BuildEntry(Model.Entities.Object entry, IRenderControlContext renderContext)
-        {
-            var id = entry.Id.ToString("N");
-            var kind = ObjectKindCatalog.GetKind(entry.Kind);
-
-            var panel = new ControlPanel("landing-pinned-" + id);
-
-            panel.Add(new ControlLink("landing-pinned-open-" + id)
-            {
-                Text = _ => entry.Summary,
-                Tooltip = _ => entry.Key,
-                Icon = _ => ObjectIcon.Resolve(entry, kind?.Icon ?? new IconObject()),
-                Uri = _ => ObjectKindCatalog.ResolveDetailUri(entry)
-            });
-
-            if (!ProseText.IsEmpty(entry.Description))
-            {
-                panel.Add(new ControlText("landing-pinned-description-" + id)
-                {
-                    Text = _ => ProseText.ToPlainText(entry.Description),
-                    TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
-                    Format = _ => TypeFormatText.Paragraph
-                });
-            }
-
-            var updated = string.Format
-            (
-                LandingHtml.Culture(renderContext),
-                I18N.Translate(renderContext, "kleenestar.core:landing.pinned.updated"),
-                entry.Updated.ToString("d", LandingHtml.Culture(renderContext))
-            );
-
-            panel.Add(new ControlText("landing-pinned-updated-" + id)
-            {
-                Text = _ => LandingHtml.Join(entry.Key, updated),
-                TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
-                Format = _ => TypeFormatText.Code
-            });
-
-            return panel;
+            return section;
         }
     }
 }

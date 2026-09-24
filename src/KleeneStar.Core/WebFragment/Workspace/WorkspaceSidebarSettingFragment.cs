@@ -27,6 +27,22 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
+    // the class administration pages carry the same sidebar and offer the workspace's menu too;
+    // the class's own actions are on its page (edit) and in the class list (clone, delete)
+    [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.SecurityLevels._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Priorities._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Slas._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Calendars._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Relations._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Calendar._calendarid_.Index>]
     // every entry of the cog administers the workspace, so the cog is its administrators'
     [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Cache]
@@ -76,6 +92,15 @@ namespace KleeneStar.Core.WebFragment.Workspace
             {
                 var objectKey = renderContext.Request.GetParameter<ObjectKeyParameter>();
                 var workspaceKey = CoreHub.ObjectManager.GetObjectByKey(objectKey?.Value)?.Workspace?.Key;
+
+                // on the class administration pages the route names a class, or a record of its
+                // structure, and the workspace is the class's
+                if (string.IsNullOrEmpty(workspaceKey)
+                    && global::KleeneStar.Core.WebPermission.RouteAuthorization.ResolveClass(renderContext.Request) is { } @class)
+                {
+                    workspaceKey = CoreHub.WorkspaceManager.GetWorkspace(@class.WorkspaceId)?.Key;
+                }
+
                 keyParameter = new WorkspaceKeyParameter(workspaceKey);
             }
 

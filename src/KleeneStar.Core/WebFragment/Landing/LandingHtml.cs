@@ -17,7 +17,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// they are fed with. Keeping it in one place is what makes "5 minutes ago" read the same
     /// on the figure row, in the news list and on the timeline.
     /// </remarks>
-    internal static class LandingHtml
+    public static class LandingHtml
     {
         /// <summary>
         /// Renders a control into an HTML node, so a control can be returned from a fragment
@@ -120,6 +120,29 @@ namespace KleeneStar.Core.WebFragment.Landing
             }
 
             return string.Join(" · ", kept);
+        }
+
+        /// <summary>
+        /// Builds the chip naming the state an object is in, coloured by its status category -
+        /// the same chip the start page of a class puts at the end of its rows.
+        /// </summary>
+        /// <param name="category">The status category, or <see langword="null"/>.</param>
+        /// <returns>The chip, or <see langword="null"/> when the object has no state.</returns>
+        public static IControl StateChip(Model.Entities.StatusCategory category)
+        {
+            if (category is null)
+            {
+                return null;
+            }
+
+            var tone = "ks-co-tone-" + (WebRestApi.ObjectBoardProjection.CategoryColorCss(category) ?? "wx-color-secondary").Replace("wx-color-", string.Empty);
+
+            return new ControlText
+            {
+                Text = _ => WebRestApi.ObjectBoardProjection.CategoryLabel(category),
+                Format = _ => TypeFormatText.Span,
+                Classes = ["ks-co-chip", tone]
+            };
         }
     }
 }

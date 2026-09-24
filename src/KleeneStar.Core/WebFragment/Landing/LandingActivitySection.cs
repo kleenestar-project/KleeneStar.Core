@@ -1,8 +1,10 @@
+using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Model.Entities;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using WebExpress.WebCore.Internationalization;
-using WebExpress.WebCore.WebHtml;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
@@ -11,39 +13,42 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Landing
 {
     /// <summary>
-    /// The activity area: the last few things that happened in the installation, each as one
-    /// sentence - who did what to which record, and how long ago.
+    /// The activity area: the objects people worked on last, each once, with who did what and
+    /// when.
     /// </summary>
     /// <remarks>
-    /// Read from the audit log, which is the installation-wide record of what happened and the
-    /// only source that covers every kind of change rather than one manager's. The sentence is
-    /// composed from the typed fields (<see cref="AuditEvent.Action"/>,
-    /// <see cref="AuditEvent.TargetType"/>) exactly as the audit view composes it - the model
-    /// deliberately has no free-form message field, so a display sentence is always built,
-    /// never stored.
-    /// <para>
-    /// A run of events in time is a timeline, and the control draws one: the entries hang off a
-    /// single line in the order they happened, which is the shape that says "and then" without
-    /// a word.
-    /// </para>
+    /// The area used to print the audit log's last entries as they came - and the audit log is
+    /// mostly the installation talking to itself: <i>System started installation</i>,
+    /// <i>Admin signed in</i>, six times over. What a reader wants from "what happened" is the
+    /// work, so only events a <b>user</b> caused on an <b>object</b>, in the content or
+    /// workflow category, are shown (<see cref="IsWork"/>), each object once (its latest
+    /// event), and only an object the reader may open - the audit log is not narrowed by
+    /// security levels, <see cref="IObjectManager.GetObject(Guid)"/> is, so a classified record
+    /// does not leak its title through the feed. The key figure beside the page counts the
+    /// same events (<see cref="WorkQuery"/>).
     /// </remarks>
-    internal static class LandingActivitySection
+    public static class LandingActivitySection
     {
         /// <summary>
-        /// The number of events shown.
+        /// The maximum number of entries shown.
         /// </summary>
         private const int MaxItems = 6;
 
         /// <summary>
+        /// The number of events read at most while collecting distinct visible objects.
+        /// </summary>
+        private const int ScanLimit = 60;
+
+        /// <summary>
         /// Builds the section.
         /// </summary>
-        /// <param name="auditManager">The audit manager the events are read from.</param>
+        /// <param name="auditManager">The audit manager the activity is read from.</param>
+        /// <param name="objectManager">The object manager deciding what the reader may see.</param>
         /// <param name="renderContext">The render context.</param>
-        /// <param name="visualTree">The visual tree.</param>
-        /// <returns>The section control.</returns>
-        public static IControl Build(IAuditManager auditManager, IRenderControlContext renderContext, IVisualTreeControl visualTree)
+        /// <returns>The section.</returns>
+        public static IControl Build(IAuditManager auditManager, IObjectManager objectManager, IRenderControlContext renderContext)
         {
-            var events = GetEvents(auditManager);
+            var entries = GetEntries(auditManager, objectManager);
 
             var section = new ControlSection("landing-activity")
             {
@@ -52,42 +57,111 @@ namespace KleeneStar.Core.WebFragment.Landing
                 Layout = _ => TypeLayoutSection.Rule
             };
 
-            if (events.Count == 0)
+            if (entries.Count == 0)
             {
-                section.Add(new ControlText("landing-activity-empty")
-                {
-                    Text = _ => "kleenestar.core:landing.activity.empty",
-                    TextColor = _ => new PropertyColorText(TypeColorText.Secondary)
-                });
+                section.Add(LandingRow.Empty("landing-activity-empty", "kleenestar.core:landing.activity.empty"));
 
                 return section;
             }
 
-            var timeline = new ControlTimeline("landing-activity-timeline");
+            var list = LandingRow.List("landing-activity-list");
 
-            foreach (var @event in events)
+            foreach (var (@event, @object) in entries)
             {
-                timeline.Add(BuildEntry(@event, renderContext));
+                var kind = ObjectKindCatalog.GetKind(@object.Kind);
+
+                list.Add(LandingRow.Build
+                (
+                    "landing-activity-" + @event.Id.ToString("N"),
+                    WebControl.ObjectIcon.Resolve(@object, kind?.Icon ?? new IconObject()),
+                    @object.Summary,
+                    ObjectKindCatalog.ResolveDetailUri(@object),
+                    meta: LandingHtml.Join(Sentence(@event, renderContext), LandingHtml.Age(@event.Timestamp, renderContext))
+                ));
             }
 
-            section.Add(timeline);
+            section.Add(list);
 
             return section;
         }
 
         /// <summary>
-        /// Builds a single entry: the sentence naming what somebody did, and how long ago.
+        /// Builds the query over the events that count as work: caused by a user, on an object,
+        /// in the content or workflow category.
         /// </summary>
-        /// <param name="event">The event to render.</param>
-        /// <param name="renderContext">The render context.</param>
-        /// <returns>The timeline item.</returns>
-        private static ControlTimelineItem BuildEntry(AuditEvent @event, IRenderControlContext renderContext)
+        /// <returns>The query, newest first.</returns>
+        public static IQuery<AuditEvent> WorkQuery()
         {
-            var actor = ResolveActor(@event, renderContext);
+            return new Query<AuditEvent>()
+                .Where(x => x.Origin == AuditOrigin.User)
+                .Where(x => x.TargetType == AuditTargetType.Object)
+                .Where(x => x.Category == AuditCategory.Content || x.Category == AuditCategory.Workflow)
+                .OrderByDesc(x => x.Sequence);
+        }
 
-            // the two halves of the sentence fall in a different order per language - "created
-            // an issue" against "hat einen Vorgang angelegt" - so the pattern carries the
-            // placeholders and is translated before the parts are put in
+        /// <summary>
+        /// Determines whether an event counts as work - the in-memory twin of
+        /// <see cref="WorkQuery"/>.
+        /// </summary>
+        /// <param name="event">The event.</param>
+        /// <returns><see langword="true"/> for work.</returns>
+        public static bool IsWork(AuditEvent @event)
+        {
+            return @event is not null
+                && @event.Origin == AuditOrigin.User
+                && @event.TargetType == AuditTargetType.Object
+                && @event.Category is AuditCategory.Content or AuditCategory.Workflow;
+        }
+
+        /// <summary>
+        /// Reads the latest work events, one per object the reader may open.
+        /// </summary>
+        /// <param name="auditManager">The audit manager.</param>
+        /// <param name="objectManager">The object manager.</param>
+        /// <returns>The events with their objects, newest first.</returns>
+        private static IReadOnlyList<(AuditEvent Event, Model.Entities.Object Object)> GetEntries(IAuditManager auditManager, IObjectManager objectManager)
+        {
+            var result = new List<(AuditEvent, Model.Entities.Object)>();
+            var seen = new HashSet<Guid>();
+
+            foreach (var @event in auditManager.GetEvents(WorkQuery().WithPaging(0, ScanLimit)).Where(IsWork))
+            {
+                if (@event.TargetId is not { } id || !seen.Add(id))
+                {
+                    continue;
+                }
+
+                var @object = objectManager.GetObject(id);
+
+                if (@object is null)
+                {
+                    continue;
+                }
+
+                result.Add((@event, @object));
+
+                if (result.Count == MaxItems)
+                {
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Composes who did what: "Admin User updated the object".
+        /// </summary>
+        /// <remarks>
+        /// The two halves fall in a different order per language, so the pattern carries the
+        /// placeholders and is translated before the parts are put in.
+        /// </remarks>
+        private static string Sentence(AuditEvent @event, IRenderControlContext renderContext)
+        {
+            var actor = (@event.ActorId.HasValue ? CoreHub.IdentityManager?.GetIdentity(@event.ActorId.Value)?.Name : null)
+                ?? @event.ActorName
+                ?? I18N.Translate(renderContext, "kleenestar.core:audit.actor.system");
+
             var predicate = string.Format
             (
                 LandingHtml.Culture(renderContext),
@@ -96,64 +170,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                 I18N.Translate(renderContext, @event.Action.Text())
             );
 
-            var title = LandingHtml.Join(actor + " " + predicate, @event.TargetKey);
-            var age = LandingHtml.Age(@event.Timestamp, renderContext);
-
-            return new ControlTimelineItem("landing-activity-" + @event.Id.ToString("N"))
-            {
-                Title = _ => title,
-                Timestamp = _ => age,
-                Color = _ => new PropertyColorBackground(Tone(@event.Severity))
-            };
-        }
-
-        /// <summary>
-        /// Returns the colour a severity is marked with, so a warning stands out of a run of
-        /// ordinary changes without being read as an error.
-        /// </summary>
-        /// <param name="severity">The severity of the event.</param>
-        /// <returns>The background colour of the timeline marker.</returns>
-        private static TypeColorBackground Tone(AuditSeverity severity)
-        {
-            return severity switch
-            {
-                AuditSeverity.Warning => TypeColorBackground.Warning,
-                AuditSeverity.Notice => TypeColorBackground.Info,
-                _ => TypeColorBackground.Secondary
-            };
-        }
-
-        /// <summary>
-        /// Resolves who caused an event: the identity's current name, falling back to the name
-        /// snapshotted when the event was written, and finally to "system" for the events
-        /// nobody caused.
-        /// </summary>
-        /// <param name="event">The event.</param>
-        /// <param name="renderContext">The render context used for translating.</param>
-        /// <returns>The actor's display name.</returns>
-        private static string ResolveActor(AuditEvent @event, IRenderControlContext renderContext)
-        {
-            var identity = @event.ActorId.HasValue
-                ? CoreHub.IdentityManager?.GetIdentity(@event.ActorId.Value)
-                : null;
-
-            return identity?.Name
-                ?? @event.ActorName
-                ?? I18N.Translate(renderContext, "kleenestar.core:audit.actor.system");
-        }
-
-        /// <summary>
-        /// Fetches the newest audit events.
-        /// </summary>
-        /// <param name="auditManager">The audit manager.</param>
-        /// <returns>The capped, newest-first set of events. The list may be empty.</returns>
-        private static IReadOnlyList<AuditEvent> GetEvents(IAuditManager auditManager)
-        {
-            var query = new Query<AuditEvent>()
-                .OrderByDesc(x => x.Sequence)
-                .WithPaging(0, MaxItems);
-
-            return [.. auditManager.GetEvents(query)];
+            return actor + " " + predicate;
         }
     }
 }
