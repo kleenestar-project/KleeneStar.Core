@@ -112,14 +112,16 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <remarks>
         /// An enabled notice without a text is treated as invisible, because an empty toast tells
-        /// the user nothing while still taking up the top of every page.
+        /// the user nothing while still taking up the top of every page. The text comes out of the
+        /// prose editor, which never submits an empty string, so emptiness is asked of the
+        /// document (<see cref="WebControl.ProseText.IsEmpty"/>), not of the string.
         /// </remarks>
         /// <returns>True when the notice is enabled and carries a text; otherwise false.</returns>
         public bool IsNoticeVisible()
         {
             var maintenance = GetMaintenance();
 
-            return maintenance.Enabled && !string.IsNullOrWhiteSpace(maintenance.Message);
+            return maintenance.Enabled && !WebControl.ProseText.IsEmpty(maintenance.Message);
         }
 
         /// <summary>

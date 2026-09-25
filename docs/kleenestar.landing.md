@@ -14,7 +14,7 @@ The page is laid out as a page rather than as a stack of blocks: a full-width he
 ┌──────────────────────────────────────────────────────────────┐
 │ head — date line, greeting, lede, actions                    │
 ├──────────────────────────────────────────────────────────────┤
-│ figures — issues · people · teams · activity                 │
+│ figures — assigned · watched · shared · my activity          │
 ├────────────────────────────────────┬─────────────────────────┤
 │ news                               │ pinned content          │
 │ my work                            │ help and support        │
@@ -42,7 +42,7 @@ The page itself contributes nothing — not even the headline, which is hidden o
 
 ## Signed out
 
-A visitor who is not signed in sees none of the above. The organization's figures, news and
+A visitor who is not signed in sees none of the above. The figures, news and
 activity are nothing to show somebody the installation does not know yet, so every landing
 fragment - head, figures, both columns and the sidebar links - is gated on `SignedInCondition`,
 and `LandingWelcomeFragment` on its complement: the page shows exactly one of the two.
@@ -68,22 +68,20 @@ visitor.
 
 ## Head
 
-The greeting follows the time of day and addresses the reader by their first name. On a page everybody shares, that one personal line is what tells a reader the figures below are the organization's and not theirs. The two actions are the ones that belong to arriving: *Choose start page*, which leads to the dashboards — the page says itself that it can be replaced — and *New issue*, which opens the same creation modal as everywhere else.
+The greeting follows the time of day and addresses the reader by their first name. The figures below it are the reader's own, like the greeting. The two actions are the ones that belong to arriving: *Choose start page*, which leads to the dashboards — the page says itself that it can be replaced — and *New issue*, which opens the same creation modal as everywhere else.
 
 ## Key figures
 
-The figures describe the organization, not the caller: they are what lets somebody place their own work in a context. They are counted, never loaded — each is a single `COUNT` against a filtered set — because the landing page is hit by everybody at the start of every session and must not drag a table across to print a number. The count helpers live on the managers (`IObjectManager.CountObjects` and its siblings) and pass the query straight through to the model.
+The figures describe the reader, not the organization (changed 2026-09-25: the row used to count all issues, people, teams and everybody's activity - numbers nobody could act on). They follow the personal entries of the sidebar, so every figure is a list one click away. Every count goes through `IObjectManager`, so security levels and content visibility apply exactly as on the lists.
 
 | Figure | Counts | Second line |
 |--------|--------|-------------|
-| Issues | Active objects of kind `issue` | How many were raised this week |
-| People | Active identities | How many left a trace in the audit log this week |
-| Teams | Active groups, without the implicit ones (`Group.IsImplicit`: signed-in users, anonymous) | The names of the first few |
-| Activity | Work events of today (see *Latest activity*) | How long ago the last one was |
+| Assigned to me | Open issues assigned to the reader - the *My work* definition (`LandingWorkSection.GetOpen`), scanned up to `ScanLimit`; shown as `150+` when more are assigned than the scan reads | How many are in the `in progress` status category |
+| Watching | Active objects the reader watches (`LandingScope.GetWatchedIds`) | How many changed this week |
+| Shared with me | Active objects shared with the reader (`LandingScope.GetSharedIds`) | How many changed this week |
+| My activity today | The reader's work events of today (`LandingActivitySection.WorkQuery`, actor = reader) | How long ago their last one was |
 
-A bare number says little. "112" next to "8 new this week" says whether the queue is growing; "4" next to "IT, Dev, HR, Finance" says which teams those are. The second line is what turns the row from a scoreboard into orientation.
-
-"Active this week" is read from the audit log rather than from a session table, because a session says somebody was signed in, not that they did anything.
+A bare number says little. "8" next to "3 changed this week" says whether something the reader follows needs a look; the second line is what turns the row from a scoreboard into orientation.
 
 The personal part of the page is the first section of the wide column.
 

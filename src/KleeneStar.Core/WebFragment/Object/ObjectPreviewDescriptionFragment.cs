@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebSection;
@@ -75,7 +76,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 Layout = _ => TypeLayoutSection.Rule
             };
 
-            if (string.IsNullOrWhiteSpace(@object.Description))
+            if (ProseText.IsEmpty(@object.Description))
             {
                 section.Add(new ControlText("object-preview-description-empty-" + id)
                 {
@@ -87,12 +88,14 @@ namespace KleeneStar.Core.WebFragment.Object
                 return section.Render(renderContext, visualTree);
             }
 
-            // the description is stored as the markup the wysiwyg editor produced, so it is
-            // emitted as markup here too - the same way the document and blog reading views
-            // render their prose
-            section.Add(new ControlHtml("object-preview-description-body-" + id)
+            // the description is stored as the editor's document, so it is handed to the
+            // framework's reading view - the same way the document and blog reading views
+            // render their prose; emitted as markup, the preview showed the serialization
+            section.Add(new ControlContent("object-preview-description-body-" + id)
             {
-                Html = _ => "<div class=\"wx-kleenestar-prose\">" + @object.Description + "</div>"
+                Content = _ => @object.Description,
+                Format = _ => TypeFormatContent.RichText,
+                Classes = ["wx-kleenestar-prose"]
             });
 
             return section.Render(renderContext, visualTree);

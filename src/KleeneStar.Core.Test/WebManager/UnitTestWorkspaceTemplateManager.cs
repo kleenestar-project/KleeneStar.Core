@@ -386,6 +386,29 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
+        /// A workspace description written in the prose editor is stored as the editor's
+        /// document; the home page leads with its words, not with the serialization.
+        /// </summary>
+        [Fact]
+        public void ApplyRendersTheWorkspaceDescription()
+        {
+            Seed(nameof(ApplyRendersTheWorkspaceDescription));
+
+            using (var db = CoreHubFixture.CreateDbContext(nameof(ApplyRendersTheWorkspaceDescription)))
+            {
+                db.Workspaces.Single(x => x.Id == WorkspaceId).Description = """
+                    {"version":1,"doc":{"type":"doc","id":"n1","children":[{"type":"p","id":"n2","children":[{"type":"text","text":"Where the service desk works.","marks":{}}]}]}}
+                    """;
+                db.SaveChanges();
+            }
+
+            var created = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId, AuthorId);
+
+            Assert.Contains("Where the service desk works.", created.Home.Description);
+            Assert.DoesNotContain("\"version\"", created.Home.Description);
+        }
+
+        /// <summary>
         /// Applying the same template twice adds what is missing rather than a second set of
         /// everything - a retried create, or a template applied to a workspace somebody had
         /// already set up by hand, must not double any of it.

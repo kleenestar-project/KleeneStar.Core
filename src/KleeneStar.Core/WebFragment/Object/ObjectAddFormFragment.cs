@@ -256,9 +256,9 @@ namespace KleeneStar.Core.WebFragment.Object
                     BadgeColor = _ => new PropertyColorTile(CoreHub.AccentColor(workspace.Id))
                 };
 
-                if (!string.IsNullOrWhiteSpace(workspace.Description))
+                if (!ProseText.IsEmpty(workspace.Description))
                 {
-                    card.Add(new ControlText { Text = _ => workspace.Description });
+                    card.Add(new ControlText { Text = _ => ProseText.ToPlainText(workspace.Description) });
                 }
 
                 card.AddFooter(new ControlText { Text = _ => workspace.Key });
@@ -300,9 +300,9 @@ namespace KleeneStar.Core.WebFragment.Object
                     FilterValue = _ => @class.WorkspaceId.ToString()
                 };
 
-                if (!string.IsNullOrWhiteSpace(@class.Description))
+                if (!ProseText.IsEmpty(@class.Description))
                 {
-                    card.Add(new ControlText { Text = _ => @class.Description });
+                    card.Add(new ControlText { Text = _ => ProseText.ToPlainText(@class.Description) });
                 }
 
                 card.AddFooter(new ControlText
@@ -386,9 +386,9 @@ namespace KleeneStar.Core.WebFragment.Object
                 FilterValue = _ => @class.Id.ToString()
             };
 
-            if (!string.IsNullOrWhiteSpace(template.Description))
+            if (!ProseText.IsEmpty(template.Description))
             {
-                card.Add(new ControlText { Text = _ => template.Description });
+                card.Add(new ControlText { Text = _ => ProseText.ToPlainText(template.Description) });
             }
 
             card.AddFooter(new ControlText

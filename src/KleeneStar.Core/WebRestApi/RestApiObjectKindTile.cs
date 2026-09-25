@@ -54,7 +54,7 @@ namespace KleeneStar.Core.WebRestApi
                 {
                     Id = x.Id.ToString(),
                     Title = x.Summary,
-                    Text = x.Description,
+                    Text = ProseText.ToPlainText(x.Description),
                     Image = ObjectIcon.Uri(x),
                     PrimaryAction = GetPrimaryAction(x, request)?.ToJson()
                 });

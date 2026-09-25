@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using WebExpress.WebCore.Internationalization;
+using WebExpress.WebUI.WebControl;
 
 namespace KleeneStar.Core.WebWorkspaceTemplate
 {
@@ -51,12 +53,6 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// </summary>
         [GeneratedRegex("<path\\b[^>]*\\bd=\"([^\"]+)\"", RegexOptions.IgnoreCase)]
         private static partial Regex GlyphRegex();
-
-        /// <summary>
-        /// Matches any tag, so a rich-text value can be asked whether it says anything.
-        /// </summary>
-        [GeneratedRegex("<[^>]*>")]
-        private static partial Regex TagRegex();
 
         /// <summary>
         /// The suffix of the embedded mark, matched against the manifest resource names with
@@ -107,12 +103,12 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
             html.Append(Banner(workspace, Translate(culture, "kleenestar.core:workspace.template.home.banner")));
 
             // the workspace's own description leads, because it is what somebody actually wrote
-            // about this workspace; the generic sentence only stands in when there is none. It is
-            // appended as markup rather than escaped, because it comes out of the same WYSIWYG
-            // editor this body is read by - escaping it would print its tags at the reader
-            if (HasText(workspace?.Description))
+            // about this workspace; the generic sentence only stands in when there is none. The
+            // editor stores a document, not markup, and this body is markup - appended as it
+            // stands, the serialization is what the reader got under the banner
+            if (!ProseText.IsEmpty(workspace?.Description))
             {
-                html.Append(workspace.Description);
+                html.Append(DescriptionMarkup(workspace.Description));
             }
             else
             {
@@ -227,7 +223,9 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
             {
                 html.Append("<li><strong>").Append(Escape(@class.Name)).Append("</strong>");
 
-                var description = I18N.Translate(culture, @class.Description);
+                // a class described in its dialog carries an editor document; the list wants
+                // its words
+                var description = ProseText.ToPlainText(I18N.Translate(culture, @class.Description));
 
                 if (!string.IsNullOrWhiteSpace(description))
                 {
@@ -339,27 +337,26 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         }
 
         /// <summary>
-        /// Determines whether a rich-text value carries anything a reader would see.
+        /// Turns a stored description into markup that can stand inside the body.
         /// </summary>
         /// <remarks>
-        /// The WYSIWYG editor never stores an empty string: a field somebody opened and left
-        /// alone comes back as <c>&lt;p&gt;&lt;br&gt;&lt;/p&gt;</c>, which is not whitespace and
-        /// would pass a plain emptiness test - and then be printed, tags and all, as the
-        /// workspace's description.
+        /// A description written in the prose editor is its versioned document, rendered here
+        /// by the framework's own reader (<see cref="ProseText.ToHtml"/>). A value that is no
+        /// document is either markup an older editor stored, taken as it stands, or a sentence
+        /// a seeder or a script wrote, which is escaped into a paragraph.
         /// </remarks>
-        /// <param name="value">The rich-text value.</param>
-        /// <returns><see langword="true"/> when there is text under the markup.</returns>
-        private static bool HasText(string value)
+        /// <param name="value">The stored description. Must not be empty.</param>
+        /// <returns>The markup.</returns>
+        private static string DescriptionMarkup(string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            if (EditorState.IsState(value))
             {
-                return false;
+                return ProseText.ToHtml(value);
             }
 
-            var text = TagRegex().Replace(value, string.Empty)
-                .Replace("&nbsp;", " ", StringComparison.OrdinalIgnoreCase);
-
-            return !string.IsNullOrWhiteSpace(text);
+            return value.TrimStart().StartsWith('<')
+                ? value
+                : "<p>" + Escape(value) + "</p>";
         }
 
         /// <summary>

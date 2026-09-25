@@ -532,8 +532,14 @@
    comment dock or the closing line of labels and likes becomes a growing column, and those two
    take the free space above them (margin-top: auto). A short text therefore ends with its labels
    and the dock flush against the bottom edge, a long one scrolls with the dock pinned there. The
-   dock's own host is left out - it is dissolved (display: contents) so the dock can stick. */
-#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)) {
+   dock's own host is left out - it is dissolved (display: contents) so the dock can stick.
+   The chain stops at a detail pane: an overview's master-detail loads the object page into
+   its pane, and without the stop every box above that pane - the tab pane of the list
+   included - became a growing flex column. That also beat `.tab-pane:not(.active)` by the
+   id's weight, so a list tab stayed laid out invisibly after switching away from it and
+   pushed the next tab (dashboard, kanban, scrum) a whole screen down. A hidden tab pane is
+   therefore never touched either. */
+#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)):not(:has(.wx-detail :is(.ks-comment-dock, .ks-object-engagement))):not(.tab-pane:not(.active)) {
     display: flex;
     flex-direction: column;
     flex: 1 0 auto;
