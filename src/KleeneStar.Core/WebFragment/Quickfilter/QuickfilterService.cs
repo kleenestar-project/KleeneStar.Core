@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebParameter;
+using System;
 using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Quickfilter
@@ -59,6 +60,18 @@ namespace KleeneStar.Core.WebFragment.Quickfilter
                         .BindParameters(new WorkspaceKeyParameter(context))?
                         .ToString();
 
+                case global::KleeneStar.Core.WWW.Api._1_.SavedSearch._savedsearchid_.Quickfilter.ViewKey:
+                    // the bar of a saved search is served under the saved search, which the chip
+                    // carries as its context
+                    if (!Guid.TryParse(context, out var savedSearchId))
+                    {
+                        return null;
+                    }
+
+                    return CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.SavedSearch._savedsearchid_.Quickfilter>()?
+                        .BindParameters(new SavedSearchIdParameter(savedSearchId))?
+                        .ToString();
+
                 default:
                     return null;
             }
@@ -112,6 +125,10 @@ namespace KleeneStar.Core.WebFragment.Quickfilter
                     return CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.Wql>()?
                         .BindParameters(new WorkspaceKeyParameter(context))?
                         .ToString();
+
+                case global::KleeneStar.Core.WWW.Api._1_.SavedSearch._savedsearchid_.Quickfilter.ViewKey:
+                    // a saved search runs over the objects of every workspace
+                    return CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Wql>()?.ToString();
 
                 default:
                     return null;

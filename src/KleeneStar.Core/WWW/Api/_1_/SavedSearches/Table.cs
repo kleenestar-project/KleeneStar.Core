@@ -1,4 +1,7 @@
+using KleeneStar.Core.WebFragment.Search;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -22,8 +25,9 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
     using SavedSearch = KleeneStar.Model.Entities.SavedSearch;
 
     /// <summary>
-    /// REST table over the calling identity's saved searches. Backs the search-page sidebar:
-    /// each row runs its query, and the row options edit (rename/restate/star) or delete it.
+    /// REST table over the saved searches the calling identity may see - their own and those
+    /// shared with them. Each row runs its query, and the row options edit, share or delete it
+    /// as far as the caller may.
     /// Supports the <c>q</c> substring search (by name) and a <c>qf_starred</c> quickfilter.
     /// </summary>
     [Title("kleenestar.core:search.saved.table.header")]
@@ -32,6 +36,7 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
     {
         private readonly IUri _editFormUri;
         private readonly IUri _deleteFormUri;
+        private readonly IUri _permissionFormUri;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -40,6 +45,7 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         {
             _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Edit>();
             _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Delete>();
+            _permissionFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Permission>();
         }
 
         /// <summary>
@@ -90,11 +96,19 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         /// <returns>The matching rows.</returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<SavedSearch> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
-            var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            if (identityId == Guid.Empty)
+            {
+                return [];
+            }
+
+            var shared = CoreHub.PermissionManager
+                .GetGrantedIds(PermissionScope.SavedSearch, identityId, typeof(SavedSearchReadPermission))
+                .ToList();
 
             query = query
-                .WhereEquals(x => x.OwnerId, ownerId)
-                .Where(x => x.State == SavedSearchState.Active);
+                .Where(x => x.State == SavedSearchState.Active && (x.OwnerId == identityId || shared.Contains(x.Id)));
 
             return CoreHub.SavedSearchManager.GetSavedSearches(query, context)
                 .OrderByDescending(x => x.Starred)
@@ -104,12 +118,12 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
                     Id = x.Id.ToString(),
                     Cells =
                     [
-                        new RestApiTableCell() { Content = (x.Starred ? "★ " : string.Empty) + x.Name },
+                        new RestApiTableCell() { Content = (x.Starred && x.OwnerId == identityId ? "★ " : string.Empty) + x.Name },
                         new() { Content = x.Query },
                         new() { Content = x.Starred.ToString() }
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
-                    Uri = RunUri(x)?.ToString()
+                    Uri = SavedSearchRun.RunUri(x)?.ToString()
                 });
         }
 
@@ -155,7 +169,8 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         }
 
         /// <summary>
-        /// Builds the per-row option menu (run / edit / delete).
+        /// Builds the per-row option menu (run / edit / permissions / delete), offering only
+        /// what the caller may do with the row.
         /// </summary>
         /// <param name="row">The saved search.</param>
         /// <param name="request">The request.</param>
@@ -164,6 +179,7 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         {
             var editUri = _editFormUri?.BindParameters(new SavedSearchIdParameter(row.Id));
             var deleteUri = _deleteFormUri?.BindParameters(new SavedSearchIdParameter(row.Id));
+            var permissionUri = _permissionFormUri?.BindParameters(new SavedSearchIdParameter(row.Id));
 
             yield return new RestApiOptionHeader(request)
             {
@@ -172,36 +188,41 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
 
             yield return new RestApiOptionCustom(request)
             {
-                Uri = RunUri(row),
+                Uri = SavedSearchRun.RunUri(row),
                 Text = I18N.Translate(request, "kleenestar.core:search.saved.run.label"),
                 Icon = new IconMagnifyingGlass()
             };
 
-            yield return new RestApiOptionEdit(request)
+            if (SavedSearchAuthorization.MayUpdate(row, request))
             {
-                Icon = new IconPen(),
-                PrimaryAction = new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
-            };
+                yield return new RestApiOptionEdit(request)
+                {
+                    Icon = new IconPen(),
+                    PrimaryAction = new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
+                };
+            }
 
-            yield return new RestApiOptionSeparator(request);
-            yield return new RestApiOptionDelete(request)
+            if (SavedSearchAuthorization.MayAdminister(row, request))
             {
-                Icon = new IconTrash(),
-                PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
-            };
-        }
+                yield return new RestApiOptionCustom(request)
+                {
+                    // a payload string is not a control: nothing on the client resolves a key in
+                    // it, so the label is translated here like the built-in options translate theirs
+                    Text = I18N.Translate(request, "kleenestar.core:search.saved.permission.label"),
+                    Icon = new IconUserShield(),
+                    PrimaryAction = new ActionModal("modal-form", permissionUri, TypeModalSize.ExtraLarge)
+                };
+            }
 
-        /// <summary>
-        /// Builds the URI that runs the given saved search — the global search page with the
-        /// saved query applied and the saved-search id flagged for recency tracking.
-        /// </summary>
-        /// <param name="row">The saved search to run.</param>
-        /// <returns>The run URI.</returns>
-        private static IUri RunUri(SavedSearch row)
-        {
-            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Search.Index>()?
-                .Add(new UriQuery("wql", row.Query ?? string.Empty))
-                .Add(new UriQuery("use", row.Id.ToString()));
+            if (SavedSearchAuthorization.MayDelete(row, request))
+            {
+                yield return new RestApiOptionSeparator(request);
+                yield return new RestApiOptionDelete(request)
+                {
+                    Icon = new IconTrash(),
+                    PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
+                };
+            }
         }
     }
 }

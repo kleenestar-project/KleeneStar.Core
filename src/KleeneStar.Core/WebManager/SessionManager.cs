@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
@@ -325,21 +326,7 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
-            var json = GetValue(request, ISessionManager.TableLayoutScope, tableKey);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return null;
-            }
-
-            try
-            {
-                var stored = JsonSerializer.Deserialize<List<RestApiTableColumnUpdate>>(json, _jsonOptions);
-                return stored?.Where(c => !string.IsNullOrWhiteSpace(c?.Id)).ToList();
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
+            return TableLayout.Parse(GetValue(request, ISessionManager.TableLayoutScope, tableKey));
         }
 
         /// <summary>
@@ -369,18 +356,7 @@ namespace KleeneStar.Core.WebManager
                 return;
             }
 
-            var snapshot = columns
-                .Where(c => !string.IsNullOrWhiteSpace(c?.Id))
-                .Select(c => new RestApiTableColumnUpdate
-                {
-                    Id = c.Id,
-                    Visible = c.Visible,
-                    Width = c.Width
-                })
-                .ToList();
-
-            var json = JsonSerializer.Serialize(snapshot, _jsonOptions);
-            SetValue(request, ISessionManager.TableLayoutScope, tableKey, json);
+            SetValue(request, ISessionManager.TableLayoutScope, tableKey, TableLayout.Serialize(columns) ?? "[]");
         }
 
         /// <summary>
@@ -399,60 +375,7 @@ namespace KleeneStar.Core.WebManager
             IEnumerable<RestApiTableColumn> defaultColumns
         )
         {
-            if (defaultColumns is null)
-            {
-                yield break;
-            }
-
-            var defaults = defaultColumns.ToList();
-            var stored = GetTableLayout(request, tableKey);
-
-            if (stored is null || stored.Count == 0)
-            {
-                foreach (var column in defaults)
-                {
-                    yield return column;
-                }
-
-                yield break;
-            }
-
-            var lookup = defaults.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // emit columns in the stored order, copying visibility/width
-            foreach (var update in stored)
-            {
-                if (string.IsNullOrWhiteSpace(update.Id) ||
-                    !lookup.TryGetValue(update.Id, out var template) ||
-                    !seen.Add(template.Id))
-                {
-                    continue;
-                }
-
-                yield return new RestApiTableColumn
-                {
-                    Id = template.Id,
-                    Name = template.Name,
-                    Label = template.Label,
-                    Icon = template.Icon,
-                    Template = template.Template,
-                    Visible = update.Visible ?? template.Visible,
-                    Width = update.Width ?? template.Width
-                };
-            }
-
-            // append any column the stored layout does not know about (e.g. a
-            // column added in a newer build) at the tail with its default state
-            foreach (var column in defaults)
-            {
-                if (seen.Contains(column.Id))
-                {
-                    continue;
-                }
-
-                yield return column;
-            }
+            return TableLayout.Apply(GetTableLayout(request, tableKey), defaultColumns);
         }
 
         /// <summary>

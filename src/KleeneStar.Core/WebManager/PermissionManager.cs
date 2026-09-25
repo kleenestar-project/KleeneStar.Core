@@ -213,6 +213,39 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the resources of one scope on which an identity holds a permission through a
+        /// grant. A resource without grants is not judged at all - nothing was shared.
+        /// </summary>
+        /// <param name="scope">The kind of resource.</param>
+        /// <param name="identityId">The identity performing the action.</param>
+        /// <param name="permission">The permission type required.</param>
+        /// <returns>The ids of the granted resources.</returns>
+        public IReadOnlySet<Guid> GetGrantedIds(string scope, Guid identityId, Type permission)
+        {
+            var granted = new HashSet<Guid>();
+
+            if (permission is null || string.IsNullOrWhiteSpace(scope))
+            {
+                return granted;
+            }
+
+            var grants = GetAllAssignments();
+            var groups = GroupsOf(identityId);
+
+            // every chain read here carries a grant, so Evaluate never takes its reading of an
+            // unadministered chain as "open"
+            foreach (var (key, chain) in grants.Where(x => x.Key.Scope == scope.ToLowerInvariant()))
+            {
+                if (Guid.TryParse(key.ScopeId, out var id) && Evaluate(groups, permission, chain))
+                {
+                    granted.Add(id);
+                }
+            }
+
+            return granted;
+        }
+
+        /// <summary>
         /// Judges a permission against the grants of one chain.
         /// </summary>
         /// <param name="groups">The groups the caller is a member of, implicit ones included.</param>

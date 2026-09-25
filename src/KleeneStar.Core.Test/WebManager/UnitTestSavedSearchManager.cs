@@ -1,4 +1,7 @@
 using KleeneStar.Core.Test;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Linq;
@@ -126,6 +129,24 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
+        /// Verifies that <c>SetColumns</c> stores the layout and that a blank one clears it.
+        /// </summary>
+        [Fact]
+        public void SetColumns_StoresAndClearsTheLayout()
+        {
+            Seed(nameof(SetColumns_StoresAndClearsTheLayout));
+
+            var item = New("Columns", starred: false, lastUsedHoursAgo: 1);
+            CoreHub.SavedSearchManager.Add(item);
+
+            CoreHub.SavedSearchManager.SetColumns(item.Id, "[{\"id\":\"summary\"}]");
+            Assert.Equal("[{\"id\":\"summary\"}]", CoreHub.SavedSearchManager.GetSavedSearch(item.Id).Columns);
+
+            CoreHub.SavedSearchManager.SetColumns(item.Id, " ");
+            Assert.Null(CoreHub.SavedSearchManager.GetSavedSearch(item.Id).Columns);
+        }
+
+        /// <summary>
         /// Verifies that <c>RecordUse</c> advances the <c>LastUsed</c> timestamp.
         /// </summary>
         [Fact]
@@ -162,6 +183,88 @@ namespace KleeneStar.Core.Test.WebManager
             var soft = CoreHub.SavedSearchManager.GetSavedSearch(item.Id);
             Assert.NotNull(soft);
             Assert.Equal(SavedSearchState.Deleted, soft.State);
+        }
+
+        /// <summary>
+        /// Verifies that the owner holds every saved-search permission on their own search,
+        /// without any grant.
+        /// </summary>
+        [Fact]
+        public void IsGranted_OwnerMayDoEverything()
+        {
+            Seed(nameof(IsGranted_OwnerMayDoEverything));
+
+            var item = New("Mine", starred: false, lastUsedHoursAgo: 1);
+            CoreHub.SavedSearchManager.Add(item);
+
+            Assert.True(CoreHub.SavedSearchManager.IsGranted(item, OwnerId, typeof(SavedSearchReadPermission)));
+            Assert.True(CoreHub.SavedSearchManager.IsGranted(item, OwnerId, typeof(SavedSearchUpdatePermission)));
+            Assert.True(CoreHub.SavedSearchManager.IsGranted(item, OwnerId, typeof(SavedSearchDeletePermission)));
+            Assert.True(CoreHub.SavedSearchManager.IsGranted(item, OwnerId, typeof(SavedSearchManageProfilesPermission)));
+        }
+
+        /// <summary>
+        /// Verifies that a saved search nobody shared is private: another identity is refused
+        /// even reading it - the opposite of an unadministered workspace, which is open.
+        /// </summary>
+        [Fact]
+        public void IsGranted_UnsharedSearchIsPrivate()
+        {
+            Seed(nameof(IsGranted_UnsharedSearchIsPrivate));
+
+            var item = New("Private", starred: false, lastUsedHoursAgo: 1);
+            CoreHub.SavedSearchManager.Add(item);
+
+            Assert.False(CoreHub.SavedSearchManager.IsGranted(item, OtherOwnerId, typeof(SavedSearchReadPermission)));
+            Assert.False(CoreHub.SavedSearchManager.IsGranted(item, OtherOwnerId, typeof(SavedSearchUpdatePermission)));
+            Assert.Empty(CoreHub.SavedSearchManager.GetSharedWith(OtherOwnerId));
+        }
+
+        /// <summary>
+        /// Verifies that nobody (<see cref="Guid.Empty"/>) and a deleted saved search are
+        /// refused, the owner included.
+        /// </summary>
+        [Fact]
+        public void IsGranted_RefusesNobodyAndDeletedSearches()
+        {
+            Seed(nameof(IsGranted_RefusesNobodyAndDeletedSearches));
+
+            var item = New("Gone", starred: false, lastUsedHoursAgo: 1);
+            CoreHub.SavedSearchManager.Add(item);
+
+            Assert.False(CoreHub.SavedSearchManager.IsGranted(item, Guid.Empty, typeof(SavedSearchReadPermission)));
+
+            CoreHub.SavedSearchManager.Remove(item.Id);
+            var deleted = CoreHub.SavedSearchManager.GetSavedSearch(item.Id);
+
+            Assert.False(CoreHub.SavedSearchManager.IsGranted(deleted, OwnerId, typeof(SavedSearchReadPermission)));
+        }
+
+        /// <summary>
+        /// Verifies that a grant whose policy carries no saved-search permission shares nothing:
+        /// the search stays out of the other identity's shared list, and the owner never finds
+        /// their own search there.
+        /// </summary>
+        [Fact]
+        public void GetSharedWith_IgnoresGrantsThatCarryNothing()
+        {
+            Seed(nameof(GetSharedWith_IgnoresGrantsThatCarryNothing));
+
+            var item = New("Granted", starred: false, lastUsedHoursAgo: 1);
+            CoreHub.SavedSearchManager.Add(item);
+
+            // written directly: Assign refuses a policy the fixture's empty registry does not know
+            ModelHub.Add(new PermissionAssignment(Guid.NewGuid())
+            {
+                Scope = PermissionScope.SavedSearch,
+                ScopeId = item.Id.ToString(),
+                GroupId = Group.AuthenticatedId,
+                Policy = "savedsearch_view_policy",
+                Created = DateTime.UtcNow
+            });
+
+            Assert.Empty(CoreHub.SavedSearchManager.GetSharedWith(OwnerId));
+            Assert.DoesNotContain(item.Id, CoreHub.PermissionManager.GetGrantedIds(PermissionScope.SavedSearch, Guid.Empty, typeof(SavedSearchReadPermission)));
         }
     }
 }

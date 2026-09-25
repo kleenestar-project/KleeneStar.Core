@@ -91,6 +91,23 @@ namespace KleeneStar.Core.WebManager
         IReadOnlySet<Guid> GetRefusedIds(string scope, Guid identityId, Type permission);
 
         /// <summary>
+        /// Returns the resources of one scope on which an identity holds a permission
+        /// <em>through a grant</em> - the reading for a resource that is private until it is
+        /// shared, such as a saved search.
+        /// </summary>
+        /// <remarks>
+        /// The counterpart of <see cref="GetRefusedIds"/> with the opposite reading of silence:
+        /// a resource nobody granted anything on is not in the answer, because nothing was
+        /// shared. The implicit groups count as usual, so a grant to <c>Group.AuthenticatedId</c>
+        /// shares with every signed-in caller.
+        /// </remarks>
+        /// <param name="scope">The kind of resource, as named in <see cref="PermissionScope"/>.</param>
+        /// <param name="identityId">The identity performing the action.</param>
+        /// <param name="permission">The permission type required.</param>
+        /// <returns>The ids of the resources a grant opens to the identity.</returns>
+        IReadOnlySet<Guid> GetGrantedIds(string scope, Guid identityId, Type permission);
+
+        /// <summary>
         /// Grants a group a policy on a resource.
         /// </summary>
         /// <remarks>

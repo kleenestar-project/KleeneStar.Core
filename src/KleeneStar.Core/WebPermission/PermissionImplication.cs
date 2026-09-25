@@ -162,7 +162,11 @@ namespace KleeneStar.Core.WebPermission
             typeof(IdentityCreatePermission),
             typeof(IdentityDeletePermission),
             typeof(IdentityReadPermission),
-            typeof(IdentityUpdatePermission)
+            typeof(IdentityUpdatePermission),
+            typeof(SavedSearchReadPermission),
+            typeof(SavedSearchUpdatePermission),
+            typeof(SavedSearchDeletePermission),
+            typeof(SavedSearchManageProfilesPermission)
         ];
 
         /// <summary>

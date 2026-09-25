@@ -34,27 +34,15 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
         };
 
         /// <summary>
-        /// Gets the input control for the query expression.
+        /// Gets the editor for the query: the WQL prompt of the search page, with its
+        /// highlighting, completion and syntax check against the object model.
         /// </summary>
-        public ControlFormItemInputText Query { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.SavedSearch.Query),
-            Label = _ => "kleenestar.core:search.saved.query.label",
-            Placeholder = _ => "kleenestar.core:search.saved.query.placeholder",
-            Help = _ => "kleenestar.core:search.saved.query.help",
-            Required = _ => true
-        };
+        public ControlDataWqlPrompt Query { get; } = SavedSearchFormItems.BuildQuery("savedsearch-edit-query");
 
         /// <summary>
-        /// Gets the input control for the optional description.
+        /// Gets the input control for the optional description, written in the prose editor.
         /// </summary>
-        public ControlFormItemInputText Description { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.SavedSearch.Description),
-            Label = _ => "kleenestar.core:search.saved.description.label",
-            Placeholder = _ => "kleenestar.core:search.saved.description.placeholder",
-            Required = _ => false
-        };
+        public ControlFormItemInputText Description { get; } = SavedSearchFormItems.BuildDescription();
 
         /// <summary>
         /// Gets the checkbox control for the starred flag.
@@ -75,14 +63,15 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
             : base(fragmentContext)
         {
             Add(SavedSearchName);
-            Add(Query);
+            Add(SavedSearchFormItems.BuildQueryPanel(Query));
             Add(Description);
             Add(Starred);
 
-            // The form's REST service is declared by the endpoint type so the
-            // client loads and submits the saved search through the emitted
-            // wx-service island. ItemId addresses the row in the body.
-            this.DataService<global::KleeneStar.Core.WWW.Api._1_.SavedSearches.Index>();
+            // The form loads and submits the saved search through the endpoint;
+            // opened from the search page running it, the address names the
+            // expression on screen, which the endpoint loads in place of the stored
+            // query. ItemId addresses the row in the body.
+            ServiceFactory = renderContext => DataServiceDescriptor.FormData(SavedSearchFormItems.ResolveService(renderContext));
 
             ItemId = renderContext =>
             {

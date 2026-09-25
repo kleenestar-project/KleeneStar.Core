@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
@@ -38,9 +39,11 @@ namespace KleeneStar.Core.WebFragment.Search
         public const string QueryParameter = "q";
 
         /// <summary>
-        /// Gets the search control used to query objects across all workspaces.
+        /// Gets the search control used to query objects across all workspaces. It opens on
+        /// the query of the saved search the page runs and carries the buttons that save and
+        /// share it (<see cref="SavedSearchAdvancedSearch"/>).
         /// </summary>
-        public ControlAdvancedSearch Search { get; } = new ControlAdvancedSearch(ContentId)
+        public ControlAdvancedSearch Search { get; } = new SavedSearchAdvancedSearch(ContentId)
         {
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Wql>().ToString()),
             Value = renderContext => renderContext?.Request?.GetParameter(QueryParameter)?.Value

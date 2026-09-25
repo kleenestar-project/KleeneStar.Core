@@ -162,6 +162,14 @@ namespace KleeneStar.Core.WebPermission
                 return MayOpenDashboardPage(pageId, request);
             }
 
+            // a saved search belongs to its owner and is shared through its own grants; it is on
+            // no workspace chain either
+            if (string.Equals(area, "savedsearches", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(area, "savedsearch", StringComparison.OrdinalIgnoreCase))
+            {
+                return MayOpenSavedSearchPage(pageId, request);
+            }
+
             // the overview lists what the caller may read and offers to create one; with neither
             // there is nothing for them on it
             if (string.Equals(pageId, Prefix + "workspaces.index", StringComparison.OrdinalIgnoreCase))
@@ -205,6 +213,42 @@ namespace KleeneStar.Core.WebPermission
             };
 
             return WebRestApi.ContentAuthorization.MayUseDashboard(id, request, permission);
+        }
+
+        /// <summary>
+        /// Decides a saved-search dialog: signed in, and - for a dialog naming a saved search -
+        /// the saved-search permission the dialog needs, which the owner always holds and anybody
+        /// else only through a grant on it.
+        /// </summary>
+        /// <param name="pageId">The page id.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the page may render.</returns>
+        private static bool MayOpenSavedSearchPage(string pageId, IRequest request)
+        {
+            if (!IsSignedIn(request))
+            {
+                return false;
+            }
+
+            var id = Parse(request.GetParameter<SavedSearchIdParameter>()?.Value);
+
+            if (id is not { } savedSearchId)
+            {
+                return true;
+            }
+
+            var permission = pageId[(pageId.LastIndexOf('.') + 1)..].ToLowerInvariant() switch
+            {
+                "edit" => typeof(SavedSearchUpdatePermission),
+                "delete" => typeof(SavedSearchDeletePermission),
+                "permission" => typeof(SavedSearchManageProfilesPermission),
+                _ => typeof(SavedSearchReadPermission)
+            };
+
+            return CoreHub.SavedSearchManager.IsGranted(
+                CoreHub.SavedSearchManager.GetSavedSearch(savedSearchId),
+                CoreHub.SessionManager.GetCurrentIdentityId(request),
+                permission);
         }
 
         /// <summary>

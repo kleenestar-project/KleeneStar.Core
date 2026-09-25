@@ -1,4 +1,7 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebRestApi;
+using System;
 using System.Collections.Generic;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -17,9 +20,16 @@ namespace KleeneStar.Core.WebFragment.Search
 
     /// <summary>
     /// Renders the saved searches of the calling identity into the global search page
-    /// sidebar: a "new search" entry, the saved searches (starred first), and a "new saved
-    /// search" action. Each saved search runs on click and can be edited on double-click.
+    /// sidebar: a "new search" entry, the own saved searches (starred first) and the saved
+    /// searches others shared with the caller. Each saved search
+    /// runs on click and can be edited on double-click where the caller may change it.
     /// </summary>
+    /// <remarks>
+    /// The tooltip is the description as words (<see cref="ProseText"/>, it is a prose
+    /// document), falling back to the query where nothing was written. The list is rendered
+    /// once per page; a dialog that changes a saved search reloads the page
+    /// (<c>Assets/js/savedsearch.js</c>).
+    /// </remarks>
     [Section<SectionSidebarPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Search.Index>]
     [Cache]
@@ -42,8 +52,9 @@ namespace KleeneStar.Core.WebFragment.Search
         /// <returns>An HTML node listing the saved-search sidebar items.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext?.Request);
-            var addUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearches.Add>();
+            var request = renderContext?.Request;
+            var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var running = SavedSearchRun.Resolve(request)?.Id;
 
             var nodes = new List<IHtmlNode>
             {
@@ -64,41 +75,62 @@ namespace KleeneStar.Core.WebFragment.Search
 
             foreach (var savedSearch in CoreHub.SavedSearchManager.GetForOwner(ownerId))
             {
-                var captured = savedSearch;
-                var editUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Edit>()?
-                    .BindParameters(new SavedSearchIdParameter(captured.Id));
+                nodes.Add(RenderItem(savedSearch, savedSearch.Starred, running, renderContext, visualTree));
+            }
 
-                nodes.Add(new ControlSidebarItemLink($"ss-{captured.Id}")
+            // a new saved search is made from the search on screen, with the save button beside
+            // the search field - an empty dialog here would only ask for the query the page
+            // already shows
+            var shared = CoreHub.SavedSearchManager.GetSharedWith(ownerId);
+
+            if (shared.Count > 0)
+            {
+                nodes.Add(new ControlSidebarItemHeader("shared-header")
                 {
-                    Text = _ => (captured.Starred ? "★ " : string.Empty) + captured.Name,
-                    Tooltip = _ => captured.Query,
-                    Uri = _ => RunUri(captured),
-                    SecondaryAction = _ => new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
+                    Text = _ => "kleenestar.core:search.sidebar.shared.heading"
                 }
                     .Render(renderContext, visualTree));
-            }
 
-            nodes.Add(new ControlSidebarItemLink("saved-new")
-            {
-                Text = _ => "kleenestar.core:search.sidebar.add.label",
-                PrimaryAction = _ => new ActionModal("modal-form", addUri, TypeModalSize.ExtraLarge)
+                foreach (var savedSearch in shared)
+                {
+                    // the star is the owner's pin, not the reader's
+                    nodes.Add(RenderItem(savedSearch, false, running, renderContext, visualTree));
+                }
             }
-                .Render(renderContext, visualTree));
 
             return new HtmlList(nodes);
         }
 
         /// <summary>
-        /// Builds the URI that runs the given saved search — the global search page with the
-        /// saved query applied and the saved-search id flagged for recency tracking.
+        /// Renders one saved search as a sidebar link that runs it, with the edit dialog on
+        /// double-click where the caller may change it.
         /// </summary>
-        /// <param name="savedSearch">The saved search to run.</param>
-        /// <returns>The run URI.</returns>
-        private static IUri RunUri(SavedSearch savedSearch)
+        /// <param name="savedSearch">The saved search.</param>
+        /// <param name="starred">Whether to mark it with the star.</param>
+        /// <param name="running">The saved search the page runs, if any.</param>
+        /// <param name="renderContext">The render context.</param>
+        /// <param name="visualTree">The visual tree.</param>
+        /// <returns>The rendered link.</returns>
+        private static IHtmlNode RenderItem(SavedSearch savedSearch, bool starred, Guid? running, IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Search.Index>()?
-                .Add(new UriQuery("wql", savedSearch.Query ?? string.Empty))
-                .Add(new UriQuery("use", savedSearch.Id.ToString()));
+            var editUri = SavedSearchAuthorization.MayUpdate(savedSearch, renderContext?.Request)
+                ? CoreHub.GetUri<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Edit>()?
+                    .BindParameters(new SavedSearchIdParameter(savedSearch.Id))
+                : null;
+            var description = ProseText.ToPlainText(savedSearch.Description);
+            var tooltip = string.IsNullOrWhiteSpace(description) ? savedSearch.Query : description;
+
+            // the link must not be bound against the request: on a page running a saved search
+            // that would turn its `use` into the running one's
+            return new UnboundSidebarItemLink($"ss-{savedSearch.Id}")
+            {
+                Text = _ => (starred ? "★ " : string.Empty) + savedSearch.Name,
+                Tooltip = _ => tooltip,
+                Uri = _ => SavedSearchRun.RunUri(savedSearch),
+                Active = _ => savedSearch.Id == running ? TypeActive.Active : TypeActive.None,
+                SecondaryAction = _ => editUri is null ? null : new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
+            }
+                .Render(renderContext, visualTree);
         }
     }
 }

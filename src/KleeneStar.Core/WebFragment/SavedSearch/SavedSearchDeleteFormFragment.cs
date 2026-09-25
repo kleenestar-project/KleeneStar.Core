@@ -11,7 +11,9 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.SavedSearch
 {
     /// <summary>
-    /// Represents the delete confirmation form fragment for a saved search.
+    /// Represents the delete confirmation form fragment for a saved search, opened from the
+    /// "…" menu beside the search while it runs. Offered to the owner and to members of a group
+    /// granted the admin policy; the endpoint asks the same question.
     /// </summary>
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.SavedSearch._savedsearchid_.Delete>]
@@ -26,6 +28,10 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
             : base(fragmentContext)
         {
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.SavedSearches.Index>();
+
+            // the row the confirmation deletes; without it the form asks the endpoint for no
+            // record at all
+            ItemId = renderContext => renderContext.Request.GetParameter<SavedSearchIdParameter>()?.Value;
         }
 
         /// <summary>

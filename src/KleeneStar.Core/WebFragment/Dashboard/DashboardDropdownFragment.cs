@@ -38,6 +38,8 @@ namespace KleeneStar.Core.WebFragment.Dashboard
         {
             FragmentContext = fragmentContext;
             Text = _ => "kleenestar.core:dashboard.dropdown.label";
+            // the icon of the dashboard overview, as the per-kind menus carry their kind's
+            Icon = _ => new WebExpress.WebUI.WebIcon.IconDashboard();
         }
 
         /// <summary>

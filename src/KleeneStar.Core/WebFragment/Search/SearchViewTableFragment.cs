@@ -1,5 +1,7 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
+using WebExpress.WebCore;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -19,13 +21,14 @@ namespace KleeneStar.Core.WebFragment.Search
     /// </summary>
     [Section<SectionViewItemPrimary>]
     [Scope<SearchViewFragment>]
+    [Order(1)]
     [Cache]
     public sealed class SearchViewTableFragment : FragmentControlViewItem
     {
         /// <summary>
         /// Gets the table that displays the objects matching the search across all workspaces.
         /// </summary>
-        public ControlDataTable Table { get; } = new ControlDataTable();
+        public ControlDataTable Table { get; } = new ColumnChoosingDataTable();
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -45,14 +48,33 @@ namespace KleeneStar.Core.WebFragment.Search
             // declares the endpoint and, derived from its generic argument, the domain the
             // table serves, so the client subscribes to the change notification the CRUD
             // endpoint emits and the table refreshes after a create, update or delete.
-            Table.DataService<global::KleeneStar.Core.WWW.Api._1_.Objects.Table>();
+            //
+            // while a saved search runs, the address names it: the endpoint then shows and
+            // stores the columns of that saved search and applies its quickfilters. The service
+            // is built while the page renders, which is when the request is at hand.
+            Table.DataService<global::KleeneStar.Core.WWW.Api._1_.Objects.Table>(descriptor =>
+            {
+                if (SavedSearchRun.Resolve(WebEx.CurrentRequest) is { } running)
+                {
+                    descriptor.WithBaseUri($"{descriptor.BaseUri}?{SavedSearchRun.Parameter}={running.Id}");
+                }
+            });
 
-            // a term carried over from the header search box seeds the first query, so the page
-            // opens on its results instead of on every object; from there the search field above
-            // drives the table through the binding below
+            // the query of a saved search being run - or a term carried over from the header
+            // search box - seeds the first query, so the page opens on its results instead of on
+            // every object; from there the search field above drives the table through the
+            // binding below. The saved search wins, as it does in the search field.
             Table.StateFactory = renderContext =>
             {
-                var query = renderContext?.Request?.GetParameter(SearchViewSearchFragment.QueryParameter)?.Value;
+                var request = renderContext?.Request;
+                var wql = SavedSearchRun.ResolveWql(request);
+
+                if (wql is not null)
+                {
+                    return DataState.Create().Set("wql", wql);
+                }
+
+                var query = request?.GetParameter(SearchViewSearchFragment.QueryParameter)?.Value;
 
                 return !string.IsNullOrWhiteSpace(query) ? DataState.Create().Search(query) : null;
             };

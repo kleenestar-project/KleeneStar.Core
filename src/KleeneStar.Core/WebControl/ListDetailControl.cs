@@ -73,7 +73,8 @@ namespace KleeneStar.Core.WebControl
         {
             Selectable = _ => true,
             Sortable = _ => true,
-            Title = _ => "List"
+            // the caption of the list, in the reader's language like the view switch naming it
+            Title = _ => "kleenestar.core:view.list.title"
         };
 
         /// <summary>

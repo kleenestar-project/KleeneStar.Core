@@ -774,6 +774,13 @@ body:has(.ks-welcome) #wx-header-notifications {
     display: none !important;
 }
 
+/* a dialog page that serves no form (the permission dialogs) is shown by the modal as a clone of
+   its whole #wx-content-main - headline included, while the modal's title bar already carries the
+   page title. The clone keeps the headline's inline display, hence the !important */
+.modal-body #wx-content-main-headline {
+    display: none !important;
+}
+
 .ks-welcome {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
@@ -1228,4 +1235,39 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
 
 .wx-content-addon.ks-addon-callout > :last-child {
     margin-bottom: 0;
+}
+
+/* -------------------------------------------------------------- saved searches */
+
+/* the save and share buttons stand beside the search field of the search page, in one bar -
+   the framework's search control clears whatever is rendered inside it */
+.ks-savedsearch-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    width: 100%;
+}
+
+.ks-savedsearch-bar > [data-ks-savedsearch-host] {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ks-savedsearch-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: .25rem;
+}
+
+.ks-savedsearch-actions .btn {
+    white-space: nowrap;
+}
+
+/* the "..." menu stands beside the save button at the same height */
+.ks-savedsearch-actions {
+    align-items: stretch;
+}
+
+.ks-savedsearch-actions > .wx-dropdown > .btn {
+    height: 100%;
 }

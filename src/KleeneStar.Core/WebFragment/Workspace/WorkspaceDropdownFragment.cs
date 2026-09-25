@@ -41,6 +41,8 @@ namespace KleeneStar.Core.WebFragment.Workspace
         {
             FragmentContext = fragmentContext;
             Text = _ => "kleenestar.core:workspace.dropdown.label";
+            // a glyph like the per-kind menus beside it (the overview page shows an image icon)
+            Icon = _ => new WebExpress.WebUI.WebIcon.IconLayerGroup();
         }
 
         /// <summary>

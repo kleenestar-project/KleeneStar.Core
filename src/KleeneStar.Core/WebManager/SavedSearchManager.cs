@@ -1,4 +1,6 @@
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -96,6 +98,46 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <inheritdoc/>
+        public IReadOnlyList<SavedSearch> GetSharedWith(Guid identityId)
+        {
+            if (identityId == Guid.Empty || CoreHub.PermissionManager is null)
+            {
+                return [];
+            }
+
+            var shared = CoreHub.PermissionManager.GetGrantedIds(PermissionScope.SavedSearch, identityId, typeof(SavedSearchReadPermission));
+
+            if (shared.Count == 0)
+            {
+                return [];
+            }
+
+            var ids = shared.ToList();
+
+            return [.. ModelHub.GetSavedSearches(new Query<SavedSearch>().Where(x => ids.Contains(x.Id)))
+                .Where(x => x.OwnerId != identityId && x.State == SavedSearchState.Active)
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <inheritdoc/>
+        public bool IsGranted(SavedSearch savedSearch, Guid identityId, Type permission)
+        {
+            if (savedSearch is null || identityId == Guid.Empty || savedSearch.State != SavedSearchState.Active)
+            {
+                return false;
+            }
+
+            if (savedSearch.OwnerId == identityId)
+            {
+                return true;
+            }
+
+            return CoreHub.PermissionManager?
+                .GetGrantedIds(PermissionScope.SavedSearch, identityId, permission)
+                .Contains(savedSearch.Id) == true;
+        }
+
+        /// <inheritdoc/>
         public ISavedSearchManager Add(SavedSearch savedSearch)
         {
             ArgumentNullException.ThrowIfNull(savedSearch);
@@ -173,6 +215,25 @@ namespace KleeneStar.Core.WebManager
             }
 
             savedSearch.Starred = starred;
+            savedSearch.Updated = DateTime.UtcNow;
+            ModelHub.Update(savedSearch);
+
+            SavedSearchUpdated?.Invoke(this, savedSearch);
+
+            return savedSearch;
+        }
+
+        /// <inheritdoc/>
+        public SavedSearch SetColumns(Guid savedSearchId, string columns)
+        {
+            var savedSearch = GetSavedSearch(savedSearchId);
+
+            if (savedSearch is null)
+            {
+                return null;
+            }
+
+            savedSearch.Columns = string.IsNullOrWhiteSpace(columns) ? null : columns;
             savedSearch.Updated = DateTime.UtcNow;
             ModelHub.Update(savedSearch);
 

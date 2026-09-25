@@ -44,5 +44,13 @@ namespace KleeneStar.Core.WebPermission
         /// A calendar.
         /// </summary>
         public const string Calendar = "calendar";
+
+        /// <summary>
+        /// A saved search. Unlike every other scope, a saved search nobody administered is
+        /// <b>private</b> to its owner rather than open: its grants are how it is shared, so
+        /// only an explicit grant lets anybody else near it (see
+        /// <c>IPermissionManager.GetGrantedIds</c>).
+        /// </summary>
+        public const string SavedSearch = "savedsearch";
     }
 }
