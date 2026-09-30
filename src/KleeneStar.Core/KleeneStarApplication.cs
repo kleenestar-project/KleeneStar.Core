@@ -55,23 +55,16 @@ namespace KleeneStar.Core
             // accounts cannot sign in until it is fixed
             WebIdentity.OpenIdConnectAuthenticationSource.RegisterConfigured(applicationContext.PluginContext?.Settings, applicationContext, componentHub);
 
-            try
-            {
-                using var db = ModelHub.CreateDbContext();
+            // a failure here is left to escape: WebExpress logs it, records the application in
+            // IApplicationManager.FailedApplications and answers /health and /health/live with
+            // 503 until a restart retries the migration and the seed
+            using var db = ModelHub.CreateDbContext();
 
-                // apply a migration path if necessary
-                MigrateWithLegacyDbReset(db, componentHub);
+            // apply a migration path if necessary
+            MigrateWithLegacyDbReset(db, componentHub);
 
-                // run seeding
-                KleeneStarDbSeeder.SeedAsync(db).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                // surface the failure rather than letting WebExpress swallow it during
-                // plugin instantiation (the plugin would then never appear in the sitemap).
-                componentHub.LogManager.DefaultLog.Exception(ex);
-                throw;
-            }
+            // run seeding
+            KleeneStarDbSeeder.SeedAsync(db).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -90,6 +83,14 @@ namespace KleeneStar.Core
             PublishRelationTypes();
 
             RecordStartup();
+        }
+
+        /// <summary>
+        /// Called when the host shuts down. The application holds no resources of its own;
+        /// the database contexts are created and disposed per use.
+        /// </summary>
+        public void Dispose()
+        {
         }
 
         /// <summary>
