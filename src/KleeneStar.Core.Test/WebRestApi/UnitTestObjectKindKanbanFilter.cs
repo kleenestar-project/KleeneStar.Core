@@ -289,11 +289,13 @@ namespace KleeneStar.Core.Test.WebRestApi
 
             Settings("Key = \"KB-1\"");
 
-            var syntax = Assert.Throws<ArgumentException>(() => Settings("=== not a query ==="));
-            Assert.Contains("WQL", syntax.Message);
+            // a refusal carries the reason to the user; without a component hub the translation
+            // answers its key
+            var syntax = Assert.Throws<RestApiRefusal>(() => Settings("=== not a query ==="));
+            Assert.Contains("object.kanban.refused.filter", syntax.Message);
 
-            var unknown = Assert.Throws<ArgumentException>(() => Settings("NoSuchAttribute = \"x\""));
-            Assert.Contains("WQL", unknown.Message);
+            var unknown = Assert.Throws<RestApiRefusal>(() => Settings("NoSuchAttribute = \"x\""));
+            Assert.Contains("object.kanban.refused.filter", unknown.Message);
 
             Assert.Equal("Key = \"KB-1\"", StoredFilter());
         }

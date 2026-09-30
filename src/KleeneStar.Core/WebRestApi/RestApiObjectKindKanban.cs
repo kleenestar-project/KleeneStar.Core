@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Model;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
@@ -34,6 +36,18 @@ namespace KleeneStar.Core.WebRestApi
     /// swimlane are all read through <see cref="Narrow"/>, so the board never shows a lane
     /// for an object it does not show a card for. A filter the request carries wins over the
     /// stored one, which is how the settings dialog previews what it is about to store.
+    /// </para>
+    /// <para>
+    /// A drop is a state change. The board offers the workflow statuses of its classes
+    /// (<see cref="KanbanStatusCatalog"/>, addressed by name across classes), every column
+    /// holds some of them - the ones an administrator assigned through the column menu
+    /// (<see cref="KanbanBoardColumn.Statuses"/>), otherwise those of its category - and
+    /// every card says which it may be moved to (<c>GetOfferedStatuses</c>: reachable and let
+    /// through by the guards, empty for a caller who may not change the object). A drop into a
+    /// column with one fitting status moves the card at once, with several the board asks which;
+    /// <see cref="MoveCard"/> then runs the transition, guards, validators and post functions
+    /// included. A board whose classes have no workflow offers no statuses and moves cards on
+    /// screen only, as before.
     /// </para>
     /// </summary>
     public abstract class RestApiObjectKindKanban : RestApiKanban<Model.Entities.Object>
@@ -129,9 +143,12 @@ namespace KleeneStar.Core.WebRestApi
             }
 
             var board = CoreHub.KanbanBoardManager.GetBoard(workspace.Id, Kind);
+            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
 
             if (board?.Columns is { Count: > 0 })
             {
+                var statusKeys = ColumnStatusKeys(board, catalog);
+
                 foreach (var column in board.Columns.OrderBy(c => c.Position))
                 {
                     yield return new RestApiKanbanColumn
@@ -139,7 +156,8 @@ namespace KleeneStar.Core.WebRestApi
                         Id = column.Id.ToString(),
                         Label = column.Name,
                         Color = column.Color,
-                        ColorCss = ResolveCategoryColorCss(column.CategoryId)
+                        ColorCss = ResolveCategoryColorCss(column.CategoryId),
+                        StatusIds = catalog.IsEmpty ? null : statusKeys[column.Id]
                     };
                 }
 
@@ -152,8 +170,87 @@ namespace KleeneStar.Core.WebRestApi
                 {
                     Id = category.Id.ToString(),
                     Label = ObjectBoardProjection.CategoryLabel(category),
-                    ColorCss = ObjectBoardProjection.CategoryColorCss(category)
+                    ColorCss = ObjectBoardProjection.CategoryColorCss(category),
+                    StatusIds = catalog.IsEmpty ? null : catalog.KeysOfCategory(category.Id)
                 };
+            }
+        }
+
+        /// <summary>
+        /// Offers the workflow statuses of the board's classes, which turns a drop into a
+        /// state change and gives every column a status list an administrator can edit. A board
+        /// whose classes carry no workflow offers none and keeps moving cards on screen only.
+        /// </summary>
+        /// <param name="request">The current HTTP request.</param>
+        /// <returns>The statuses, or null for a board without workflow statuses.</returns>
+        protected override IEnumerable<RestApiKanbanStatus> RetrieveStatuses(IRequest request)
+        {
+            var workspace = GetWorkspace(request);
+            var catalog = workspace is null ? null : KanbanStatusCatalog.Build(workspace.Id, Kind);
+
+            return catalog is null || catalog.IsEmpty ? null : catalog.Statuses;
+        }
+
+        /// <summary>
+        /// Moves a dropped card into the status the user chose, through the workflow: the
+        /// transition has to exist, its guards and validators have to pass, and its post
+        /// functions run - exactly what the state dropdown on the object page does.
+        /// </summary>
+        /// <remarks>
+        /// The framework has already checked the drop against what the board offered; this
+        /// asks again, because the workflow, the object or the caller's rights may have changed
+        /// since the board was loaded. A refusal is a <see cref="RestApiRefusal"/>: the board
+        /// takes the card back and shows its message, so every reason is written for the user,
+        /// in the language of the request.
+        /// </remarks>
+        /// <param name="move">The card, its destination and the chosen status.</param>
+        /// <param name="request">The current HTTP request.</param>
+        protected override void MoveCard(RestApiKanbanMove move, IRequest request)
+        {
+            var @object = Guid.TryParse(move?.CardId, out var objectId)
+                ? CoreHub.ObjectManager.GetObject(objectId)
+                : null;
+
+            if (@object is null || string.IsNullOrWhiteSpace(move.StatusId))
+            {
+                return;
+            }
+
+            var cls = CoreHub.ClassManager.GetClass(@object.ClassId);
+            var field = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls).WorkflowField;
+            var workflow = field?.WorkflowId is Guid workflowId
+                ? CoreHub.WorkflowManager.GetWorkflowWithStructure(workflowId)
+                : null;
+
+            if (workflow is null)
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.workflow"));
+            }
+
+            var current = CoreHub.WorkflowManager.ResolveStatus(workflow, CoreHub.ValueManager.GetValue(@object.Id, field.Id)?.Data);
+
+            // a reorder inside the column keeps the status
+            if (KanbanStatusCatalog.Key(current) == move.StatusId)
+            {
+                return;
+            }
+
+            if (!ContentAuthorization.MayWrite(@object, request, typeof(WebPermissions.TransitionExecutePermission)))
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.permission"));
+            }
+
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var target = CoreHub.WorkflowManager
+                .GetOfferedStatuses(workflow, current, @object, field, identityId)
+                .FirstOrDefault(x => KanbanStatusCatalog.Key(x) == move.StatusId)
+                ?? throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.property.workflow.transition.notallowed"));
+
+            var result = CoreHub.WorkflowManager.ExecuteTransition(@object.Id, field.Id, target.Id, identityId);
+
+            if (!result.Succeeded && result.Outcome != WorkflowTransitionOutcome.Unchanged)
+            {
+                throw new RestApiRefusal(WebWorkflow.WorkflowTransitionNotice.Explain(result, request));
             }
         }
 
@@ -266,6 +363,25 @@ namespace KleeneStar.Core.WebRestApi
                     .ToDictionary(g => g.Key, g => g.First().Id.ToString());
             }
 
+            // a status an administrator assigned to a column explicitly places its cards there,
+            // ahead of the category the status belongs to
+            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var columnIdByStatusKey = new Dictionary<string, string>();
+
+            if (board?.Columns is { Count: > 0 } assignedColumns && !catalog.IsEmpty)
+            {
+                foreach (var column in assignedColumns.OrderBy(c => c.Position))
+                {
+                    foreach (var key in KanbanStatusCatalog.Parse(column.Statuses) ?? [])
+                    {
+                        columnIdByStatusKey.TryAdd(key, column.Id.ToString());
+                    }
+                }
+            }
+
+            var mayMoveByClass = new Dictionary<Guid, bool>();
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
             var contextByClass = new Dictionary<Guid, ObjectBoardClassContext>();
             var identityById = new Dictionary<Guid, Identity>();
             var sprintId = ResolveSprint(request);
@@ -291,7 +407,45 @@ namespace KleeneStar.Core.WebRestApi
                 var columnId = ResolveColumnId(category, columnIdByCategoryId, fallbackColumnId);
                 var swimlaneId = ResolveSwimlaneId(entity.ClassId, swimlaneIdByClassId);
 
-                yield return BuildCard(entity, classContext, columnId, swimlaneId, identityById);
+                if (catalog.IsEmpty)
+                {
+                    yield return BuildCard(entity, classContext, columnId, swimlaneId, identityById);
+                    continue;
+                }
+
+                var (field, workflow) = catalog.WorkflowOf(entity.ClassId);
+                var current = workflow is null
+                    ? null
+                    : CoreHub.WorkflowManager.ResolveStatus(workflow, CoreHub.ValueManager.GetValue(entity.Id, field.Id)?.Data);
+                var statusKey = current is null ? null : KanbanStatusCatalog.Key(current);
+
+                if (statusKey is not null && columnIdByStatusKey.TryGetValue(statusKey, out var assignedColumnId))
+                {
+                    columnId = assignedColumnId;
+                }
+
+                if (!mayMoveByClass.TryGetValue(entity.ClassId, out var mayMove))
+                {
+                    // the permission chain is class -> workspace, so one answer serves every
+                    // card of the class
+                    mayMove = ContentAuthorization.MayWrite(entity, request, typeof(WebPermissions.TransitionExecutePermission));
+                    mayMoveByClass[entity.ClassId] = mayMove;
+                }
+
+                var card = BuildCard(entity, classContext, columnId, swimlaneId, identityById);
+
+                card.StatusId = statusKey;
+
+                // what the state dropdown would offer this caller: reachable and let through by
+                // the guards; a card that cannot be moved still reorders within its column
+                card.AllowedStatusIds = workflow is null || !mayMove
+                    ? []
+                    : [.. CoreHub.WorkflowManager
+                        .GetOfferedStatuses(workflow, current, entity, field, identityId)
+                        .Select(KanbanStatusCatalog.Key)
+                        .Distinct()];
+
+                yield return card;
             }
         }
 
@@ -307,6 +461,13 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="request">The current HTTP request. Cannot be null.</param>
         protected override void UpdtaeColumns(RestApiDashboardLayout layout, IRequest request)
         {
+            // the framework's save entry point is not virtual; the refusal reaches the user as the
+            // board's own error message
+            if (!ContentAuthorization.MayWriteContent(request))
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
+            }
+
             var workspace = GetWorkspace(request);
 
             if (workspace is null || layout?.Columns is null)
@@ -317,6 +478,8 @@ namespace KleeneStar.Core.WebRestApi
             var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);
             var existingById = board.Columns.ToDictionary(c => c.Id);
             var existingByKey = board.Columns.Where(c => c.Key is not null).ToDictionary(c => c.Key);
+            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var shownKeys = ColumnStatusKeys(board, catalog);
 
             var usedCategoryIds = board.Columns
                 .Where(c => c.CategoryId.HasValue)
@@ -346,11 +509,89 @@ namespace KleeneStar.Core.WebRestApi
                     Key = key,
                     Name = FallbackName(column.Title, "Column"),
                     Color = column.Color,
-                    CategoryId = categoryId
+                    CategoryId = categoryId,
+                    Statuses = ResolveStoredStatuses(column.StatusIds, existing, categoryId, shownKeys, catalog)
                 };
             }).ToList();
 
             CoreHub.KanbanBoardManager.SetColumns(board.Id, columns);
+        }
+
+        /// <summary>
+        /// Decides what a saved column stores as its statuses.
+        /// </summary>
+        /// <remarks>
+        /// The board sends every column's status list with every column change - a rename
+        /// included - so a list is stored explicitly only when it differs from what the column
+        /// showed. Otherwise a column that followed its category would be pinned to today's
+        /// statuses by the first rename, and a status added to the workflow later would never
+        /// reach it.
+        /// </remarks>
+        /// <param name="submitted">The status keys the board sent, or null from a board without statuses.</param>
+        /// <param name="existing">The stored column, or null for a new one.</param>
+        /// <param name="categoryId">The category the column places cards by.</param>
+        /// <param name="shownKeys">The status keys each stored column showed before the change.</param>
+        /// <param name="catalog">The statuses the board offers.</param>
+        /// <returns>The value to store in <see cref="KanbanBoardColumn.Statuses"/>.</returns>
+        private static string ResolveStoredStatuses
+        (
+            IEnumerable<string> submitted,
+            KanbanBoardColumn existing,
+            Guid? categoryId,
+            IReadOnlyDictionary<Guid, IReadOnlyList<string>> shownKeys,
+            KanbanStatusCatalog catalog
+        )
+        {
+            if (submitted is null || catalog.IsEmpty)
+            {
+                return existing?.Statuses;
+            }
+
+            var keys = submitted.Where(catalog.Contains).Distinct().ToList();
+            var shown = existing is not null && shownKeys.TryGetValue(existing.Id, out var before)
+                ? before
+                : catalog.KeysOfCategory(categoryId);
+
+            if (keys.ToHashSet().SetEquals(shown))
+            {
+                return existing?.Statuses;
+            }
+
+            // a column the board just added arrives without statuses; it follows the category
+            // it was given, as columns always did
+            if (existing is null && keys.Count == 0)
+            {
+                return null;
+            }
+
+            return KanbanStatusCatalog.Format(keys);
+        }
+
+        /// <summary>
+        /// Returns the status keys each stored column holds: the ones assigned to it, or - for
+        /// a column that follows its category - the statuses of that category no other column
+        /// claimed explicitly, so a status is never offered by two columns at once.
+        /// </summary>
+        /// <param name="board">The board with its columns.</param>
+        /// <param name="catalog">The statuses the board offers.</param>
+        /// <returns>The keys per column id, in catalog order.</returns>
+        private static Dictionary<Guid, IReadOnlyList<string>> ColumnStatusKeys(KanbanBoard board, KanbanStatusCatalog catalog)
+        {
+            var assigned = board.Columns
+                .ToDictionary(c => c.Id, c => KanbanStatusCatalog.Parse(c.Statuses)?.Where(catalog.Contains).ToList());
+
+            var claimed = assigned.Values
+                .Where(x => x is not null)
+                .SelectMany(x => x)
+                .ToHashSet();
+
+            return board.Columns.ToDictionary
+            (
+                c => c.Id,
+                c => assigned[c.Id] is { } keys
+                    ? (IReadOnlyList<string>)keys
+                    : [.. catalog.KeysOfCategory(c.CategoryId).Where(x => !claimed.Contains(x))]
+            );
         }
 
         /// <summary>
@@ -367,11 +608,11 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="request">The current HTTP request. Cannot be null.</param>
         protected override void UpdateSwimlanes(RestApiDashboardLayout layout, IRequest request)
         {
-            // the framework's save entry point is not virtual; a refusal travels as the failure
-            // the board already reports
+            // the framework's save entry point is not virtual; the refusal reaches the user as the
+            // board's own error message
             if (!ContentAuthorization.MayWriteContent(request))
             {
-                throw new UnauthorizedAccessException("The board may be arranged by those who may change the workspace's content only.");
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
             }
 
             var workspace = GetWorkspace(request);
@@ -433,21 +674,22 @@ namespace KleeneStar.Core.WebRestApi
         /// An expression that does not compile against the object is refused here, at the
         /// moment it is written, rather than being stored and silently ignored on every read:
         /// a board that quietly shows everything is worse than a dialog that says why it
-        /// cannot save. The refusal reaches the client as a 400 carrying the parser's reason.
+        /// cannot save. The refusal (<see cref="RestApiRefusal"/>) reaches the user with the
+        /// parser's reason.
         /// </remarks>
         /// <param name="layout">
         /// The layout payload whose <see cref="RestApiDashboardLayout.Filter"/> carries the
         /// submitted WQL filter.
         /// </param>
         /// <param name="request">The current HTTP request. Cannot be null.</param>
-        /// <exception cref="ArgumentException">The filter does not compile.</exception>
+        /// <exception cref="RestApiRefusal">The filter does not compile, or the caller may not arrange the board.</exception>
         protected override void UpdateSettings(RestApiDashboardLayout layout, IRequest request)
         {
-            // the framework's save entry point is not virtual; a refusal travels as the failure
-            // the board already reports
+            // the framework's save entry point is not virtual; the refusal reaches the user as the
+            // board's own error message
             if (!ContentAuthorization.MayWriteContent(request))
             {
-                throw new UnauthorizedAccessException("The board may be arranged by those who may change the workspace's content only.");
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
             }
 
             var workspace = GetWorkspace(request);
@@ -461,7 +703,8 @@ namespace KleeneStar.Core.WebRestApi
 
             if (!WqlFilter.TryValidate<Model.Entities.Object>(filter, out var error))
             {
-                throw new ArgumentException($"The board filter is not a valid WQL expression: {error}");
+                // the parser names its reason by an i18n key
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.filter", I18N.Translate(request, error)));
             }
 
             var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);

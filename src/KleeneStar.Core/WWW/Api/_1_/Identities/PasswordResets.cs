@@ -176,16 +176,58 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
         private static string BuildLink(IRequest request, string secret)
         {
             var page = CoreHub.GetUri<global::KleeneStar.Core.WWW.SetPassword.Index>()?.ToString() ?? string.Empty;
+            var anchored = Anchor
+            (
+                page,
+                CoreHub.HttpServerContext?.ExternalUri,
+                request?.Uri?.ToString(),
+                request?.Header?.Host
+            );
 
-            // the page address is usually absolute already; only a relative one needs the origin
-            // of the request in front of it
-            if (!Uri.TryCreate(page, UriKind.Absolute, out _)
-                && Uri.TryCreate(request?.Uri?.ToString(), UriKind.Absolute, out var current))
+            return $"{anchored}?token={Uri.EscapeDataString(secret)}";
+        }
+
+        /// <summary>
+        /// Places the reset page at the address the link will be opened from.
+        /// </summary>
+        /// <remarks>
+        /// The sitemap builds page addresses on <c>WebExpress:ExternalUri</c> when one is
+        /// configured - the public address, which is what the link needs - and on the listener
+        /// binding otherwise, which is nobody's address from outside (<c>0.0.0.0</c> in the
+        /// container, <c>localhost</c> on a server). Without a public address the origin the
+        /// administrator's browser used is the better guess: the scheme of the request and its
+        /// <c>Host</c> header, which keeps a mapped port the request's own address has already
+        /// replaced by the listener's.
+        /// </remarks>
+        /// <param name="page">The page address the sitemap answered.</param>
+        /// <param name="externalUri">The configured public address, or null.</param>
+        /// <param name="requestUri">The address of the request that issues the link.</param>
+        /// <param name="requestHost">The <c>Host</c> header of that request.</param>
+        /// <returns>The absolute address of the page.</returns>
+        private static string Anchor(string page, string externalUri, string requestUri, string requestHost)
+        {
+            var absolute = Uri.TryCreate(page, UriKind.Absolute, out var pageUri);
+
+            if (absolute && !string.IsNullOrWhiteSpace(externalUri))
             {
-                page = current.GetLeftPart(UriPartial.Authority) + page;
+                return page;
             }
 
-            return $"{page}?token={Uri.EscapeDataString(secret)}";
+            if (!Uri.TryCreate(requestUri, UriKind.Absolute, out var current))
+            {
+                return page;
+            }
+
+            // the header is the issuing administrator's own browser speaking, and the link is shown
+            // to them rather than mailed to somebody - but a value that is no bare authority is
+            // still not put in front of a secret
+            var origin = Uri.TryCreate($"{current.Scheme}://{requestHost?.Trim()}", UriKind.Absolute, out var host)
+                && host.PathAndQuery == "/" && string.IsNullOrEmpty(host.UserInfo)
+                    ? host.GetLeftPart(UriPartial.Authority)
+                    : current.GetLeftPart(UriPartial.Authority);
+            var path = absolute ? pageUri.PathAndQuery : page;
+
+            return origin + path;
         }
 
         /// <summary>

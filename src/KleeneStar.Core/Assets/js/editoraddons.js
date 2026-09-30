@@ -291,7 +291,9 @@
         type: "block",
         category: CATEGORY,
         isContainer: true,
-        contentClass: "ks-addon-callout",
+        // the framework puts the class on the editable body in the editor and on the reading
+        // block in the reading view, so one rule styles both
+        bodyClass: "ks-addon-callout",
         properties: [
             {
                 name: "variant", label: t("callout.variant"), type: "select", default: "info",

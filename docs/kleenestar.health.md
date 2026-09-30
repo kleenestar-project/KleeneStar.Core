@@ -86,6 +86,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --start-interval=5s 
 The container needs no probe binary - the kubelet calls the endpoint itself:
 
 ```yaml
+terminationGracePeriodSeconds: 45   # above ShutdownTimeoutSeconds (30), see Shutdown below
 containers:
   - name: kleenestar
     image: kleenestarorg/kleenestar:<version>
@@ -130,7 +131,7 @@ containers:
 Two further consequences of the defaults:
 
 - **sqlite means one replica.** The database is a file on a `ReadWriteOnce` volume; two pods writing it corrupt it. Scale-out needs a database server.
-- **Shutdown.** WebExpress answers `503` from the moment it starts stopping, so readiness drops before the listener closes. Set `WebExpress:Shutdown` to `graceful` and `terminationGracePeriodSeconds` above `ShutdownTimeoutSeconds` to let running requests finish.
+- **Shutdown.** WebExpress answers `503` from the moment it starts stopping, so readiness drops before the listener closes. The image sets `WebExpress:Shutdown` to `graceful` (`WEBEXPRESS_WebExpress__Shutdown`), which lets admitted requests finish within `ShutdownTimeoutSeconds` (30 s by default); `terminationGracePeriodSeconds` - Kubernetes' default is exactly 30 - and Compose's `stop_grace_period` (45 s in `docker-compose.yml`) have to be longer, or the process is killed while it drains.
 
 ## Adding a Check
 

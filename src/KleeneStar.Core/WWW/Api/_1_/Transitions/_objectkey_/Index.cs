@@ -2,8 +2,6 @@ using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using System;
-using System.Globalization;
-using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -59,7 +57,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
                 var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
                 var result = CoreHub.WorkflowManager.ExecuteTransition(@object.Id, fieldId, stateId, identityId);
 
-                Report(result);
+                global::KleeneStar.Core.WebWorkflow.WorkflowTransitionNotice.Report(result);
             }
 
             // dispatch to the detail view matching the object's kind (/issue, /document, …)
@@ -68,56 +66,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
                 .BindParameters(request);
 
             return new ResponseMovedTemporarily(target);
-        }
-
-        /// <summary>
-        /// Surfaces a refused state change as a toast, because the redirect would otherwise
-        /// return the user to an unchanged page with no explanation. A change that went
-        /// through stays silent here: it is visible on the page the redirect lands on, and
-        /// stamping the object already raises the "object updated" toast, so reporting it a
-        /// second time would only stack notifications. A no-op change is not worth a toast.
-        /// </summary>
-        /// <param name="result">The outcome reported by the workflow manager.</param>
-        private static void Report(WorkflowTransitionResult result)
-        {
-            if (result is null || result.Succeeded || result.Outcome == WorkflowTransitionOutcome.Unchanged)
-            {
-                return;
-            }
-
-            CoreHub.AddNotification
-            (
-                "kleenestar.core:notification.title.error",
-                Describe(result),
-                5000
-            );
-        }
-
-        /// <summary>
-        /// Builds the sentence a refused state change is reported with. A move a relation
-        /// refused names what has to happen first, because "not allowed" would leave the user
-        /// looking for a workflow rule that is not the reason.
-        /// </summary>
-        /// <remarks>
-        /// The message is composed here rather than by the manager: it is translated and filled
-        /// in one step, and the notification pipeline translates a key it is given while passing
-        /// finished prose through unchanged.
-        /// </remarks>
-        /// <param name="result">The outcome reported by the workflow manager.</param>
-        /// <returns>The message key, or the composed sentence.</returns>
-        private static string Describe(WorkflowTransitionResult result)
-        {
-            if (result.Outcome != WorkflowTransitionOutcome.Blocked || result.ValidationErrors is not { Count: > 0 })
-            {
-                return result.Message;
-            }
-
-            return string.Format
-            (
-                CultureInfo.CurrentCulture,
-                I18N.Translate(result.Message),
-                string.Join(", ", result.ValidationErrors)
-            );
         }
     }
 }

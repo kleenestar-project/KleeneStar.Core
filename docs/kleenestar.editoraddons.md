@@ -45,6 +45,7 @@ Workspace, class, kind and assignee are columns and narrow the query. The **stat
 - **Only the add-on's properties are persisted.** A controller may rewrite the widget's inner markup freely: the editor reads an add-on back from its frame's name and data attributes, never from its body (verified: the saved state of a document with a live list carries only `{ name, data }`).
 - **The reading view indents every list of the prose**, so the add-on lists name their host in the selector to take the indent back.
 - **A notice's title is a property, not text**, so it is drawn from the `data-title` the reading block carries (`::before`); in the editor the frame's header names the add-on instead.
+- **A notice is styled through `bodyClass`, not through the frame.** The framework puts `ks-addon-callout` on the editable body in the editor and on the reading block in the reading view, so the box is one rule. Its variant is a data attribute, which sits on the frame in the editor and on the block in the reading view - only the variant rules name both.
 
 ## Known limits
 

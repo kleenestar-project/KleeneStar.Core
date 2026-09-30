@@ -43,7 +43,10 @@ the next successful sign-in.
   It is shown once, valid for 24 hours, spent by its first use, and issuing a new one spends the
   open one. Only the SHA-256 of its 256-bit secret is stored (`PasswordReset`).
 - **The link** opens `/kleenestar/setpassword?token=...`, which sets the password without a
-  sign-in (`/api/1/password/reset`): the secret is the authorization.
+  sign-in (`/api/1/password/reset`): the secret is the authorization. Its address is
+  `WebExpress:ExternalUri` when that is configured; otherwise the origin the administrator's
+  browser used (scheme and `Host` header), because the listener binding - `0.0.0.0` in the
+  container - is nobody's address from outside.
 
 Rules (`ICredentialManager.ValidatePassword`): 8 to 256 characters, not the account's user name,
 e-mail address or display name.

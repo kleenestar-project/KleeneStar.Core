@@ -1200,8 +1200,10 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
 
 /* -------------------------------------------------------------- notice (container) */
 
-.wx-addon-frame[data-addon-id="ks-callout"] > .wx-addon-body-container,
-.wx-content-addon.ks-addon-callout {
+/* the notice's class (bodyClass) sits on the editable body in the editor and on the reading
+   block in the reading view; its variant sits on the frame in the editor and on the block in
+   the reading view, so only the variants need both forms */
+.ks-addon-callout {
     --ks-callout: var(--wx-info);
     border-left: 4px solid var(--ks-callout);
     border-radius: var(--wx-border-radius, 0.375rem);
@@ -1209,18 +1211,18 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     padding: 0.75rem 1rem;
 }
 
-.wx-addon-frame[data-addon-id="ks-callout"][data-variant="tip"] > .wx-addon-body-container,
-.wx-content-addon.ks-addon-callout[data-variant="tip"] {
+[data-variant="tip"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="tip"] {
     --ks-callout: var(--wx-success);
 }
 
-.wx-addon-frame[data-addon-id="ks-callout"][data-variant="warning"] > .wx-addon-body-container,
-.wx-content-addon.ks-addon-callout[data-variant="warning"] {
+[data-variant="warning"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="warning"] {
     --ks-callout: var(--wx-warning);
 }
 
-.wx-addon-frame[data-addon-id="ks-callout"][data-variant="danger"] > .wx-addon-body-container,
-.wx-content-addon.ks-addon-callout[data-variant="danger"] {
+[data-variant="danger"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="danger"] {
     --ks-callout: var(--wx-danger);
 }
 
