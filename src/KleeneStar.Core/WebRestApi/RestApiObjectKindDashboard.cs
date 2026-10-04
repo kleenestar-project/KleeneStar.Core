@@ -28,7 +28,7 @@ namespace KleeneStar.Core.WebRestApi
         /// The widget types the board offers in its "…" add menu once customized. The server
         /// owns which widgets a board may use; the client resolves each type's render and
         /// display metadata from its widget registry by id. Mirrors the standalone dashboard's
-        /// set (<see cref="global::KleeneStar.Core.WWW.Api._1_.Dashboards._dashboardid_.View"/>).
+        /// set (<see cref="global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.View"/>).
         /// </summary>
         private static readonly string[] AvailableWidgetIds =
         [

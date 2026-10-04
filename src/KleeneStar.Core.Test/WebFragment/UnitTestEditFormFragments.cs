@@ -1,6 +1,6 @@
 using KleeneStar.Core.WebFragment.Calendar;
 using KleeneStar.Core.WebFragment.Class;
-using KleeneStar.Core.WebFragment.Dashboard;
+using KleeneStar.Core.WebFragment.Insight;
 using KleeneStar.Core.WebFragment.Field;
 using KleeneStar.Core.WebFragment.Form;
 using KleeneStar.Core.WebFragment.Group;
@@ -85,29 +85,29 @@ namespace KleeneStar.Core.Test.WebFragment
         }
 
         // ------------------------------------------------------------------
-        // Dashboard
+        // Insight
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Verifies that <see cref="DashboardEditFormFragment"/> registers
-        /// four dashboard-edit controls and binds the
-        /// <c>…/Api/_1_/Dashboards/Index</c> endpoint. Regression guard for
+        /// Verifies that <see cref="InsightEditFormFragment"/> registers
+        /// four insight-edit controls and binds the
+        /// <c>…/Api/_1_/Insights/Index</c> endpoint. Regression guard for
         /// Pitfall&nbsp;4A from the Edit-form migration skill: the dashboard
-        /// fragment originally had no <c>ItemId</c> setter and produced empty
+        /// (now insight) fragment originally had no <c>ItemId</c> setter and produced empty
         /// <c>data-id=</c> attributes; the assertion below fails if a
         /// refactor drops the setter again.
         /// </summary>
         [Fact]
-        public void Dashboard_Fragment_HasExpectedShape()
+        public void Insight_Fragment_HasExpectedShape()
         {
-            CoreHubFixture.Initialize(nameof(Dashboard_Fragment_HasExpectedShape));
+            CoreHubFixture.Initialize(nameof(Insight_Fragment_HasExpectedShape));
 
-            var frag = new DashboardEditFormFragment(null!);
+            var frag = new InsightEditFormFragment(null!);
 
             AssertEditFragmentShape(
                 frag,
                 expectedControls: 4,
-                expectedDataServiceEndpoint: typeof(KleeneStar.Core.WWW.Api._1_.Dashboards.Index));
+                expectedDataServiceEndpoint: typeof(KleeneStar.Core.WWW.Api._1_.Insights.Index));
         }
 
         /// <summary>
@@ -485,7 +485,7 @@ namespace KleeneStar.Core.Test.WebFragment
             Assert.Equal(2, genericArgs.Length);
 
             // 4) ItemId setter is non-null. Regression for Pitfall 4A
-            //    (DashboardEditFormFragment originally had no setter and
+            //    (InsightEditFormFragment originally had no setter and
             //    produced empty data-id attributes).
             var itemIdProp = fragment.GetType().GetProperty(
                 "ItemId",

@@ -122,7 +122,7 @@ namespace KleeneStar.Core.WebManager
             Configuration<Status>(h => CoreHub.StatusManager.StatusAdded += h, h => CoreHub.StatusManager.StatusUpdated += h, h => CoreHub.StatusManager.StatusRemoved += h);
             Configuration<SlaPolicy>(h => CoreHub.SlaManager.SlaAdded += h, h => CoreHub.SlaManager.SlaUpdated += h, h => CoreHub.SlaManager.SlaRemoved += h);
             Configuration<Calendar>(h => CoreHub.CalendarManager.CalendarAdded += h, h => CoreHub.CalendarManager.CalendarUpdated += h, h => CoreHub.CalendarManager.CalendarRemoved += h);
-            Configuration<Dashboard>(h => CoreHub.DashboardManager.DashboardAdded += h, h => CoreHub.DashboardManager.DashboardUpdated += h, h => CoreHub.DashboardManager.DashboardRemoved += h);
+            Configuration<Insight>(h => CoreHub.InsightManager.InsightAdded += h, h => CoreHub.InsightManager.InsightUpdated += h, h => CoreHub.InsightManager.InsightRemoved += h);
             Configuration<ObjectView>(h => CoreHub.ObjectViewManager.ObjectViewAdded += h, h => CoreHub.ObjectViewManager.ObjectViewUpdated += h, h => CoreHub.ObjectViewManager.ObjectViewRemoved += h);
             Configuration<NavigatorLink>(h => CoreHub.NavigatorLinkManager.NavigatorLinkAdded += h, h => CoreHub.NavigatorLinkManager.NavigatorLinkUpdated += h, h => CoreHub.NavigatorLinkManager.NavigatorLinkRemoved += h);
             Configuration<ObjectRelationType>(h => CoreHub.ObjectRelationTypeManager.RelationTypeAdded += h, h => CoreHub.ObjectRelationTypeManager.RelationTypeUpdated += h, h => CoreHub.ObjectRelationTypeManager.RelationTypeRemoved += h);

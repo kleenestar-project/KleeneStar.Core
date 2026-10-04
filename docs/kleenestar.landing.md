@@ -68,7 +68,7 @@ visitor.
 
 ## Head
 
-The greeting follows the time of day and addresses the reader by their first name. The figures below it are the reader's own, like the greeting. The two actions are the ones that belong to arriving: *Choose start page*, which leads to the dashboards — the page says itself that it can be replaced — and *New issue*, which opens the same creation modal as everywhere else.
+The greeting follows the time of day and addresses the reader by their first name. The figures below it are the reader's own, like the greeting. The two actions are the ones that belong to arriving: *Choose start page*, which leads to the insights — the page says itself that it can be replaced — and *New issue*, which opens the same creation modal as everywhere else.
 
 ## Key figures
 

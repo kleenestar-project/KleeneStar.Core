@@ -10,7 +10,7 @@ namespace KleeneStar.Core.WebManager
 {
     /// <summary>
     /// Manages the persisted Kanban board layout (columns, swimlanes and board filter) of a
-    /// workspace/kind pair. Unlike <see cref="DashboardManager"/>, boards are never created
+    /// workspace/kind pair. Unlike <see cref="InsightManager"/>, boards are never created
     /// through a user-facing form: they come into existence lazily, the first time the board is
     /// customized through <see cref="SetColumns"/>, <see cref="SetSwimlanes"/> or
     /// <see cref="SetFilter"/>.

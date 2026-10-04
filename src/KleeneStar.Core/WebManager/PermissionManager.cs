@@ -181,7 +181,7 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Returns the resources of one scope, each its own whole chain (a dashboard, a
+        /// Returns the resources of one scope, each its own whole chain (an insight, a
         /// calendar), on which an identity does <em>not</em> hold a non-administrative
         /// permission. Only administered resources can refuse one, so only they are judged.
         /// </summary>

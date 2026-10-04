@@ -144,17 +144,17 @@ namespace KleeneStar.Core.WebPermission
         }
 
         /// <summary>
-        /// Narrows a dashboard query to the dashboards the caller may read.
+        /// Narrows an insight query to the insights the caller may read.
         /// </summary>
         /// <remarks>
-        /// A dashboard belongs to no workspace, so the workspace grants that keep an anonymous
-        /// visitor out say nothing about it. Dashboards are therefore for signed-in callers: an
-        /// anonymous one reads none. A signed-in caller reads every dashboard whose own grants
-        /// (the dashboard's permission dialog) do not refuse <see cref="DashboardReadPermission"/>.
+        /// An insight belongs to no workspace, so the workspace grants that keep an anonymous
+        /// visitor out say nothing about it. Insights are therefore for signed-in callers: an
+        /// anonymous one reads none. A signed-in caller reads every insight whose own grants
+        /// (the insight's permission dialog) do not refuse <see cref="InsightReadPermission"/>.
         /// </remarks>
         /// <param name="query">The query to narrow.</param>
         /// <returns>The narrowed query.</returns>
-        public static IQuery<Dashboard> Restrict(IQuery<Dashboard> query)
+        public static IQuery<Insight> Restrict(IQuery<Insight> query)
         {
             if (query is null || !Applies())
             {
@@ -166,7 +166,7 @@ namespace KleeneStar.Core.WebPermission
                 return query.Where(x => false);
             }
 
-            var refused = Refused(Kind.Dashboard, typeof(DashboardReadPermission));
+            var refused = Refused(Kind.Insight, typeof(InsightReadPermission));
 
             if (refused.Count == 0)
             {
@@ -179,11 +179,11 @@ namespace KleeneStar.Core.WebPermission
         }
 
         /// <summary>
-        /// Determines whether the caller may read at least one dashboard, or create one - whether
-        /// the dashboard menu has anything for them. Both need a signed-in caller.
+        /// Determines whether the caller may read at least one insight, or create one - whether
+        /// the insights menu has anything for them. Both need a signed-in caller.
         /// </summary>
-        /// <returns><see langword="true"/> when the dashboard menu is offered.</returns>
-        public static bool MayUseDashboards()
+        /// <returns><see langword="true"/> when the insights menu is offered.</returns>
+        public static bool MayUseInsights()
         {
             return !Applies() || CoreHub.SessionManager.GetCurrentIdentityId(null) != Guid.Empty;
         }
@@ -221,7 +221,7 @@ namespace KleeneStar.Core.WebPermission
             IReadOnlySet<Guid> compute() => kind switch
             {
                 Kind.Class => CoreHub.PermissionManager.GetRefusedClassIds(identityId, permission),
-                Kind.Dashboard => CoreHub.PermissionManager.GetRefusedIds(PermissionScope.Dashboard, identityId, permission),
+                Kind.Insight => CoreHub.PermissionManager.GetRefusedIds(PermissionScope.Insight, identityId, permission),
                 _ => CoreHub.PermissionManager.GetRefusedWorkspaceIds(identityId, permission)
             };
 
@@ -250,7 +250,7 @@ namespace KleeneStar.Core.WebPermission
         {
             Class,
             Workspace,
-            Dashboard
+            Insight
         }
 
         /// <summary>

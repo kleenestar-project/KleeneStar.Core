@@ -1,6 +1,6 @@
 using KleeneStar.Core.WebFragment.Calendar;
 using KleeneStar.Core.WebFragment.Class;
-using KleeneStar.Core.WebFragment.Dashboard;
+using KleeneStar.Core.WebFragment.Insight;
 using KleeneStar.Core.WebFragment.SavedSearch;
 using KleeneStar.Core.WebFragment.Workspace;
 using WebExpress.WebApp.WebSection;
@@ -32,7 +32,7 @@ namespace KleeneStar.Core.WebFragment
     [Section<SectionPermissionToolbarPrimary>]
     [Scope<ClassPermissionFragment>]
     [Scope<WorkspacePermissionFragment>]
-    [Scope<DashboardPermissionFragment>]
+    [Scope<InsightPermissionFragment>]
     [Scope<CalendarPermissionFragment>]
     [Scope<SavedSearchPermissionFragment>]
     [Cache]

@@ -32,7 +32,7 @@ namespace KleeneStar.Core
         private static WorkflowManager _workflowManager;
         private static StatusManager _statusManager;
         private static ObjectManager _objectManager;
-        private static DashboardManager _dashboardManager;
+        private static InsightManager _insightManager;
         private static KanbanBoardManager _kanbanBoardManager;
         private static KindDashboardManager _kindDashboardManager;
         private static TenantManager _tenantManager;
@@ -135,9 +135,10 @@ namespace KleeneStar.Core
         public static IObjectManager ObjectManager => _objectManager ??= ComponentHub.GetComponentManager<ObjectManager>();
 
         /// <summary>
-        /// Gets the dashboard manager responsible for managing dashboards within the application.
+        /// Gets the insight manager responsible for managing the insights (user-defined views such as
+        /// dashboards) within the application.
         /// </summary>
-        public static IDashboardManager DashboardManager => _dashboardManager ??= ComponentHub.GetComponentManager<DashboardManager>();
+        public static IInsightManager InsightManager => _insightManager ??= ComponentHub.GetComponentManager<InsightManager>();
 
         /// <summary>
         /// Gets the Kanban board manager responsible for the persisted board layout (columns,

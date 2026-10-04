@@ -159,7 +159,7 @@ namespace KleeneStar.Core.WebFragment.Landing
         /// Builds the two actions of the head: replacing the start page, and raising an issue.
         /// </summary>
         /// <remarks>
-        /// "Choose start page" leads to the dashboards, because that is what a reader who has
+        /// "Choose start page" leads to the insights, because that is what a reader who has
         /// outgrown this page replaces it with. The landing page says so itself rather than
         /// leaving the reader to discover that it can be left behind.
         /// </remarks>
@@ -172,7 +172,7 @@ namespace KleeneStar.Core.WebFragment.Landing
             {
                 Text = _ => "kleenestar.core:landing.action.choose",
                 Icon = _ => new IconTableCells(),
-                Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Dashboards.Index>(),
+                Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Insights.Index>(),
                 Outline = _ => true,
                 BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Secondary)
             };

@@ -94,7 +94,7 @@ namespace KleeneStar.Core.WebManager
                 PermissionAssignment x => new(AuditTargetType.Permission, x.Id, x.Policy),
                 SlaPolicy x => new(AuditTargetType.SlaPolicy, x.Id, x.Name),
                 CalendarEntity x => new(AuditTargetType.Calendar, x.Id, x.Name),
-                Dashboard x => new(AuditTargetType.Dashboard, x.Id, x.Name),
+                Insight x => new(AuditTargetType.Insight, x.Id, x.Name),
                 ObjectView x => new(AuditTargetType.ObjectView, x.Id, x.Name),
                 NavigatorLink x => new(AuditTargetType.NavigatorLink, x.Id, x.Name),
                 Branding x => new(AuditTargetType.Branding, x.Id, x.Title),

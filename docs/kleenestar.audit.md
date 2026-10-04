@@ -130,7 +130,7 @@ CommitManager.CommitRestored ─────► Content   / Restored
 WorkflowManager.TransitionExecuted► Workflow  / Transitioned  (refusals included)
 
 Class·Field·Form·Workflow·Status·Priority·Template·Sla·Calendar·
-Dashboard·ObjectView·NavigatorLink·Workspace  Added/Updated/Removed
+Insight·ObjectView·NavigatorLink·Workspace    Added/Updated/Removed
                                   ► Configuration
 Branding·Maintenance Updated ─────► Configuration
 

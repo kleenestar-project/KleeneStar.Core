@@ -147,8 +147,8 @@ namespace KleeneStar.Core.WebPermission
                 return IsSignedIn(request);
             }
 
-            // notifications belong to an account and dashboards to the signed-in callers of the
-            // installation (they are on no workspace chain); a dashboard's own grants decide beyond
+            // notifications belong to an account and insights to the signed-in callers of the
+            // installation (they are on no workspace chain); an insight's own grants decide beyond
             var area = AreaOf(pageId);
 
             if (string.Equals(area, "notifications", StringComparison.OrdinalIgnoreCase))
@@ -156,10 +156,10 @@ namespace KleeneStar.Core.WebPermission
                 return IsSignedIn(request);
             }
 
-            if (string.Equals(area, "dashboards", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(area, "dashboard", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(area, "insights", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(area, "insight", StringComparison.OrdinalIgnoreCase))
             {
-                return MayOpenDashboardPage(pageId, request);
+                return MayOpenInsightPage(pageId, request);
             }
 
             // a saved search belongs to its owner and is shared through its own grants; it is on
@@ -194,25 +194,25 @@ namespace KleeneStar.Core.WebPermission
         }
 
         /// <summary>
-        /// Decides a dashboard page: signed in, and - for a page naming a dashboard - the
-        /// dashboard permission the page needs on its own grants.
+        /// Decides an insight page: signed in, and - for a page naming an insight - the
+        /// insight permission the page needs on its own grants.
         /// </summary>
         /// <param name="pageId">The page id.</param>
         /// <param name="request">The request.</param>
         /// <returns><see langword="true"/> when the page may render.</returns>
-        private static bool MayOpenDashboardPage(string pageId, IRequest request)
+        private static bool MayOpenInsightPage(string pageId, IRequest request)
         {
-            var id = Parse(request.GetParameter<DashboardIdParameter>()?.Value);
+            var id = Parse(request.GetParameter<InsightIdParameter>()?.Value);
             var permission = pageId[(pageId.LastIndexOf('.') + 1)..].ToLowerInvariant() switch
             {
-                "edit" => typeof(DashboardUpdatePermission),
-                "delete" => typeof(DashboardDeletePermission),
-                "clone" => typeof(DashboardClonePermission),
-                "permission" => typeof(DashboardManageProfilesPermission),
-                _ => typeof(DashboardReadPermission)
+                "edit" => typeof(InsightUpdatePermission),
+                "delete" => typeof(InsightDeletePermission),
+                "clone" => typeof(InsightClonePermission),
+                "permission" => typeof(InsightManageProfilesPermission),
+                _ => typeof(InsightReadPermission)
             };
 
-            return WebRestApi.ContentAuthorization.MayUseDashboard(id, request, permission);
+            return WebRestApi.ContentAuthorization.MayUseInsight(id, request, permission);
         }
 
         /// <summary>

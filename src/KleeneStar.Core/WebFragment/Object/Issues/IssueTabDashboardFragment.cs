@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebFragment.Dashboard;
+using KleeneStar.Core.WebFragment.Insight;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;

@@ -12,7 +12,7 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Search
 {
     /// <summary>
-    /// Contributes the search menu to the application header, after the dashboards: saved
+    /// Contributes the search menu to the application header, after the insights: saved
     /// searches, searches shared with the caller and the last searches, each opening the search
     /// page on its query.
     /// </summary>

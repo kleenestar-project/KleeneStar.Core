@@ -103,23 +103,23 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Determines whether the caller may act on a dashboard. Dashboards belong to no
-        /// workspace and are for signed-in callers; a dashboard's own grants (its permission
+        /// Determines whether the caller may act on an insight. Insights belong to no
+        /// workspace and are for signed-in callers; an insight's own grants (its permission
         /// dialog) decide beyond that, with the usual reading that an unadministered one is open.
         /// </summary>
-        /// <param name="dashboardId">The dashboard, or <see langword="null"/> for a new one.</param>
+        /// <param name="insightId">The insight, or <see langword="null"/> for a new one.</param>
         /// <param name="request">The request.</param>
-        /// <param name="permission">The dashboard permission the action needs.</param>
+        /// <param name="permission">The insight permission the action needs.</param>
         /// <returns><see langword="true"/> when the action may proceed.</returns>
-        public static bool MayUseDashboard(Guid? dashboardId, IRequest request, Type permission)
+        public static bool MayUseInsight(Guid? insightId, IRequest request, Type permission)
         {
             if (!RouteAuthorization.IsSignedIn(request))
             {
                 return false;
             }
 
-            return dashboardId is not { } id
-                || PageAuthorization.IsGranted(request, permission, new PermissionResource(PermissionScope.Dashboard, id.ToString()));
+            return insightId is not { } id
+                || PageAuthorization.IsGranted(request, permission, new PermissionResource(PermissionScope.Insight, id.ToString()));
         }
 
         /// <summary>

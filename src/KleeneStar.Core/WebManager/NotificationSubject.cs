@@ -59,7 +59,7 @@ namespace KleeneStar.Core.WebManager
                     Status x => new(x.Name, Path<global::KleeneStar.Core.WWW.Status._statusid_.Index>(new WorkflowStateIdParameter(x.Id))),
                     SlaPolicy x => new(x.Name, Path<global::KleeneStar.Core.WWW.Sla._slaid_.Index>(new SlaIdParameter(x.Id))),
                     Calendar x => new(x.Name, Path<global::KleeneStar.Core.WWW.Calendar._calendarid_.Index>(new CalendarIdParameter(x.Id))),
-                    Dashboard x => new(x.Name, Path<global::KleeneStar.Core.WWW.Dashboard._dashboardid_.Index>(new DashboardIdParameter(x.Id))),
+                    Insight x => new(x.Name, Path<global::KleeneStar.Core.WWW.Insight._insightid_.Index>(new InsightIdParameter(x.Id))),
                     Template x => new(x.Name, Path<global::KleeneStar.Core.WWW.Template._templateid_.Index>(new TemplateIdParameter(x.Id)), Icon(x.Icon)),
                     Identity x => new(x.Name, Path<global::KleeneStar.Core.WWW.Settings.Identity._identityid_.Index>(new IdentityIdParameter(x.Id)), Icon(x.Avatar)),
                     Tenant x => new(x.Name, Path<global::KleeneStar.Core.WWW.Settings.Tenant._tenantid_.Index>(new TenantIdParameter(x.Id)), Icon(x.Icon)),

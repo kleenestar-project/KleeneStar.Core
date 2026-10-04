@@ -36,9 +36,10 @@ namespace KleeneStar.Core.WebPermission
         public const string Class = "class";
 
         /// <summary>
-        /// A dashboard.
+        /// An insight - a user-defined view such as a dashboard. Grants stored on the former
+        /// <c>dashboard</c> scope were moved here by the migration that renamed it.
         /// </summary>
-        public const string Dashboard = "dashboard";
+        public const string Insight = "insight";
 
         /// <summary>
         /// A calendar.

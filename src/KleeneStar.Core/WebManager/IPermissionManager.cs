@@ -81,7 +81,7 @@ namespace KleeneStar.Core.WebManager
         IReadOnlySet<Guid> GetRefusedWorkspaceIds(Guid identityId, Type permission);
 
         /// <summary>
-        /// Returns the resources of one scope - each its own whole chain, such as a dashboard -
+        /// Returns the resources of one scope - each its own whole chain, such as an insight -
         /// on which an identity does <em>not</em> hold a non-administrative permission.
         /// </summary>
         /// <param name="scope">The kind of resource, as named in <see cref="PermissionScope"/>.</param>

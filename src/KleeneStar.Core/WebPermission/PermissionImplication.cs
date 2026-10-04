@@ -140,21 +140,21 @@ namespace KleeneStar.Core.WebPermission
         ];
 
         /// <summary>
-        /// The permissions that are on no workspace chain at all - the installation's dashboards,
+        /// The permissions that are on no workspace chain at all - the installation's insights,
         /// groups and accounts - and are therefore neither implied nor classified.
         /// </summary>
         private static readonly HashSet<Type> Unscoped =
         [
-            typeof(DashboardArchivePermission),
-            typeof(DashboardClonePermission),
-            typeof(DashboardCreatePermission),
-            typeof(DashboardDeletePermission),
-            typeof(DashboardManageProfilesPermission),
-            typeof(DashboardReadContentPermission),
-            typeof(DashboardReadPermission),
-            typeof(DashboardRestorePermission),
-            typeof(DashboardUpdatePermission),
-            typeof(DashboardWriteContentPermission),
+            typeof(InsightArchivePermission),
+            typeof(InsightClonePermission),
+            typeof(InsightCreatePermission),
+            typeof(InsightDeletePermission),
+            typeof(InsightManageProfilesPermission),
+            typeof(InsightReadContentPermission),
+            typeof(InsightReadPermission),
+            typeof(InsightRestorePermission),
+            typeof(InsightUpdatePermission),
+            typeof(InsightWriteContentPermission),
             typeof(GroupCreatePermission),
             typeof(GroupDeletePermission),
             typeof(GroupReadPermission),

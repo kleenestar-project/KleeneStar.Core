@@ -64,10 +64,10 @@ namespace KleeneStar.Core.Test.WebPermission
             Assert.True(PermissionImplication.IsAdministrative(typeof(WorkspaceManageProfilesPermission)));
             Assert.False(PermissionImplication.IsAdministrative(typeof(ObjectReadPermission)));
             Assert.False(PermissionImplication.IsAdministrative(typeof(ObjectUpdatePermission)));
-            Assert.False(PermissionImplication.IsAdministrative(typeof(DashboardUpdatePermission)));
+            Assert.False(PermissionImplication.IsAdministrative(typeof(InsightUpdatePermission)));
             Assert.False(PermissionImplication.IsAdministrative(null));
 
-            Assert.Equal([typeof(DashboardUpdatePermission)], PermissionImplication.Satisfying(typeof(DashboardUpdatePermission)));
+            Assert.Equal([typeof(InsightUpdatePermission)], PermissionImplication.Satisfying(typeof(InsightUpdatePermission)));
         }
     }
 }

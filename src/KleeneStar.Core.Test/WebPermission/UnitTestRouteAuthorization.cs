@@ -176,20 +176,20 @@ namespace KleeneStar.Core.Test.WebPermission
         }
 
         /// <summary>
-        /// Notifications and dashboards are on no workspace chain; they are for signed-in callers,
+        /// Notifications and insights are on no workspace chain; they are for signed-in callers,
         /// and an anonymous one is refused both pages and offered neither menu.
         /// </summary>
         [Fact]
-        public void NotificationsAndDashboardsNeedASignedInCaller()
+        public void NotificationsAndInsightsNeedASignedInCaller()
         {
-            Seed(nameof(NotificationsAndDashboardsNeedASignedInCaller));
+            Seed(nameof(NotificationsAndInsightsNeedASignedInCaller));
 
             using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
             {
                 Assert.False(RouteAuthorization.IsGranted("kleenestar.core.www.notifications.index", CreateRequest()));
-                Assert.False(RouteAuthorization.IsGranted("kleenestar.core.www.dashboards.index", CreateRequest()));
-                Assert.False(RouteAuthorization.IsGranted("kleenestar.core.www.dashboard._dashboardid_.index", CreateRequest((DashboardIdParameter.Key, Guid.NewGuid().ToString()))));
-                Assert.False(ContentVisibility.MayUseDashboards());
+                Assert.False(RouteAuthorization.IsGranted("kleenestar.core.www.insights.index", CreateRequest()));
+                Assert.False(RouteAuthorization.IsGranted("kleenestar.core.www.insight._insightid_.index", CreateRequest((InsightIdParameter.Key, Guid.NewGuid().ToString()))));
+                Assert.False(ContentVisibility.MayUseInsights());
             }
         }
 
