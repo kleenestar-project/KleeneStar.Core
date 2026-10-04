@@ -2,7 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebComponent;
-using WebExpress.WebCore.WebHealt;
+using WebExpress.WebCore.WebHealth;
 
 namespace KleeneStar.Core.WebHealth
 {

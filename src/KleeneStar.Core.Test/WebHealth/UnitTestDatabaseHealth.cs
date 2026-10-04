@@ -3,7 +3,7 @@ using KleeneStar.Model;
 using KleeneStar.Model.Settings;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using WebExpress.WebCore.WebHealt;
+using WebExpress.WebCore.WebHealth;
 
 namespace KleeneStar.Core.Test.WebHealth
 {

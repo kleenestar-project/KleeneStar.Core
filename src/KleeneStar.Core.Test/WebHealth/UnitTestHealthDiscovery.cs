@@ -1,7 +1,7 @@
 using KleeneStar.Core.WebHealth;
 using System.Reflection;
 using WebExpress.WebCore.WebAttribute;
-using WebExpress.WebCore.WebHealt;
+using WebExpress.WebCore.WebHealth;
 
 namespace KleeneStar.Core.Test.WebHealth
 {

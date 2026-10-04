@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebUI.WebControl;
 
 namespace KleeneStar.Core.WebRestApi
 {
@@ -37,9 +38,15 @@ namespace KleeneStar.Core.WebRestApi
 
         /// <summary>
         /// Gets the statuses in the order the board lists them: by status category (to do, in
-        /// progress, waiting, done), then in the order the workflows declare them.
+        /// progress, waiting, done), then in the order the workflows declare them. Each chip is
+        /// coloured like its category, the colour the object page shows the same state in.
         /// </summary>
-        public IReadOnlyList<RestApiKanbanStatus> Statuses => [.. _entries.Select(x => new RestApiKanbanStatus { Id = x.Key, Label = x.Label })];
+        public IReadOnlyList<RestApiKanbanStatus> Statuses => [.. _entries.Select(x => new RestApiKanbanStatus
+        {
+            Id = x.Key,
+            Label = x.Label,
+            Color = string.IsNullOrWhiteSpace(x.Color) ? null : new PropertyColorBackgroundBadge(x.Color)
+        })];
 
         /// <summary>
         /// Builds the catalog of the classes of a kind in a workspace.
@@ -50,9 +57,11 @@ namespace KleeneStar.Core.WebRestApi
         public static KanbanStatusCatalog Build(Guid workspaceId, string kind)
         {
             var catalog = new KanbanStatusCatalog();
-            var rank = ObjectBoardProjection.GetOrderedCategories()
+            var categories = ObjectBoardProjection.GetOrderedCategories();
+            var rank = categories
                 .Select((category, index) => (category.Id, index))
                 .ToDictionary(x => x.Id, x => x.index);
+            var colors = categories.ToDictionary(x => x.Id, x => x.Color);
 
             var classes = CoreHub.ClassManager
                 .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
@@ -88,7 +97,9 @@ namespace KleeneStar.Core.WebRestApi
 
                     if (entry is null)
                     {
-                        entry = new Entry(key, status.Name, order++);
+                        // a name shared across classes keeps the colour of its first category,
+                        // like it keeps the spelling of its first class
+                        entry = new Entry(key, status.Name, colors.GetValueOrDefault(status.CategoryId), order++);
                         catalog._entries.Add(entry);
                     }
 
@@ -176,12 +187,15 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         /// <param name="key">The normalized name.</param>
         /// <param name="label">The name shown, the one the first class spells it with.</param>
+        /// <param name="color">The colour of the status category it first appeared in, or null.</param>
         /// <param name="order">The position of its first appearance.</param>
-        private sealed class Entry(string key, string label, int order)
+        private sealed class Entry(string key, string label, string color, int order)
         {
             public string Key { get; } = key;
 
             public string Label { get; } = label;
+
+            public string Color { get; } = color;
 
             public int Order { get; } = order;
 

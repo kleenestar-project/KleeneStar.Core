@@ -3,9 +3,7 @@ using KleeneStar.Core.WebTheme;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using KleeneStar.Model.Settings;
-using Microsoft.EntityFrameworkCore;
 using System;
-using System.Data.Common;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebAttribute;
@@ -60,11 +58,8 @@ namespace KleeneStar.Core
             // 503 until a restart retries the migration and the seed
             using var db = ModelHub.CreateDbContext();
 
-            // apply a migration path if necessary
-            MigrateWithLegacyDbReset(db, componentHub);
-
-            // run seeding
-            KleeneStarDbSeeder.SeedAsync(db).GetAwaiter().GetResult();
+            // migrate and seed under a lock, since replicas sharing the database start at once
+            DatabaseStartup.Run(db, componentHub?.ClusterManager, componentHub?.LogManager?.DefaultLog);
         }
 
         /// <summary>
@@ -171,57 +166,6 @@ namespace KleeneStar.Core
                 // missing entry is visible as a run with no Started event preceding its changes
                 CoreHub.ComponentHub?.LogManager?.DefaultLog?.Exception(ex);
             }
-        }
-
-        /// <summary>
-        /// Applies pending migrations. When the database exists but its schema was
-        /// previously created without a <c>__EFMigrationsHistory</c> table (for example
-        /// by an older <c>EnsureCreated()</c> code path or by a developer manually
-        /// editing the migration files), the first migration throws "table already
-        /// exists". In that case the database is reset and the migration is retried —
-        /// the seeder will then repopulate every row.
-        /// </summary>
-        /// <param name="db">The database context.</param>
-        /// <param name="componentHub">The component hub used to write a warning entry.</param>
-        private static void MigrateWithLegacyDbReset(KleeneStarDbContext db, IComponentHub componentHub)
-        {
-            try
-            {
-                db.Database.Migrate();
-            }
-            catch (Exception ex) when (IsAlreadyExistsError(ex))
-            {
-                componentHub?.LogManager?.DefaultLog?.Warning
-                (
-                    "Legacy database schema without migrations history detected. " +
-                    "Resetting the database and re-running migrations + seed."
-                );
-
-                db.Database.EnsureDeleted();
-                db.Database.Migrate();
-            }
-        }
-
-        /// <summary>
-        /// Returns whether the supplied exception (or any of its inner exceptions)
-        /// reports the "table already exists" condition that providers raise when
-        /// the migration tries to (re-)create a table that is already present in
-        /// the database.
-        /// </summary>
-        /// <param name="ex">The exception to inspect.</param>
-        /// <returns><c>true</c> when the message chain contains "already exists".</returns>
-        private static bool IsAlreadyExistsError(Exception ex)
-        {
-            for (var current = ex; current != null; current = current.InnerException)
-            {
-                if (current is DbException &&
-                    current.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

@@ -27,7 +27,7 @@ The framework's own conditions come first: the HTTP server has to be running, ev
 
 ## The Checks
 
-A health component is a `public sealed` class implementing `WebExpress.WebCore.WebHealt.IHealth`. WebExpress's `HealthManager` finds it by scanning the plugin's assembly and binds it once per application the plugin is associated with; nothing registers it. The core's components live in `WebHealth/` and are bound to `KleeneStarApplication`:
+A health component is a `public sealed` class implementing `WebExpress.WebCore.WebHealth.IHealth`. WebExpress's `HealthManager` finds it by scanning the plugin's assembly and binds it once per application the plugin is associated with; nothing registers it. The core's components live in `WebHealth/` and are bound to `KleeneStarApplication`:
 
 |Component              |Budget |Unhealthy when
 |-----------------------|-------|------------------------------------------------------------------

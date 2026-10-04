@@ -6,7 +6,7 @@ using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebCore.WebEndpoint;
-using WebExpress.WebCore.WebHealt;
+using WebExpress.WebCore.WebHealth;
 using WebExpress.WebCore.WebLog;
 using WebExpress.WebCore.WebPlugin;
 

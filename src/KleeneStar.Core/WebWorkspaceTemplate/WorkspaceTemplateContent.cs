@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebEditor;
 
 namespace KleeneStar.Core.WebWorkspaceTemplate
 {
