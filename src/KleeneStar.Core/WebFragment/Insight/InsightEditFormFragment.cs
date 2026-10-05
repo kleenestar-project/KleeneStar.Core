@@ -33,6 +33,11 @@ namespace KleeneStar.Core.WebFragment.Insight
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights.UniqueName>().ToString())};
 
         /// <summary>
+        /// Gets the prompt of the query that selects the objects the insight shows.
+        /// </summary>
+        public ControlDataWqlPrompt Query { get; } = InsightFormItems.BuildQuery("insight-edit-query");
+
+        /// <summary>
         /// Gets the input tag definition for the category field.
         /// </summary>
         public ControlFormItemInputTag Category { get; } = new()
@@ -74,6 +79,7 @@ namespace KleeneStar.Core.WebFragment.Insight
             : base(fragmentContext)
         {
             Add(InsightName);
+            Add(InsightFormItems.BuildQueryPanel(Query));
             Add(Category);
             Add(Description);
             Add(InsightState);

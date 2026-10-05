@@ -135,5 +135,63 @@ namespace KleeneStar.Core.WebManager
         /// </param>
         /// <returns>The current instance to allow for method chaining.</returns>
         IInsightManager SetBoard(Guid insightId, IReadOnlyList<DashboardColumn> columns);
+
+        /// <summary>
+        /// Returns the tabs of an insight in display order.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <returns>The tabs, ordered by position.</returns>
+        IReadOnlyList<InsightView> GetViews(Guid insightId);
+
+        /// <summary>
+        /// Returns a tab by its id.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <returns>The tab, or <see langword="null"/> when there is none.</returns>
+        InsightView GetView(Guid viewId);
+
+        /// <summary>
+        /// Adds a tab to an insight, behind the tabs it has, under a name no other tab of the
+        /// insight carries (a number is appended when the name is taken).
+        /// </summary>
+        /// <remarks>
+        /// Arranging tabs is part of the insight's live editing, like the board autosave: it raises
+        /// <see cref="InsightUpdated"/> but no user notification.
+        /// </remarks>
+        /// <param name="view">The tab to add. Its insight must exist. Cannot be null.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        IInsightManager AddView(InsightView view);
+
+        /// <summary>
+        /// Removes a tab.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <returns><see langword="true"/> when a tab was removed.</returns>
+        bool RemoveView(Guid viewId);
+
+        /// <summary>
+        /// Puts the tabs of an insight into the given order.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <param name="order">The tab ids in their new order. Cannot be null.</param>
+        /// <returns><see langword="true"/> when the order was applied.</returns>
+        bool ReorderViews(Guid insightId, IReadOnlyList<Guid> order);
+
+        /// <summary>
+        /// Gives an insight the tabs a new insight starts with - the objects and the reports -
+        /// unless it has tabs already.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <param name="nameOf">Resolves the name of a tab from its view type's label key.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        IInsightManager AddDefaultViews(Guid insightId, Func<string, string> nameOf);
+
+        /// <summary>
+        /// Copies the tabs and the dashboard of one insight onto another that has none.
+        /// </summary>
+        /// <param name="sourceId">The insight copied from.</param>
+        /// <param name="targetId">The insight copied to.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        IInsightManager CopyViews(Guid sourceId, Guid targetId);
     }
 }

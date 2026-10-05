@@ -134,7 +134,8 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Narrows a query to the workspace the request addresses and to the endpoint's kind.
+        /// Narrows a query to the workspace the request addresses and to the endpoint's kind;
+        /// an insight's list overrides it with the objects its query selects.
         /// </summary>
         /// <remarks>
         /// The scope is applied here rather than in <see cref="Filter(string, IQuery{Model.Entities.Object}, IRequest)"/>
@@ -144,7 +145,7 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="query">The query to narrow.</param>
         /// <param name="request">The request naming the workspace.</param>
         /// <returns>The narrowed query.</returns>
-        private IQuery<Model.Entities.Object> Scope(IQuery<Model.Entities.Object> query, IRequest request)
+        protected virtual IQuery<Model.Entities.Object> Scope(IQuery<Model.Entities.Object> query, IRequest request)
         {
             var key = request.GetParameter<WorkspaceKeyParameter>();
             var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);

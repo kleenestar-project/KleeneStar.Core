@@ -56,6 +56,21 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The catalog.</returns>
         public static KanbanStatusCatalog Build(Guid workspaceId, string kind)
         {
+            var classes = CoreHub.ClassManager
+                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
+                .Where(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase));
+
+            return Build(classes);
+        }
+
+        /// <summary>
+        /// Builds the catalog of a set of classes - the classes a board's objects come from,
+        /// whichever workspaces those are in.
+        /// </summary>
+        /// <param name="classes">The classes of the board.</param>
+        /// <returns>The catalog.</returns>
+        public static KanbanStatusCatalog Build(IEnumerable<Class> classes)
+        {
             var catalog = new KanbanStatusCatalog();
             var categories = ObjectBoardProjection.GetOrderedCategories();
             var rank = categories
@@ -63,14 +78,9 @@ namespace KleeneStar.Core.WebRestApi
                 .ToDictionary(x => x.Id, x => x.index);
             var colors = categories.ToDictionary(x => x.Id, x => x.Color);
 
-            var classes = CoreHub.ClassManager
-                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
-                .Where(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(x => x.Name);
-
             var order = 0;
 
-            foreach (var cls in classes)
+            foreach (var cls in (classes ?? []).Where(x => x is not null).DistinctBy(x => x.Id).OrderBy(x => x.Name))
             {
                 var field = ObjectBoardProjection.BuildClassContext(cls).WorkflowField;
                 var workflow = field?.WorkflowId is Guid workflowId

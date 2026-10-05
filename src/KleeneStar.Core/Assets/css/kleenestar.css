@@ -1273,3 +1273,137 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
 .ks-savedsearch-actions > .wx-dropdown > .btn {
     height: 100%;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   insight reports tab (InsightReportControl, insightreports.js): a toolbar, the chart on a stage
+   of a fixed height, the description above and the key figures beneath it
+   --------------------------------------------------------------------------------------------- */
+
+.ks-insight-reports {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    min-width: 0;
+}
+
+.ks-insight-reports-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-end;
+}
+
+.ks-insight-reports-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-field[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-field select {
+    min-width: 11rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.875rem;
+    color: inherit;
+    background: var(--wx-body-bg);
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius, 0.375rem);
+}
+
+.ks-insight-reports-report {
+    min-width: 16rem;
+}
+
+.ks-insight-reports-description {
+    margin: 0;
+    max-width: 60rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-stage {
+    position: relative;
+    height: 22rem;
+    padding: 0.75rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: var(--wx-body-bg);
+}
+
+.ks-insight-reports-stage canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.ks-insight-reports-stage canvas[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-empty,
+.ks-insight-reports-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    text-align: center;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-empty[hidden],
+.ks-insight-reports-error[hidden],
+.ks-insight-reports-notice[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-error {
+    color: var(--wx-danger);
+}
+
+.ks-insight-reports-loading .ks-insight-reports-stage {
+    opacity: 0.6;
+}
+
+.ks-insight-reports-notice {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2.5rem;
+    margin: 0;
+}
+
+.ks-insight-reports-summary dt {
+    font-size: 0.75rem;
+    font-weight: normal;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-summary dd {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+    .ks-insight-reports-field,
+    .ks-insight-reports-field select,
+    .ks-insight-reports-report {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .ks-insight-reports-stage {
+        height: 16rem;
+    }
+}

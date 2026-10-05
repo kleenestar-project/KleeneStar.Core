@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebInsight;
+using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -168,7 +169,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
                 Name = data.Name + " (Copy)",
                 Description = data.Description,
                 Icon = data.Icon,
-                Type = data.Type,
+                Query = data.Query ?? string.Empty,
                 State = InsightState.Active
             };
 
@@ -193,6 +194,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
             using var context = ModelHub.CreateDbContext();
             var data = CoreHub.InsightManager.GetInsights(query, context)
                 .FirstOrDefault();
+
+            // the query prompt fills its field from the loaded value; a missing one is an empty
+            // query, which is what the field shows anyway
+            if (data is not null)
+            {
+                data.Query ??= string.Empty;
+            }
 
             return RetrieveForUpdate(request, data);
         }
@@ -242,39 +250,30 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         protected override IRestApiValidationResult Validate(Model.Entities.Insight existingItem, RestApiCrudFormData payload, IRequest request)
         {
             var result = base.Validate(existingItem, payload, request);
-            var (submitted, sent) = payload.TryRead(nameof(Model.Entities.Insight.Type));
-            var type = InsightTypeCatalog.Normalize(submitted);
+            var (query, sent) = payload.TryRead(nameof(Model.Entities.Insight.Query));
 
-            // a field the payload does not carry, or carries blank, names no type: a create
-            // falls back to the default, an update and a clone keep the type they have
-            if (!sent || type is null)
+            // the query is what every tab of the insight shows; one that does not compile would
+            // leave every tab empty, so it is refused when it is written, with the parser's reason
+            if (sent && !WqlFilter.TryValidate<Model.Entities.Object>(query, out var error))
             {
-                return result;
-            }
-
-            if (existingItem is null)
-            {
-                // the type of a new insight has to be one somebody registered - a key no type
-                // answers to would leave the insight with no fragment to draw it
-                if (!InsightTypeCatalog.IsRegistered(type))
-                {
-                    var offered = string.Join(", ", InsightTypeCatalog.Types.Select(x => Translate(request, x.Label)));
-
-                    result.Add
-                    (
-                        string.Format(Translate(request, "kleenestar.core:insight.type.validation.unknown"), offered),
-                        nameof(Model.Entities.Insight.Type)
-                    );
-                }
-            }
-            else if (type != InsightTypeCatalog.Normalize(existingItem.Type))
-            {
-                // the content of one type means nothing to another (a dashboard's columns are
-                // no calendar), so the type is chosen once; an update and a clone keep it
-                result.Add(Translate(request, "kleenestar.core:insight.type.validation.immutable"), nameof(Model.Entities.Insight.Type));
+                result.Add
+                (
+                    string.Format(Translate(request, "kleenestar.core:insight.query.validation.invalid"), Translate(request, error)),
+                    nameof(Model.Entities.Insight.Query)
+                );
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Stores a blank query as none, so "everything the reader may see" has one spelling.
+        /// </summary>
+        /// <param name="query">The submitted query.</param>
+        /// <returns>The trimmed query, or <see langword="null"/>.</returns>
+        private static string NormalizeQuery(string query)
+        {
+            return string.IsNullOrWhiteSpace(query) ? null : query.Trim();
         }
 
         /// <summary>
@@ -318,10 +317,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
 
             fieldMap.BindTo(newItem);
 
-            // a create that names no type is a dashboard; Validate has refused an unknown one
-            newItem.Type = InsightTypeCatalog.Normalize(newItem.Type) ?? InsightTypeCatalog.Default;
+            newItem.Query = NormalizeQuery(newItem.Query);
 
             CoreHub.InsightManager.Add(newItem);
+
+            // a new insight opens on its objects, with the reports beside them; everything else
+            // is a tab the user adds
+            CoreHub.InsightManager.AddDefaultViews(newItem.Id, key => Translate(request, key));
 
             return new RestApiCrudResultCreate();
         }
@@ -359,10 +361,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
 
             fieldMap.BindTo(newItem);
 
-            // a clone is of the type of its original, whatever the payload said
-            newItem.Type = InsightTypeCatalog.Normalize(existingItem.Type) ?? InsightTypeCatalog.Default;
+            newItem.Query = NormalizeQuery(newItem.Query);
 
             CoreHub.InsightManager.Add(newItem);
+
+            // a clone shows what its original shows: the same tabs and a copy of its dashboard
+            CoreHub.InsightManager.CopyViews(existingItem.Id, newItem.Id);
+            CoreHub.InsightManager.AddDefaultViews(newItem.Id, key => Translate(request, key));
 
             return new RestApiCrudResultCreate();
         }
@@ -381,13 +386,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Insight existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            // the type is chosen once (Validate refuses a different one); a payload that
-            // carried it blank must not clear it either
+            // the type is a record of what the insight was created as; no payload changes it
             var type = existingItem.Type;
 
             var res = base.Update(existingItem, payload, request);
 
             existingItem.Type = type;
+            existingItem.Query = NormalizeQuery(existingItem.Query);
 
             CoreHub.InsightManager.Update(existingItem);
 

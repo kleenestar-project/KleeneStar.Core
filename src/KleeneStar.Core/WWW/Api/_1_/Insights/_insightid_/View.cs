@@ -61,8 +61,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         /// </returns>
         protected override IEnumerable<RestApiDashboardColumn> RetrieveColumns(IRequest request)
         {
-            var insightParameter = request.GetParameter<InsightIdParameter>();
-            var insight = CoreHub.InsightManager.GetInsight(insightParameter);
+            // the board is the insight's content; a caller who may not read it gets none
+            var insight = global::KleeneStar.Core.WebInsight.InsightScope.ResolveReadable(request);
 
             if (insight == null)
             {
@@ -109,6 +109,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 return;
             }
 
+            DemandArrange(request);
+
             var columns = layout.Columns
                 .Select(column => new DashboardColumn(ParseColumnId(column.Id))
                 {
@@ -136,6 +138,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             {
                 return;
             }
+
+            DemandArrange(request);
 
             var columns = board
                 .Select(column => new DashboardColumn(ParseColumnId(column.Id))
@@ -196,6 +200,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Refuses a change of the board to a caller who may not change the insight's content.
+        /// The framework's save entry points are not virtual; the refusal reaches the user as the
+        /// board's own error message.
+        /// </summary>
+        /// <param name="request">The current HTTP request.</param>
+        /// <exception cref="RestApiRefusal">The caller may not arrange the insight.</exception>
+        private static void DemandArrange(IRequest request)
+        {
+            var insight = global::KleeneStar.Core.WebInsight.InsightScope.Resolve(request);
+
+            if (!global::KleeneStar.Core.WebInsight.InsightScope.MayArrange(insight, request))
+            {
+                throw new RestApiRefusal(WebExpress.WebCore.Internationalization.I18N.Translate(request, "kleenestar.core:insight.refused.arrange"));
+            }
         }
 
         /// <summary>

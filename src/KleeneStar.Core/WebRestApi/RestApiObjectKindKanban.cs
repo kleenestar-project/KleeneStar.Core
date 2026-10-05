@@ -86,6 +86,49 @@ namespace KleeneStar.Core.WebRestApi
         protected virtual IEnumerable<Model.Entities.Object> ApplyQuickfilter(IEnumerable<Model.Entities.Object> objects, IRequest request) => objects;
 
         /// <summary>
+        /// Resolves the board the request addresses: who its configuration is stored under,
+        /// which objects it is made of and which classes its lanes and statuses come from. The
+        /// default is the board of the <see cref="Kind"/> in the workspace the route names; an
+        /// insight's board overrides it with the objects its query selects.
+        /// </summary>
+        /// <param name="request">The request that provides the operational context.</param>
+        /// <returns>The board scope, or <see langword="null"/> when the route names no board.</returns>
+        protected virtual KanbanBoardScope ResolveScope(IRequest request)
+        {
+            var workspace = GetWorkspace(request);
+
+            if (workspace is null)
+            {
+                return null;
+            }
+
+            var kind = Kind;
+
+            return new KanbanBoardScope
+            {
+                OwnerId = workspace.Id,
+                BoardKind = kind,
+                Apply = query => query
+                    .WhereEquals(x => x.WorkspaceId, workspace.Id)
+                    .WhereEquals(x => x.Kind, kind),
+                Classes = () => [.. CoreHub.ClassManager
+                    .GetClasses(new Query<Model.Entities.Class>().WhereEquals(x => x.WorkspaceId, workspace.Id))],
+                Catalog = () => KanbanStatusCatalog.Build(workspace.Id, kind)
+            };
+        }
+
+        /// <summary>
+        /// Determines whether the caller may arrange the board - its columns, swimlanes and
+        /// filter. The default asks for the right to change the workspace's content.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the board may be arranged.</returns>
+        protected virtual bool MayArrange(IRequest request)
+        {
+            return ContentAuthorization.MayWriteContent(request);
+        }
+
+        /// <summary>
         /// Returns a <see cref="KleeneStarDbContext"/> so <see cref="CoreHub.ObjectManager"/>
         /// can run its queries; the base class' default query context would cast to null
         /// in the manager and trigger an NRE downstream.
@@ -135,15 +178,15 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         protected override IEnumerable<RestApiKanbanColumn> RetrieveColumns(IRequest request)
         {
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(workspace.Id, Kind);
-            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
+            var catalog = scope.Catalog();
 
             if (board?.Columns is { Count: > 0 })
             {
@@ -185,8 +228,7 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The statuses, or null for a board without workflow statuses.</returns>
         protected override IEnumerable<RestApiKanbanStatus> RetrieveStatuses(IRequest request)
         {
-            var workspace = GetWorkspace(request);
-            var catalog = workspace is null ? null : KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var catalog = ResolveScope(request)?.Catalog();
 
             return catalog is null || catalog.IsEmpty ? null : catalog.Statuses;
         }
@@ -262,14 +304,14 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         protected override IEnumerable<RestApiKanbanSwimlane> RetrieveSwimlanes(IRequest request)
         {
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
 
             if (board?.Swimlanes is { Count: > 0 })
             {
@@ -285,7 +327,7 @@ namespace KleeneStar.Core.WebRestApi
                     };
                 }
 
-                if (HasUnconfiguredActiveObjects(workspace.Id, board, request))
+                if (HasUnconfiguredActiveObjects(scope, board, request))
                 {
                     yield return new RestApiKanbanSwimlane
                     {
@@ -298,12 +340,11 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var populatedClassIds = GetActiveObjects(workspace.Id, ResolveSprint(request), request)
+            var populatedClassIds = GetActiveObjects(scope, ResolveSprint(request), request)
                 .Select(x => x.ClassId)
                 .ToHashSet();
 
-            var classes = CoreHub.ClassManager
-                .GetClasses(new Query<Model.Entities.Class>().WhereEquals(x => x.WorkspaceId, workspace.Id))
+            var classes = scope.Classes()
                 .Where(x => populatedClassIds.Contains(x.Id))
                 .OrderBy(x => x.Name);
 
@@ -327,14 +368,14 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         protected override IEnumerable<RestApiKanbanCard> RetrieveCards(IQuery<Model.Entities.Object> query, IQueryContext context, IRequest request)
         {
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
 
             var categories = ObjectBoardProjection.GetOrderedCategories();
             var categoriesById = categories.ToDictionary(x => x.Id, x => x);
@@ -365,7 +406,7 @@ namespace KleeneStar.Core.WebRestApi
 
             // a status an administrator assigned to a column explicitly places its cards there,
             // ahead of the category the status belongs to
-            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var catalog = scope.Catalog();
             var columnIdByStatusKey = new Dictionary<string, string>();
 
             if (board?.Columns is { Count: > 0 } assignedColumns && !catalog.IsEmpty)
@@ -386,9 +427,7 @@ namespace KleeneStar.Core.WebRestApi
             var identityById = new Dictionary<Guid, Identity>();
             var sprintId = ResolveSprint(request);
 
-            query = query
-                .WhereEquals(x => x.WorkspaceId, workspace.Id)
-                .WhereEquals(x => x.Kind, Kind);
+            query = scope.Apply(query);
 
             var cards = Narrow(CoreHub.ObjectManager.GetObjects(query, context), sprintId, request);
 
@@ -463,22 +502,22 @@ namespace KleeneStar.Core.WebRestApi
         {
             // the framework's save entry point is not virtual; the refusal reaches the user as the
             // board's own error message
-            if (!ContentAuthorization.MayWriteContent(request))
+            if (!MayArrange(request))
             {
                 throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
             }
 
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null || layout?.Columns is null)
+            if (scope is null || layout?.Columns is null)
             {
                 return;
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
             var existingById = board.Columns.ToDictionary(c => c.Id);
             var existingByKey = board.Columns.Where(c => c.Key is not null).ToDictionary(c => c.Key);
-            var catalog = KanbanStatusCatalog.Build(workspace.Id, Kind);
+            var catalog = scope.Catalog();
             var shownKeys = ColumnStatusKeys(board, catalog);
 
             var usedCategoryIds = board.Columns
@@ -610,19 +649,19 @@ namespace KleeneStar.Core.WebRestApi
         {
             // the framework's save entry point is not virtual; the refusal reaches the user as the
             // board's own error message
-            if (!ContentAuthorization.MayWriteContent(request))
+            if (!MayArrange(request))
             {
                 throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
             }
 
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null || layout?.Swimlanes is null)
+            if (scope is null || layout?.Swimlanes is null)
             {
                 return;
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
             var existingById = board.Swimlanes.ToDictionary(s => s.Id);
             var existingByKey = board.Swimlanes.Where(s => s.Key is not null).ToDictionary(s => s.Key);
 
@@ -633,8 +672,7 @@ namespace KleeneStar.Core.WebRestApi
 
             var availableClasses = new Queue<Model.Entities.Class>
             (
-                CoreHub.ClassManager
-                    .GetClasses(new Query<Model.Entities.Class>().WhereEquals(x => x.WorkspaceId, workspace.Id))
+                scope.Classes()
                     .Where(c => !usedClassIds.Contains(c.Id))
                     .OrderBy(c => c.Name)
             );
@@ -687,14 +725,14 @@ namespace KleeneStar.Core.WebRestApi
         {
             // the framework's save entry point is not virtual; the refusal reaches the user as the
             // board's own error message
-            if (!ContentAuthorization.MayWriteContent(request))
+            if (!MayArrange(request))
             {
                 throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.arrange"));
             }
 
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 return;
             }
@@ -707,7 +745,7 @@ namespace KleeneStar.Core.WebRestApi
                 throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.filter", I18N.Translate(request, error)));
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(workspace.Id, Kind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
 
             CoreHub.KanbanBoardManager.SetFilter(board.Id, filter);
         }
@@ -726,14 +764,14 @@ namespace KleeneStar.Core.WebRestApi
                 return wql;
             }
 
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 return null;
             }
 
-            return CoreHub.KanbanBoardManager.GetBoard(workspace.Id, Kind)?.Filter;
+            return CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind)?.Filter;
         }
 
         /// <summary>
@@ -841,18 +879,16 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Returns the active objects of the kind in the workspace, optionally narrowed to
-        /// the objects committed to <paramref name="sprintId"/>.
+        /// Returns the active objects of the board, optionally narrowed to the objects
+        /// committed to <paramref name="sprintId"/>.
         /// </summary>
-        /// <param name="workspaceId">The workspace id.</param>
-        /// <param name="sprintId">The sprint to scope to, or <see langword="null"/> for the whole workspace.</param>
+        /// <param name="scope">The board scope.</param>
+        /// <param name="sprintId">The sprint to scope to, or <see langword="null"/> for the whole board.</param>
         /// <param name="request">The request that provides the operational context for the quickfilter.</param>
         /// <returns>The active objects.</returns>
-        private IEnumerable<Model.Entities.Object> GetActiveObjects(Guid workspaceId, Guid? sprintId, IRequest request)
+        private IEnumerable<Model.Entities.Object> GetActiveObjects(KanbanBoardScope scope, Guid? sprintId, IRequest request)
         {
-            var query = new Query<Model.Entities.Object>()
-                .WhereEquals(x => x.WorkspaceId, workspaceId)
-                .WhereEquals(x => x.Kind, Kind);
+            var query = scope.Apply(new Query<Model.Entities.Object>());
 
             return Narrow(CoreHub.ObjectManager.GetObjects(query), sprintId, request);
         }
@@ -862,18 +898,18 @@ namespace KleeneStar.Core.WebRestApi
         /// a customized board's swimlane list, meaning the "Other" catch-all swimlane must be
         /// shown so the object's card is not silently dropped.
         /// </summary>
-        /// <param name="workspaceId">The workspace id.</param>
+        /// <param name="scope">The board scope.</param>
         /// <param name="board">The customized board.</param>
         /// <param name="request">The request that provides the operational context.</param>
         /// <returns><see langword="true"/> when at least one active object has no configured swimlane.</returns>
-        private bool HasUnconfiguredActiveObjects(Guid workspaceId, KanbanBoard board, IRequest request)
+        private bool HasUnconfiguredActiveObjects(KanbanBoardScope scope, KanbanBoard board, IRequest request)
         {
             var configuredClassIds = board.Swimlanes
                 .Where(s => s.ClassId.HasValue)
                 .Select(s => s.ClassId!.Value)
                 .ToHashSet();
 
-            return GetActiveObjects(workspaceId, ResolveSprint(request), request)
+            return GetActiveObjects(scope, ResolveSprint(request), request)
                 .Any(x => !configuredClassIds.Contains(x.ClassId));
         }
 

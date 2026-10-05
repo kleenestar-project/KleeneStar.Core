@@ -68,7 +68,50 @@ namespace KleeneStar.Core.WebRestApi
         /// workspace defines no class of that kind.</returns>
         public static ObjectTableColumnCatalog Build(Guid? workspaceId, string kind, IRequest request)
         {
-            var classes = ResolveClasses(workspaceId, kind);
+            return Build(ResolveClasses(workspaceId, kind), request);
+        }
+
+        /// <summary>
+        /// Builds the catalog over an arbitrary set of classes - the classes the objects of an
+        /// insight come from, whichever workspaces and kinds those are.
+        /// </summary>
+        /// <param name="classIds">The ids of the classes whose fields become columns.</param>
+        /// <param name="request">The request used to localize the labels and bind the endpoint.</param>
+        /// <returns>The catalog.</returns>
+        public static ObjectTableColumnCatalog Build(IEnumerable<Guid> classIds, IRequest request)
+        {
+            var ids = (classIds ?? []).Distinct().ToList();
+
+            if (ids.Count == 0)
+            {
+                return Build((IReadOnlyList<ObjectTableClassContext>)[], request);
+            }
+
+            using var context = ModelHub.CreateDbContext();
+            var query = new Query<Class>()
+                .Where(x => ids.Contains(x.Id));
+
+            return Build
+            (
+                [
+                    .. CoreHub.ClassManager
+                        .GetClasses(query, context)
+                        .Where(x => x.State == ClassState.Active)
+                        .OrderBy(x => x.Name)
+                        .Select(ObjectTableClassContext.Build)
+                ],
+                request
+            );
+        }
+
+        /// <summary>
+        /// Builds the catalog over resolved class contexts.
+        /// </summary>
+        /// <param name="classes">The classes whose fields become columns.</param>
+        /// <param name="request">The request used to localize the labels and bind the endpoint.</param>
+        /// <returns>The catalog.</returns>
+        private static ObjectTableColumnCatalog Build(IReadOnlyList<ObjectTableClassContext> classes, IRequest request)
+        {
             var columns = new List<ObjectTableColumn>();
 
             columns.AddRange(BuildSystemColumns(request));

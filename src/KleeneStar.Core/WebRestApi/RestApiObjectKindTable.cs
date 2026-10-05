@@ -116,8 +116,6 @@ namespace KleeneStar.Core.WebRestApi
         [Method(RequestMethod.GET)]
         public virtual IResponse Get(IRequest request)
         {
-            var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>()?.Value;
-            var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(workspaceKey);
             var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
 
             var pageNumber = Math.Max(0, ParseInt(request, "p", 0));
@@ -136,7 +134,7 @@ namespace KleeneStar.Core.WebRestApi
                 .Select(x => x.Id)
                 .ToHashSet();
 
-            var objects = GetObjects(workspace?.Id).AsEnumerable();
+            var objects = RetrieveScope(request).AsEnumerable();
 
             // the archived chip flips the lifecycle scope: without it the table shows the
             // active objects, with it the archived history
@@ -173,7 +171,7 @@ namespace KleeneStar.Core.WebRestApi
             // search
             objects = CustomQuickfilterSupport.Apply(filters, objects, ViewKey);
 
-            var catalog = ObjectTableColumnCatalog.Build(workspace?.Id, Kind, request);
+            var catalog = BuildCatalog(request);
             var layout = ResolveLayout(catalog, request);
 
             var filtered = objects.ToList();
@@ -240,9 +238,7 @@ namespace KleeneStar.Core.WebRestApi
                 return new ResponseBadRequest(new StatusMessage("Missing column configuration."));
             }
 
-            var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>()?.Value;
-            var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(workspaceKey);
-            var catalog = ObjectTableColumnCatalog.Build(workspace?.Id, Kind, request);
+            var catalog = BuildCatalog(request);
             var known = catalog.Columns.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -287,7 +283,7 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The layout key.</returns>
         private string ResolveLayoutKey(IRequest request)
         {
-            var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>()?.Value ?? string.Empty;
+            var scope = LayoutScope(request) ?? string.Empty;
             var view = request?.GetParameter(ViewParameter)?.Value;
 
             if (string.IsNullOrWhiteSpace(view) || view == "null")
@@ -295,7 +291,7 @@ namespace KleeneStar.Core.WebRestApi
                 view = "default";
             }
 
-            return $"{GetType().FullName}:{workspaceKey}:{view}";
+            return $"{GetType().FullName}:{scope}:{view}";
         }
 
         /// <summary>
@@ -394,23 +390,61 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Fetches the objects of the kind in the supplied workspace. Returns an empty list
-        /// when the workspace is unknown.
+        /// Fetches the objects the table lists, in every state - the archived chip decides which
+        /// state is shown. The default is the objects of the <see cref="Kind"/> in the workspace
+        /// the route names; an insight's table overrides it with the objects its query selects.
         /// </summary>
-        /// <param name="workspaceId">The id of the workspace, or <see langword="null"/>.</param>
-        /// <returns>The workspace's objects of the kind. The list may be empty.</returns>
-        private IReadOnlyList<ObjectEntity> GetObjects(Guid? workspaceId)
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The objects. The list may be empty.</returns>
+        protected virtual IReadOnlyList<ObjectEntity> RetrieveScope(IRequest request)
         {
-            if (workspaceId is null)
+            var workspace = ResolveWorkspace(request);
+
+            if (workspace is null)
             {
                 return [];
             }
 
             var query = new Query<ObjectEntity>()
-                .WhereEquals(x => x.WorkspaceId, workspaceId.Value)
+                .WhereEquals(x => x.WorkspaceId, workspace.Id)
                 .WhereEquals(x => x.Kind, Kind);
 
             return [.. CoreHub.ObjectManager.GetObjects(query)];
+        }
+
+        /// <summary>
+        /// Builds the columns the table can offer. The default offers the fields of the classes
+        /// of the <see cref="Kind"/> in the workspace the route names.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The column catalog.</returns>
+        private protected virtual ObjectTableColumnCatalog BuildCatalog(IRequest request)
+        {
+            return ObjectTableColumnCatalog.Build(ResolveWorkspace(request)?.Id, Kind, request);
+        }
+
+        /// <summary>
+        /// Returns what the stored column layouts of the table are kept apart by besides the
+        /// view - the workspace key by default, so two workspaces' tables of the same view name
+        /// never share a layout.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The scope part of the layout key.</returns>
+        protected virtual string LayoutScope(IRequest request)
+        {
+            return request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+        }
+
+        /// <summary>
+        /// Resolves the workspace the route names.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The workspace, or <see langword="null"/>.</returns>
+        private static Model.Entities.Workspace ResolveWorkspace(IRequest request)
+        {
+            var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+
+            return CoreHub.WorkspaceManager.GetWorkspaceByKey(workspaceKey);
         }
 
         /// <summary>
@@ -481,7 +515,7 @@ namespace KleeneStar.Core.WebRestApi
             // the reading view is addressed through the kind catalog rather than through a
             // route named here, so a kind brings its own detail page without this base
             // knowing it
-            var uri = ObjectKindCatalog.ResolveDetailUri(Kind, entity.Key);
+            var uri = ObjectKindCatalog.ResolveDetailUri(entity.Kind ?? Kind, entity.Key);
             var starred = starredIds.Contains(entity.Id);
 
             // a parent chain that loops back on itself would otherwise recurse forever

@@ -294,6 +294,99 @@ namespace KleeneStar.Core.Test.WebManager
         };
 
         /// <summary>
+        /// Verifies that a tab added under a name the insight already carries is numbered, and
+        /// that tabs are appended behind the ones there are.
+        /// </summary>
+        [Fact]
+        public void AddView_NumbersATakenNameAndAppends()
+        {
+            Seed(nameof(AddView_NumbersATakenNameAndAppends));
+
+            var insight = Sample("Tabs");
+            CoreHub.InsightManager.Add(insight);
+
+            CoreHub.InsightManager.AddView(new InsightView { InsightId = insight.Id, Name = "Objects", ViewType = InsightViewTypes.Objects });
+            CoreHub.InsightManager.AddView(new InsightView { InsightId = insight.Id, Name = "Objects", ViewType = InsightViewTypes.Objects });
+
+            var views = CoreHub.InsightManager.GetViews(insight.Id);
+
+            Assert.Equal(["Objects", "Objects (2)"], views.Select(x => x.Name));
+            Assert.Equal([0, 1], views.Select(x => x.Order));
+        }
+
+        /// <summary>
+        /// Verifies that a new insight gets the objects and the reports tab, and that an insight
+        /// that has tabs is left alone.
+        /// </summary>
+        [Fact]
+        public void AddDefaultViews_OnlyOnAnInsightWithoutTabs()
+        {
+            Seed(nameof(AddDefaultViews_OnlyOnAnInsightWithoutTabs));
+
+            var insight = Sample("Defaults");
+            CoreHub.InsightManager.Add(insight);
+
+            CoreHub.InsightManager.AddDefaultViews(insight.Id, key => key);
+            CoreHub.InsightManager.AddDefaultViews(insight.Id, key => key);
+
+            Assert.Equal
+            (
+                [InsightViewTypes.Objects, InsightViewTypes.Reports],
+                CoreHub.InsightManager.GetViews(insight.Id).Select(x => x.ViewType)
+            );
+        }
+
+        /// <summary>
+        /// Verifies that a copy takes the tabs and a board of its own with the same widgets.
+        /// </summary>
+        [Fact]
+        public void CopyViews_CopiesTabsAndBoard()
+        {
+            Seed(nameof(CopyViews_CopiesTabsAndBoard));
+
+            var source = SampleWithBoard("Source");
+            CoreHub.InsightManager.Add(source);
+            CoreHub.InsightManager.AddView(new InsightView { InsightId = source.Id, Name = "Board", ViewType = InsightViewTypes.Dashboard });
+            CoreHub.InsightManager.AddView(new InsightView { InsightId = source.Id, Name = "Charts", ViewType = InsightViewTypes.Reports });
+
+            var target = new Insight(Guid.NewGuid()) { Name = "Target", Created = DateTime.UtcNow, Updated = DateTime.UtcNow };
+            CoreHub.InsightManager.Add(target);
+
+            CoreHub.InsightManager.CopyViews(source.Id, target.Id);
+
+            var copied = CoreHub.InsightManager.GetInsight(target.Id);
+            var original = CoreHub.InsightManager.GetInsight(source.Id);
+
+            Assert.Equal(["Board", "Charts"], CoreHub.InsightManager.GetViews(target.Id).Select(x => x.Name));
+            Assert.Equal(original.Columns.Count, copied.Columns.Count);
+            Assert.Empty(copied.Columns.Select(x => x.Id).Intersect(original.Columns.Select(x => x.Id)));
+            Assert.Equal
+            (
+                original.Columns.SelectMany(x => x.Widgets).Select(x => x.Name).OrderBy(x => x),
+                copied.Columns.SelectMany(x => x.Widgets).Select(x => x.Name).OrderBy(x => x)
+            );
+        }
+
+        /// <summary>
+        /// Verifies that removing a tab removes it and nothing else.
+        /// </summary>
+        [Fact]
+        public void RemoveView_RemovesTheTab()
+        {
+            Seed(nameof(RemoveView_RemovesTheTab));
+
+            var insight = Sample("Remove");
+            CoreHub.InsightManager.Add(insight);
+            CoreHub.InsightManager.AddDefaultViews(insight.Id, key => key);
+
+            var first = CoreHub.InsightManager.GetViews(insight.Id)[0];
+
+            Assert.True(CoreHub.InsightManager.RemoveView(first.Id));
+            Assert.False(CoreHub.InsightManager.RemoveView(first.Id));
+            Assert.Single(CoreHub.InsightManager.GetViews(insight.Id));
+        }
+
+        /// <summary>
         /// Creates a sample <see cref="Insight"/> with a fresh GUID.
         /// </summary>
         /// <param name="name">The insight name.</param>

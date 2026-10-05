@@ -1,5 +1,4 @@
-﻿using KleeneStar.Core.WebControl;
-using WebExpress.WebApp.WebApiControl;
+﻿using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -34,10 +33,9 @@ namespace KleeneStar.Core.WebFragment.Insight
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights.UniqueName>().ToString())};
 
         /// <summary>
-        /// Gets the picker of the insight type - what kind of view the insight is. It stands on
-        /// this dialog alone: the type is chosen once and kept by every edit and clone.
+        /// Gets the prompt of the query that selects the objects the insight shows.
         /// </summary>
-        public InsightTypeSelectionControl InsightType { get; } = new();
+        public ControlDataWqlPrompt Query { get; } = InsightFormItems.BuildQuery("insight-add-query");
 
         /// <summary>
         /// Gets the input tag definition for the category field.
@@ -81,7 +79,7 @@ namespace KleeneStar.Core.WebFragment.Insight
             : base(fragmentContext)
         {
             Add(InsightName);
-            Add(InsightType);
+            Add(InsightFormItems.BuildQueryPanel(Query));
             Add(Category);
             Add(Description);
             Add(InsightState);

@@ -54,6 +54,36 @@ namespace KleeneStar.Core.WebRestApi
         protected virtual IEnumerable<Model.Entities.Object> ApplyQuickfilter(IEnumerable<Model.Entities.Object> objects, IRequest request) => objects;
 
         /// <summary>
+        /// Returns the query over the objects the view is made of. The default is the objects of
+        /// the <see cref="Kind"/> in the workspace the route names; an insight's view overrides
+        /// it with the objects its query selects.
+        /// </summary>
+        /// <param name="request">The request that provides the operational context.</param>
+        /// <returns>The query, or <see langword="null"/> when the route names nothing to show.</returns>
+        protected virtual IQuery<Model.Entities.Object> ResolveScope(IRequest request)
+        {
+            var workspace = GetWorkspace(request);
+
+            return workspace is null
+                ? null
+                : new Query<Model.Entities.Object>()
+                    .WhereEquals(x => x.WorkspaceId, workspace.Id)
+                    .WhereEquals(x => x.Kind, Kind);
+        }
+
+        /// <summary>
+        /// Determines whether an object an edit addresses belongs to the view. The default
+        /// accepts the objects of the <see cref="Kind"/>.
+        /// </summary>
+        /// <param name="entity">The object, already read through the object manager.</param>
+        /// <param name="request">The request that provides the operational context.</param>
+        /// <returns><see langword="true"/> when the object is one the view shows.</returns>
+        protected virtual bool InScope(Model.Entities.Object entity, IRequest request)
+        {
+            return string.Equals(entity.Kind, Kind, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Returns one container per class that has objects on the plan, followed by one bar
         /// per active object of the kind.
         /// </summary>
@@ -61,14 +91,14 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The tasks of the plan.</returns>
         protected override IEnumerable<RestApiGanttTask> RetrieveTasks(IRequest request)
         {
-            var workspace = GetWorkspace(request);
+            var scope = ResolveScope(request);
 
-            if (workspace is null)
+            if (scope is null)
             {
                 yield break;
             }
 
-            var objects = GetActiveObjects(workspace.Id, request);
+            var objects = GetActiveObjects(scope, request);
             var onPlan = objects.Select(x => x.Id).ToHashSet();
 
             var categories = ObjectBoardProjection.GetOrderedCategories();
@@ -188,7 +218,7 @@ namespace KleeneStar.Core.WebRestApi
 
                 var entity = CoreHub.ObjectManager.GetObject(objectId);
 
-                if (entity is null || !string.Equals(entity.Kind, Kind, StringComparison.OrdinalIgnoreCase))
+                if (entity is null || !InScope(entity, request))
                 {
                     return new ResponseNotFound(new StatusMessage($"task '{segments[1]}' not found."));
                 }
@@ -275,16 +305,12 @@ namespace KleeneStar.Core.WebRestApi
         /// Returns the active objects of the kind in the workspace, ordered by their planned
         /// start so the grid reads chronologically.
         /// </summary>
-        /// <param name="workspaceId">The workspace id.</param>
+        /// <param name="scope">The query over the objects of the view.</param>
         /// <param name="request">The request that provides the operational context.</param>
         /// <returns>The objects on the plan.</returns>
-        private List<Model.Entities.Object> GetActiveObjects(Guid workspaceId, IRequest request)
+        private List<Model.Entities.Object> GetActiveObjects(IQuery<Model.Entities.Object> scope, IRequest request)
         {
-            var query = new Query<Model.Entities.Object>()
-                .WhereEquals(x => x.WorkspaceId, workspaceId)
-                .WhereEquals(x => x.Kind, Kind);
-
-            var objects = CoreHub.ObjectManager.GetObjects(query)
+            var objects = CoreHub.ObjectManager.GetObjects(scope)
                 .Where(x => x.State == WorkspaceState.Active);
 
             return [.. ApplyQuickfilter(objects, request).OrderBy(x => x.Created).ThenBy(x => x.Key)];

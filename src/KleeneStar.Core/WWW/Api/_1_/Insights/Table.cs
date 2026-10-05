@@ -1,6 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebControl;
-using KleeneStar.Core.WebInsight;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -75,8 +74,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
 
             yield return new RestApiTableColumn()
             {
-                Id = "type",
-                Label = "Type",
+                Id = "query",
+                Label = "Query",
                 Visible = true
             };
 
@@ -209,18 +208,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         /// </summary>
         /// <param name="row">The insight of the row.</param>
         /// <param name="order">The ids of the columns, in the order they are shown.</param>
-        /// <param name="request">The request, for the language of the type label.</param>
+        /// <param name="request">The request.</param>
         /// <returns>The cells.</returns>
         private static List<RestApiTableCell> Cells(Model.Entities.Insight row, IEnumerable<string> order, IRequest request)
         {
-            // a type nobody registered (its plugin is gone) is shown by its key rather than
-            // not at all, so the row still says what it was
-            var type = InsightTypeCatalog.Get(row.Type);
-
             var cells = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
                 ["name"] = row.Name,
-                ["type"] = type is null ? row.Type : I18N.Translate(request, type.Label),
+                ["query"] = row.Query,
                 ["description"] = ProseText.ToPlainText(row.Description),
                 ["state"] = row.State.ToString()
             };

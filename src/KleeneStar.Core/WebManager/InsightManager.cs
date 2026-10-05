@@ -233,6 +233,234 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the tabs of an insight in display order.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <returns>The tabs, ordered by position.</returns>
+        public IReadOnlyList<InsightView> GetViews(Guid insightId)
+        {
+            var query = new Query<InsightView>()
+                .WhereEquals(x => x.InsightId, insightId);
+
+            return [.. ModelHub.GetInsightViews(query)
+                .OrderBy(x => x.Order)
+                .ThenBy(x => x.Created)];
+        }
+
+        /// <summary>
+        /// Returns a tab by its id.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <returns>The tab, or <see langword="null"/> when there is none.</returns>
+        public InsightView GetView(Guid viewId)
+        {
+            var query = new Query<InsightView>()
+                .WhereEquals(x => x.Id, viewId);
+
+            return ModelHub.GetInsightViews(query).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Adds a tab to an insight, behind the tabs it has, under a name no other tab of the
+        /// insight carries.
+        /// </summary>
+        /// <param name="view">The tab to add. Its insight must exist. Cannot be null.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        public IInsightManager AddView(InsightView view)
+        {
+            ArgumentNullException.ThrowIfNull(view);
+
+            var insight = GetInsight(view.InsightId);
+
+            if (insight is null)
+            {
+                return this;
+            }
+
+            var existing = GetViews(view.InsightId);
+
+            view.Name = UniqueName(existing, string.IsNullOrWhiteSpace(view.Name) ? view.ViewType : view.Name.Trim());
+            view.Order = existing.Count == 0 ? 0 : existing.Max(x => x.Order) + 1;
+            view.Created = view.Created == default ? DateTime.UtcNow : view.Created;
+            view.Updated = DateTime.UtcNow;
+
+            ModelHub.Add(view);
+
+            InsightUpdated?.Invoke(this, insight);
+
+            return this;
+        }
+
+        /// <summary>
+        /// Removes a tab.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <returns><see langword="true"/> when a tab was removed.</returns>
+        public bool RemoveView(Guid viewId)
+        {
+            var view = GetView(viewId);
+
+            if (view is null)
+            {
+                return false;
+            }
+
+            ModelHub.Remove(view);
+
+            var insight = GetInsight(view.InsightId);
+
+            if (insight is not null)
+            {
+                InsightUpdated?.Invoke(this, insight);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Puts the tabs of an insight into the given order.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <param name="order">The tab ids in their new order. Cannot be null.</param>
+        /// <returns><see langword="true"/> when the order was applied.</returns>
+        public bool ReorderViews(Guid insightId, IReadOnlyList<Guid> order)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+
+            return ModelHub.SetInsightViewOrder(insightId, order);
+        }
+
+        /// <summary>
+        /// Gives an insight the tabs a new insight starts with - the objects and the reports -
+        /// unless it has tabs already.
+        /// </summary>
+        /// <param name="insightId">The id of the insight.</param>
+        /// <param name="nameOf">Resolves the name of a tab from its view type's label key.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        public IInsightManager AddDefaultViews(Guid insightId, Func<string, string> nameOf)
+        {
+            if (GetViews(insightId).Count > 0)
+            {
+                return this;
+            }
+
+            foreach (var key in new[] { WebInsight.InsightViewTypeCatalog.Default, InsightViewTypes.Reports })
+            {
+                var type = WebInsight.InsightViewTypeCatalog.Get(key);
+
+                if (type is null)
+                {
+                    continue;
+                }
+
+                AddView(new InsightView
+                {
+                    InsightId = insightId,
+                    ViewType = WebInsight.InsightViewTypeCatalog.Normalize(type.Key),
+                    Name = nameOf?.Invoke(type.Label) ?? type.Key,
+                    State = ObjectViewState.Active
+                });
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Copies the tabs and the dashboard of one insight onto another that has none.
+        /// </summary>
+        /// <param name="sourceId">The insight copied from.</param>
+        /// <param name="targetId">The insight copied to.</param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        public IInsightManager CopyViews(Guid sourceId, Guid targetId)
+        {
+            var source = GetInsight(sourceId);
+
+            if (source is null || GetInsight(targetId) is null || GetViews(targetId).Count > 0)
+            {
+                return this;
+            }
+
+            foreach (var view in GetViews(sourceId))
+            {
+                AddView(new InsightView
+                {
+                    InsightId = targetId,
+                    Name = view.Name,
+                    ViewType = view.ViewType,
+                    Configuration = view.Configuration,
+                    State = view.State
+                });
+            }
+
+            // the dashboard is the insight's, so a copy of its dashboard tabs needs the board
+            // they show; fresh ids keep the two boards apart from here on
+            if (source.Columns is { Count: > 0 })
+            {
+                SetBoard(targetId,
+                [
+                    .. source.Columns
+                        .OrderBy(x => x.Position)
+                        .Select(x => new DashboardColumn(Guid.Empty)
+                        {
+                            Name = x.Name,
+                            Size = x.Size,
+                            Color = x.Color,
+                            Widgets = [.. (x.Widgets ?? [])
+                                .OrderBy(w => w.Position)
+                                .Select(w => new Widget(Guid.Empty)
+                                {
+                                    Type = w.Type,
+                                    Name = w.Name,
+                                    Color = w.Color,
+                                    Params = w.Params,
+                                    Wql = w.Wql
+                                })]
+                        })
+                ]);
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Returns a name based on <paramref name="seed"/> that no tab of the list carries.
+        /// </summary>
+        /// <param name="existing">The tabs of the insight.</param>
+        /// <param name="seed">The desired name.</param>
+        /// <returns>The name, with a number appended when the seed is taken.</returns>
+        private static string UniqueName(IEnumerable<InsightView> existing, string seed)
+        {
+            var taken = existing
+                .Select(x => x.Name ?? string.Empty)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            seed = string.IsNullOrWhiteSpace(seed) ? "View" : seed;
+
+            // the name column holds 64 characters; leave room for the suffix
+            if (seed.Length > 56)
+            {
+                seed = seed[..56];
+            }
+
+            if (!taken.Contains(seed))
+            {
+                return seed;
+            }
+
+            for (var i = 2; i < 1000; i++)
+            {
+                var candidate = $"{seed} ({i})";
+
+                if (!taken.Contains(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return Guid.NewGuid().ToString("N");
+        }
+
+        /// <summary>
         /// Release of unmanaged resources reserved during use.
         /// </summary>
         public void Dispose()
