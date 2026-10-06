@@ -100,6 +100,11 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             _objectManager = objectManager;
             _commentManager = commentManager;
+
+            // the editors of a new, an edited and an answering comment offer the objects to
+            // link from the link dialog, like every other rich-text editor of the application
+            Comments.LinksService<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
+            Composer.LinksService<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
         }
 
         /// <summary>

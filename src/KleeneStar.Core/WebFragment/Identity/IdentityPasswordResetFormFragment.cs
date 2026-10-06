@@ -19,7 +19,8 @@ namespace KleeneStar.Core.WebFragment.Identity
     /// </summary>
     /// <remarks>
     /// The form carries nothing but the account; submitting it issues the link, which the
-    /// dialog then shows - the only time it can be read - for the administrator to hand over.
+    /// dialog then shows - the only time it can be read - for the administrator to hand over,
+    /// and which is mailed to the account too where the installation delivers mail.
     /// An external account gets a sentence instead of the form: its password is its source's.
     /// </remarks>
     [Section<SectionContentPreferences>]
@@ -38,9 +39,22 @@ namespace KleeneStar.Core.WebFragment.Identity
         /// <summary>
         /// Gets the text explaining what the link does.
         /// </summary>
+        /// <remarks>
+        /// Where the link will also be mailed, the text says so before the submit rather than
+        /// only after it: whether a link is mailed decides whether it has to be handed over.
+        /// </remarks>
         public ControlFormItemStaticText Explanation { get; } = new()
         {
-            Text = _ => "kleenestar.core:setting.identity.password.description"
+            Text = renderContext =>
+            {
+                var description = I18N.Translate(renderContext, "kleenestar.core:setting.identity.password.description");
+                var parameter = renderContext?.Request?.GetParameter<IdentityIdParameter>();
+                var account = parameter is null ? null : CoreHub.IdentityManager.GetIdentity(parameter);
+
+                return PasswordResetMail.WouldSend(account)
+                    ? $"{description} {I18N.Translate(renderContext, "kleenestar.core:setting.identity.password.mail.notice", account.Email.Trim())}"
+                    : description;
+            }
         };
 
         /// <summary>

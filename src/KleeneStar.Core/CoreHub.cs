@@ -14,6 +14,7 @@ using WebExpress.WebCore.WebParameter;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebNotification;
+using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core
 {
@@ -757,6 +758,20 @@ namespace KleeneStar.Core
                     // failing here would lose the picture the user just uploaded
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns the address of the link library, for <c>ControlFormItemInputText.LinkLibraryUri</c>.
+        /// </summary>
+        /// <param name="renderContext">The render context.</param>
+        /// <returns>The address, or <see langword="null"/> where the sitemap does not know it.</returns>
+        public static IUri EditorLinkLibrary(IRenderControlContext renderContext)
+        {
+            // without a running host there is no sitemap, and an editor without a library is
+            // still an editor
+            return CoreHub.ComponentHub?.SitemapManager is null || CoreHub.ApplicationContext is null
+                ? null
+                : CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
         }
     }
 }

@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebCore.WebFragment;
@@ -62,6 +63,10 @@ namespace KleeneStar.Core.WebFragment.Object
 
             Body.Name = _ => nameof(Model.Entities.Object.Description);
             Body.Placeholder = _ => "kleenestar.core:object.description.placeholder";
+
+            // a page is where other pages and issues are linked most; the link dialog offers
+            // them to pick rather than to paste
+            Body.LinkLibraryUri = CoreHub.EditorLinkLibrary;
 
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Prose.Index>();
             this.DraftService<global::KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_.Index>();

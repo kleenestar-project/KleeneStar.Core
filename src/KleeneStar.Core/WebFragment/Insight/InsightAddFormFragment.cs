@@ -1,4 +1,5 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -57,6 +58,7 @@ namespace KleeneStar.Core.WebFragment.Insight
             Label = _ => "kleenestar.core:insight.description.label",
             Placeholder = _ => "kleenestar.core:insight.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

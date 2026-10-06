@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebWorkspaceTemplate;
 using System.Collections.Generic;
 using System.Linq;
@@ -122,6 +123,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
             Label = _ => "kleenestar.core:workspace.description.label",
             Placeholder = _ => "kleenestar.core:workspace.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

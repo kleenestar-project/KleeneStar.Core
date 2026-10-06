@@ -19,8 +19,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
     /// Issues the one-time links that set the password of an internal account.
     /// </summary>
     /// <remarks>
-    /// There is no mail delivery, so the link is answered to the administrator who issued it -
-    /// in the create response, the only time its secret can be read - and handed over by them.
+    /// The link is answered to the administrator who issued it - in the create response, the
+    /// only time its secret can be read - and handed over by them. Where the installation
+    /// delivers mail (<c>WebExpress:Email</c>) and the account has an address, it is mailed to
+    /// the account as well (<see cref="WebIdentity.PasswordResetMail"/>) and the answer says
+    /// whether that worked; it is still shown, because an accepted message may never arrive.
     /// The endpoint only creates: a stored link is a hash, and there is nothing in it worth
     /// listing. Issuing is for the account administrators alone (<see cref="AccountAuthorization"/>),
     /// because a link for somebody's account <em>is</em> that account; an external account is
@@ -140,9 +143,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
 
             newItem = result.Reset;
 
+            var link = BuildLink(request, secret);
+            var account = CoreHub.IdentityManager.GetIdentity(newItem.IdentityId);
+            var mailed = WebIdentity.PasswordResetMail.Send(account, newItem, link, request?.Culture);
+
             return new RestApiCrudResultCreate
             {
-                Message = Describe(request, secret, newItem)
+                Message = Describe(request, link, newItem) + DescribeMail(request, mailed, account)
             };
         }
 
@@ -154,17 +161,39 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
         /// built from the request's own address, which a client can say anything about.
         /// </remarks>
         /// <param name="request">The request.</param>
-        /// <param name="secret">The secret.</param>
+        /// <param name="link">The link carrying the secret.</param>
         /// <param name="reset">The stored link.</param>
         /// <returns>The markup.</returns>
-        private static string Describe(IRequest request, string secret, PasswordReset reset)
+        private static string Describe(IRequest request, string link, PasswordReset reset)
         {
-            var link = BuildLink(request, secret);
             var expires = reset.Expires.ToLocalTime().ToString("g", request?.Culture ?? CultureInfo.CurrentCulture);
             var intro = I18N.Translate(request, "kleenestar.core:setting.identity.password.issued", expires);
 
             return $"<p>{WebUtility.HtmlEncode(intro)}</p>"
                 + $"<input type=\"text\" class=\"form-control\" readonly=\"readonly\" onfocus=\"this.select()\" value=\"{WebUtility.HtmlEncode(link)}\"/>";
+        }
+
+        /// <summary>
+        /// Composes the sentence on the mailed copy of the link, or nothing where none was meant
+        /// to be sent.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <param name="outcome">What happened to the message.</param>
+        /// <param name="account">The account the link was issued for.</param>
+        /// <returns>The markup.</returns>
+        private static string DescribeMail(IRequest request, WebIdentity.PasswordResetMailOutcome outcome, Identity account)
+        {
+            var key = outcome switch
+            {
+                WebIdentity.PasswordResetMailOutcome.Sent => "kleenestar.core:setting.identity.password.mail.sent",
+                WebIdentity.PasswordResetMailOutcome.AlreadySent => "kleenestar.core:setting.identity.password.mail.already",
+                WebIdentity.PasswordResetMailOutcome.Failed => "kleenestar.core:setting.identity.password.mail.failed",
+                _ => null
+            };
+
+            return key is null
+                ? string.Empty
+                : $"<p class=\"mt-2\">{WebUtility.HtmlEncode(I18N.Translate(request, key, account?.Email?.Trim()))}</p>";
         }
 
         /// <summary>
@@ -218,9 +247,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
                 return page;
             }
 
-            // the header is the issuing administrator's own browser speaking, and the link is shown
-            // to them rather than mailed to somebody - but a value that is no bare authority is
-            // still not put in front of a secret
+            // the header is the issuing administrator's own browser speaking - only an administrator
+            // issues a link, so even the mailed copy is built on an origin they used - but a value
+            // that is no bare authority is still not put in front of a secret
             var origin = Uri.TryCreate($"{current.Scheme}://{requestHost?.Trim()}", UriKind.Absolute, out var host)
                 && host.PathAndQuery == "/" && string.IsNullOrEmpty(host.UserInfo)
                     ? host.GetLeftPart(UriPartial.Authority)

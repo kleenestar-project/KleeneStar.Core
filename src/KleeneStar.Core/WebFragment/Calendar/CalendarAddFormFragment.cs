@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
@@ -41,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Calendar
             Label = _ => "kleenestar.core:calendar.description.label",
             Placeholder = _ => "kleenestar.core:calendar.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

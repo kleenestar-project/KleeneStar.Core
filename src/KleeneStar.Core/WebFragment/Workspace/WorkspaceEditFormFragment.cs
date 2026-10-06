@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
 using System.Reflection;
 using WebExpress.WebApp.WebApiControl;
@@ -68,6 +69,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
             Label = _ => "kleenestar.core:workspace.description.label",
             Placeholder = _ => "kleenestar.core:workspace.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

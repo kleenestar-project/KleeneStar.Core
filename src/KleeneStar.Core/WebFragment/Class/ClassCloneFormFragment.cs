@@ -48,6 +48,7 @@ namespace KleeneStar.Core.WebFragment.Class
             Label = _ => "kleenestar.core:class.description.label",
             Placeholder = _ => "kleenestar.core:class.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

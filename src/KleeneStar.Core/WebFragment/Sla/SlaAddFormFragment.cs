@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
@@ -43,6 +44,7 @@ namespace KleeneStar.Core.WebFragment.Sla
             Label = _ => "kleenestar.core:sla.description.label",
             Placeholder = _ => "kleenestar.core:sla.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

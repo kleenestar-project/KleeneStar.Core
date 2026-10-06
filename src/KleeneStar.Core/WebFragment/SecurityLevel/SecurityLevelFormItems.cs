@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebUI.WebControl;
@@ -45,6 +46,7 @@ namespace KleeneStar.Core.WebFragment.SecurityLevel
                 Label = _ => "kleenestar.core:securitylevel.description.label",
                 Placeholder = _ => "kleenestar.core:securitylevel.description.placeholder",
                 Format = _ => TypeEditTextFormat.Wysiwyg,
+                LinkLibraryUri = CoreHub.EditorLinkLibrary,
                 Required = _ => false
             };
         }

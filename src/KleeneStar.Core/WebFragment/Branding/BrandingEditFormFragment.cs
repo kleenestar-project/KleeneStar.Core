@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -62,6 +63,7 @@ namespace KleeneStar.Core.WebFragment.Branding
             Placeholder = _ => "kleenestar.core:setting.branding.welcome.placeholder",
             Help = _ => "kleenestar.core:setting.branding.welcome.help",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
@@ -41,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Tenant
             Label = _ => "kleenestar.core:setting.tenant.description.label",
             Placeholder = _ => "kleenestar.core:setting.tenant.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

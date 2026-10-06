@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebFragment.Search;
 using System;
 using System.Linq;
@@ -74,6 +75,7 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
                 Label = _ => "kleenestar.core:search.saved.description.label",
                 Placeholder = _ => "kleenestar.core:search.saved.description.placeholder",
                 Format = _ => TypeEditTextFormat.Wysiwyg,
+                LinkLibraryUri = CoreHub.EditorLinkLibrary,
                 Required = _ => false
             };
         }

@@ -36,6 +36,15 @@ namespace KleeneStar.Core.WebManager
         IEnumerable<ObjectRelation> GetRelations(Guid objectId);
 
         /// <summary>
+        /// Returns every relation running between two of the supplied objects, in one read. A
+        /// view showing many objects at once - the Gantt draws the dependencies among its bars -
+        /// asks this rather than <see cref="GetRelations(Guid)"/> once per object.
+        /// </summary>
+        /// <param name="objectIds">The ids of the objects.</param>
+        /// <returns>The relations whose source and target are both among the objects.</returns>
+        IEnumerable<ObjectRelation> GetRelationsAmong(IEnumerable<Guid> objectIds);
+
+        /// <summary>
         /// Returns a single relation by its unique identifier.
         /// </summary>
         /// <param name="id">The id of the relation.</param>

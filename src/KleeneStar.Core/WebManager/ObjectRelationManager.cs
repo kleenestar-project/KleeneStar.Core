@@ -3,6 +3,7 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebIndex.Queries;
@@ -54,6 +55,26 @@ namespace KleeneStar.Core.WebManager
         {
             var query = new Query<ObjectRelation>()
                 .Where(x => x.SourceObjectId == objectId || x.TargetObjectId == objectId);
+
+            return ModelHub.GetObjectRelations(query);
+        }
+
+        /// <summary>
+        /// Returns every relation running between two of the supplied objects, in one read.
+        /// </summary>
+        /// <param name="objectIds">The ids of the objects.</param>
+        /// <returns>The relations whose source and target are both among the objects.</returns>
+        public IEnumerable<ObjectRelation> GetRelationsAmong(IEnumerable<Guid> objectIds)
+        {
+            var ids = (objectIds ?? []).Distinct().ToList();
+
+            if (ids.Count == 0)
+            {
+                return [];
+            }
+
+            var query = new Query<ObjectRelation>()
+                .Where(x => ids.Contains(x.SourceObjectId) && x.TargetObjectId != null && ids.Contains(x.TargetObjectId.Value));
 
             return ModelHub.GetObjectRelations(query);
         }

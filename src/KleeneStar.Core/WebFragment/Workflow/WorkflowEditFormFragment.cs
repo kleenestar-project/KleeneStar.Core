@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
@@ -41,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Workflow
             Label = _ => "kleenestar.core:workflow.description.label",
             Placeholder = _ => "kleenestar.core:workflow.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

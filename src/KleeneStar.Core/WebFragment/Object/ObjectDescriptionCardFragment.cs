@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -105,7 +106,8 @@ namespace KleeneStar.Core.WebFragment.Object
                 Label = _ => "kleenestar.core:object.description.label",
                 Placeholder = _ => "kleenestar.core:object.description.placeholder",
                 Required = _ => false,
-                Format = _ => TypeEditTextFormat.Wysiwyg
+                Format = _ => TypeEditTextFormat.Wysiwyg,
+                LinkLibraryUri = CoreHub.EditorLinkLibrary
             };
 
             var smartEdit = new ControlSmartEdit("attr-description")

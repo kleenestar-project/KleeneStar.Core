@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -47,6 +48,7 @@ namespace KleeneStar.Core.WebFragment.Maintenance
             Placeholder = _ => "kleenestar.core:setting.maintenance.message.placeholder",
             Help = _ => "kleenestar.core:setting.maintenance.message.help",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 

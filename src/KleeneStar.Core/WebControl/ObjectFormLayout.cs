@@ -6,7 +6,6 @@ using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebUI.WebControl;
-using WebExpress.WebUI.WebPage;
 
 using ClassEntity = KleeneStar.Model.Entities.Class;
 using FieldEntity = KleeneStar.Model.Entities.Field;
@@ -60,6 +59,7 @@ namespace KleeneStar.Core.WebControl
                 Label = _ => "kleenestar.core:object.add.description.label",
                 Placeholder = _ => "kleenestar.core:object.add.description.placeholder",
                 Format = _ => TypeEditTextFormat.Wysiwyg,
+                LinkLibraryUri = CoreHub.EditorLinkLibrary,
                 Required = _ => false
             };
         }
@@ -440,6 +440,7 @@ namespace KleeneStar.Core.WebControl
                         Placeholder = _ => field.Placeholder,
                         Help = _ => field.HelpText,
                         Format = _ => description ? TypeEditTextFormat.Wysiwyg : TypeEditTextFormat.Default,
+                        LinkLibraryUri = CoreHub.EditorLinkLibrary,
                         Required = _ => field.Required
                     };
 
@@ -462,6 +463,7 @@ namespace KleeneStar.Core.WebControl
                         Placeholder = _ => field.Placeholder,
                         Help = _ => field.HelpText,
                         Format = _ => TypeEditTextFormat.Wysiwyg,
+                        LinkLibraryUri = CoreHub.EditorLinkLibrary,
                         Required = _ => field.Required
                     };
 
