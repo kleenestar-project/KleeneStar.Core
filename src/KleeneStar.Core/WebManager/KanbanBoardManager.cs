@@ -43,10 +43,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The board, or <see langword="null"/> when none is persisted.</returns>
-        public KanbanBoard GetBoard(Guid workspaceId, string kind)
+        public KanbanBoard GetBoard(Guid workspaceId, string kind, Guid viewId = default)
         {
-            return ModelHub.GetKanbanBoard(workspaceId, kind);
+            return ModelHub.GetKanbanBoard(workspaceId, kind, viewId);
         }
 
         /// <summary>
@@ -55,10 +56,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The existing or newly created board.</returns>
-        public KanbanBoard EnsureBoard(Guid workspaceId, string kind)
+        public KanbanBoard EnsureBoard(Guid workspaceId, string kind, Guid viewId = default)
         {
-            return ModelHub.EnsureKanbanBoard(workspaceId, kind);
+            return ModelHub.EnsureKanbanBoard(workspaceId, kind, viewId);
         }
 
         /// <summary>

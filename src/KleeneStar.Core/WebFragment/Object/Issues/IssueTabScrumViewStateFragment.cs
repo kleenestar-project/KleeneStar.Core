@@ -45,7 +45,7 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         {
             var id = fragmentContext?.FragmentId?.ToString()?.Replace(".", "-");
 
-            Add(new ControlViewState<DataQueryState>(id + "-viewstate")
+            Add(new global::KleeneStar.Core.WebControl.TabBoardViewState(id + "-viewstate")
                 .State(_ => { })
                 .Service<WWW.Api._1_.Objects._workspacekey_.ScrumSprintKanban>(service => service.Method(HttpMethod.Get))
                 .Service<WWW.Api._1_.Objects._workspacekey_.ScrumBacklog>(service => service.Method(HttpMethod.Get))

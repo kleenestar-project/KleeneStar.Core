@@ -23,8 +23,9 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The board, or <see langword="null"/> when none is persisted.</returns>
-        KindDashboard GetBoard(Guid workspaceId, string kind);
+        KindDashboard GetBoard(Guid workspaceId, string kind, Guid viewId = default);
 
         /// <summary>
         /// Returns the persisted board of a workspace/kind pair, creating an empty one when
@@ -32,8 +33,9 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The existing or newly created board.</returns>
-        KindDashboard EnsureBoard(Guid workspaceId, string kind);
+        KindDashboard EnsureBoard(Guid workspaceId, string kind, Guid viewId = default);
 
         /// <summary>
         /// Applies a column-only layout change (add / rename / resize / recolor / reorder /

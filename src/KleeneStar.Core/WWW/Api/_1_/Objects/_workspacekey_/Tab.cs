@@ -30,6 +30,25 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
     public sealed class Tab : RestApiTab<Model.Entities.Object>
     {
         /// <summary>
+        /// Builds the board service address with the owning tab identifier.
+        /// </summary>
+        /// <param name="view">The tab whose board is addressed.</param>
+        /// <param name="request">The request supplying the route parameters.</param>
+        /// <returns>The board service address, or null for a tab without a board.</returns>
+        private static string BoardService(ObjectView view, IRequest request)
+        {
+            var uri = view.ViewType switch
+            {
+                ObjectViewType.Dashboard => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_.Dashboard>(),
+                ObjectViewType.Kanban => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_.Kanban>(),
+                ObjectViewType.ScrumSprint or ObjectViewType.ScrumBacklog => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_.ScrumSprintKanban>(),
+                _ => null
+            };
+
+            return uri?.Add(new UriQuery("v", view.Id.ToString())).BindParameters(request).ToString();
+        }
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Tab()
@@ -72,7 +91,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                     Icon = (view.ViewType.Icon() as WebExpress.WebUI.WebIcon.Icon)?.Class,
                     TemplateId = ObjectViewTemplate.ResolveTemplateId(view.ViewType, Model.Entities.ObjectKind.Issue),
                     Uri = ResolveContentUri(view.ViewType, request)?.ToString(),
-                    Binding = BuildBinding(view.Id, request)
+                    Binding = BuildBinding(view, request)
                 };
             }
         }
@@ -90,18 +109,19 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         /// below onto the base address of its data service, and every view's table talks
         /// to its own address from then on.
         /// </remarks>
-        /// <param name="viewId">The view the tab shows.</param>
+        /// <param name="view">The view the tab shows.</param>
         /// <param name="request">The request, used to bind the route parameters.</param>
         /// <returns>The binding payload.</returns>
-        private static IDictionary<string, object> BuildBinding(Guid viewId, IRequest request)
+        private static IDictionary<string, object> BuildBinding(ObjectView view, IRequest request)
         {
             var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Issues._workspacekey_.Table>()?
-                .Add(new UriQuery("v", viewId.ToString()))
+                .Add(new UriQuery("v", view.Id.ToString()))
                 .BindParameters(request);
 
             return new Dictionary<string, object>
             {
-                ["issuetable"] = uri?.ToString()
+                ["issuetable"] = uri?.ToString(),
+                ["boardservice"] = BoardService(view, request)
             };
         }
 
@@ -147,7 +167,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                 Icon = (viewType.Icon() as WebExpress.WebUI.WebIcon.Icon)?.Class,
                 TemplateId = ObjectViewTemplate.ResolveTemplateId(viewType, Model.Entities.ObjectKind.Issue),
                 Uri = ResolveContentUri(viewType, request)?.ToString(),
-                Binding = BuildBinding(view.Id, request)
+                Binding = BuildBinding(view, request)
             };
         }
 

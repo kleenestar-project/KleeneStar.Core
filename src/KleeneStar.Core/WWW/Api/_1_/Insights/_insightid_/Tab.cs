@@ -193,8 +193,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 .Add(new UriQuery("v", view.Id.ToString()))
                 .BindParameters(request);
 
+            var board = view.ViewType switch
+            {
+                InsightViewTypes.Dashboard => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.View>(),
+                InsightViewTypes.Kanban => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.Kanban>(),
+                InsightViewTypes.Scrum => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.ScrumBoard>(),
+                _ => null
+            };
+
             return new Dictionary<string, object>
             {
+                ["boardservice"] = board?.Add(new UriQuery("v", view.Id.ToString())).BindParameters(request).ToString(),
                 ["insighttable"] = table?.ToString(),
                 ["insightview"] = view.Id.ToString()
             };

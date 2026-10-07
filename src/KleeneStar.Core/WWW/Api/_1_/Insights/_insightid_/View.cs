@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -69,7 +70,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 yield break;
             }
 
-            foreach (var column in insight.Columns.OrderBy(c => c.Position))
+            var viewId = BoardViewScope.Insight(request, insight.Id, InsightViewTypes.Dashboard);
+
+            foreach (var column in insight.Columns.Where(c => c.ViewId == viewId).OrderBy(c => c.Position))
             {
                 yield return new RestApiDashboardColumn
                 {
@@ -121,7 +124,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 })
                 .ToList();
 
-            CoreHub.InsightManager.SetColumns(insightId, columns);
+            CoreHub.InsightManager.SetColumns(insightId, columns, BoardViewScope.Insight(request, insightId, InsightViewTypes.Dashboard));
         }
 
         /// <summary>
@@ -160,7 +163,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 })
                 .ToList();
 
-            CoreHub.InsightManager.SetBoard(insightId, columns);
+            CoreHub.InsightManager.SetBoard(insightId, columns, BoardViewScope.Insight(request, insightId, InsightViewTypes.Dashboard));
         }
 
         /// <summary>

@@ -71,11 +71,13 @@ Rules:
 - **What is stored is not gated.** A tab keeps the key of a type whose plugin is gone; the tab
   endpoint leaves it out and it returns as soon as the type is registered again. The default type
   cannot be unregistered.
-- **The board and the Kanban configuration belong to the insight, not to a tab.** Every dashboard
-  tab of an insight shows its one board (`DashboardColumn.InsightId`); every Kanban tab and the
-  Scrum sprint board share one `KanbanBoard`, stored under the insight id and the kind
-  `InsightScope.BoardKind` (`insight`) - the same way the tabs of a workspace overview share the
-  board of their workspace and kind.
+- **Each board tab owns its configuration.** Dashboard columns carry `ViewId`, while
+  `KindDashboard` and `KanbanBoard` use the owner, kind and `ViewId` as their unique scope.
+  Two dashboard, Kanban or Scrum tabs can therefore have different columns, widgets, lanes
+  and filters. The tab binding `boardservice` writes `v=<tab id>` into the board service
+  before the client initializes it. The server validates the tab's owner, kind, type and state.
+  Requests without `v` address the retained legacy configuration; an invalid explicit `v`
+  is refused. New tabs start with the default layout and never inherit a sibling's changes.
 - **The objects table stores its column layout per reader, insight and tab** (`v` parameter,
   written into the table's data service through the tab binding `insighttable`).
 - **Quickfilters users define on an insight** are stored under the view key `insight` with the
@@ -176,14 +178,25 @@ visible and usable; a deleted one is removed. The audit log keeps every change.
 |`Insight`         |`Insight`          |Name (unique), **Query**, icon, description, state, timestamps; `Type` (legacy, see below).
 |`InsightView`     |`InsightView`      |A tab: name (unique per insight), view type key, configuration, order, state; cascades with the insight.
 |`InsightCategory` |`InsightCategory`  |Many-to-many link between insights and categories.
-|`DashboardColumn` |`DashboardColumn`  |A column of the insight's board; references the insight (`Insight`).
+|`DashboardColumn` |`DashboardColumn`  |A column of one dashboard tab; references the insight (`Insight`) and tab (`View`).
 |`Widget`          |`Widget`           |A widget in a column (type id, name, colour, params, WQL).
-|`KanbanBoard`     |`KanbanBoard`      |The insight's board configuration: `Workspace` = insight id, `Kind` = `insight`.
+|`KanbanBoard`     |`KanbanBoard`      |A tab's board configuration: `Workspace` = insight id, `Kind` = `insight`, `View` = tab id.
 
 `Insight.Type` is the type an insight was created as before it hosted tabs. It is kept, not
 dropped (dropping a column rebuilds the table in SQLite), and nothing reads it since.
 
 ### Migrations
+
+The `ScopeBoardsToTabs` migration retains the legacy boards and gives every existing dashboard,
+Kanban and Scrum tab an independent copy with fresh column, widget and lane identifiers. It
+preserves widget parameters, legacy WQL, status assignments, ordering, colors and filters.
+This also applies to issue and asset overviews. Rolling back discards the tab-specific copies
+and restores the retained legacy configurations. Fresh installations seed dashboard columns
+with their owning tab identifier.
+
+The lifecycle follows the tab. Removing a tab deletes its configuration and children, while
+removing an insight or workspace deletes all its board configurations. Cloning an insight copies
+each tab's dashboard and Kanban configuration under new identifiers, including Scrum boards.
 
 `20261004222550_AddInsightViews` adds `Insight.Query` and the `InsightView` table, and gives every
 existing insight one tab of its type (`Dashboard`), so it opens on what it showed before; the board

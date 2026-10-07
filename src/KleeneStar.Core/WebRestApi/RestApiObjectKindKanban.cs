@@ -64,6 +64,11 @@ namespace KleeneStar.Core.WebRestApi
         protected abstract string Kind { get; }
 
         /// <summary>
+        /// Gets the tab type that owns this board.
+        /// </summary>
+        protected virtual ObjectViewType BoardViewType => ObjectViewType.Kanban;
+
+        /// <summary>
         /// Resolves an optional sprint the board is additionally scoped to: when non-null,
         /// only objects committed to that sprint become cards (and only their classes form
         /// swimlanes). The default returns <see langword="null"/>, so the board shows every
@@ -107,6 +112,7 @@ namespace KleeneStar.Core.WebRestApi
             return new KanbanBoardScope
             {
                 OwnerId = workspace.Id,
+                ViewId = BoardViewScope.Workspace(request, workspace.Id, kind, BoardViewType),
                 BoardKind = kind,
                 Apply = query => query
                     .WhereEquals(x => x.WorkspaceId, workspace.Id)
@@ -185,7 +191,7 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
             var catalog = scope.Catalog();
 
             if (board?.Columns is { Count: > 0 })
@@ -311,7 +317,7 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
 
             if (board?.Swimlanes is { Count: > 0 })
             {
@@ -375,7 +381,7 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
 
             var categories = ObjectBoardProjection.GetOrderedCategories();
             var categoriesById = categories.ToDictionary(x => x.Id, x => x);
@@ -514,7 +520,7 @@ namespace KleeneStar.Core.WebRestApi
                 return;
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
             var existingById = board.Columns.ToDictionary(c => c.Id);
             var existingByKey = board.Columns.Where(c => c.Key is not null).ToDictionary(c => c.Key);
             var catalog = scope.Catalog();
@@ -661,7 +667,7 @@ namespace KleeneStar.Core.WebRestApi
                 return;
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
             var existingById = board.Swimlanes.ToDictionary(s => s.Id);
             var existingByKey = board.Swimlanes.Where(s => s.Key is not null).ToDictionary(s => s.Key);
 
@@ -745,7 +751,7 @@ namespace KleeneStar.Core.WebRestApi
                 throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.filter", I18N.Translate(request, error)));
             }
 
-            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind);
+            var board = CoreHub.KanbanBoardManager.EnsureBoard(scope.OwnerId, scope.BoardKind, scope.ViewId);
 
             CoreHub.KanbanBoardManager.SetFilter(board.Id, filter);
         }
@@ -771,7 +777,7 @@ namespace KleeneStar.Core.WebRestApi
                 return null;
             }
 
-            return CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind)?.Filter;
+            return CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind, scope.ViewId)?.Filter;
         }
 
         /// <summary>

@@ -70,7 +70,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
         {
             var id = fragmentContext?.FragmentId?.ToString()?.Replace(".", "-");
 
-            Add(new ControlViewState<DataQueryState>(id + "-viewstate")
+            Add(new global::KleeneStar.Core.WebControl.TabBoardViewState(id + "-viewstate")
                 .State(_ => { })
                 .Service<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.ScrumBoard>(service => service.Method(HttpMethod.Get))
                 .Service<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.ScrumBacklog>(service => service.Method(HttpMethod.Get))

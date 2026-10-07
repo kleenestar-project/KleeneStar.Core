@@ -1,3 +1,5 @@
+using WebExpress.WebApp.WebControl;
+using WebExpress.WebUI.WebControl;
 using KleeneStar.Core.WebFragment.Insight;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
@@ -68,7 +70,10 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
                 visualTree.AddHeaderScript(script);
             }
 
-            return base.Render(renderContext, visualTree);
+            var html = base.Render(renderContext, visualTree);
+            new Binding().Add(new BindTemplate().Add("boardservice", TypeBindMode.Attr,
+                target: "wx-service", name: "base-uri")).ApplyUserAttributes(html);
+            return html;
         }
     }
 }

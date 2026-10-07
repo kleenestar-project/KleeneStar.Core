@@ -185,16 +185,17 @@ namespace KleeneStar.Core.WebManager
         /// insight while preserving the widgets of the surviving columns.
         /// </summary>
         /// <param name="insightId">The id of the insight to update.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <param name="columns">
         /// The desired columns in their target order. Widgets on these instances are ignored. Must not
         /// be null.
         /// </param>
         /// <returns>The current instance to allow for method chaining.</returns>
-        public IInsightManager SetColumns(Guid insightId, IReadOnlyList<DashboardColumn> columns)
+        public IInsightManager SetColumns(Guid insightId, IReadOnlyList<DashboardColumn> columns, Guid viewId = default)
         {
             ArgumentNullException.ThrowIfNull(columns);
 
-            ModelHub.SetDashboardColumns(insightId, columns);
+            ModelHub.SetDashboardColumns(insightId, columns, viewId);
 
             var insight = GetInsight(insightId);
 
@@ -211,16 +212,17 @@ namespace KleeneStar.Core.WebManager
         /// insight, rebuilding the widgets of every column from the desired state.
         /// </summary>
         /// <param name="insightId">The id of the insight to update.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <param name="columns">
         /// The desired columns, each carrying the widgets it should hold, in their target order. Must
         /// not be null.
         /// </param>
         /// <returns>The current instance to allow for method chaining.</returns>
-        public IInsightManager SetBoard(Guid insightId, IReadOnlyList<DashboardColumn> columns)
+        public IInsightManager SetBoard(Guid insightId, IReadOnlyList<DashboardColumn> columns, Guid viewId = default)
         {
             ArgumentNullException.ThrowIfNull(columns);
 
-            ModelHub.SetDashboardBoard(insightId, columns);
+            ModelHub.SetDashboardBoard(insightId, columns, viewId);
 
             var insight = GetInsight(insightId);
 
@@ -382,42 +384,19 @@ namespace KleeneStar.Core.WebManager
 
             foreach (var view in GetViews(sourceId))
             {
-                AddView(new InsightView
+                var copy = new InsightView
                 {
                     InsightId = targetId,
                     Name = view.Name,
                     ViewType = view.ViewType,
                     Configuration = view.Configuration,
                     State = view.State
-                });
+                };
+                AddView(copy);
+                ModelHub.CopyInsightBoard(sourceId, targetId, view.Id, copy.Id);
             }
 
-            // the dashboard is the insight's, so a copy of its dashboard tabs needs the board
-            // they show; fresh ids keep the two boards apart from here on
-            if (source.Columns is { Count: > 0 })
-            {
-                SetBoard(targetId,
-                [
-                    .. source.Columns
-                        .OrderBy(x => x.Position)
-                        .Select(x => new DashboardColumn(Guid.Empty)
-                        {
-                            Name = x.Name,
-                            Size = x.Size,
-                            Color = x.Color,
-                            Widgets = [.. (x.Widgets ?? [])
-                                .OrderBy(w => w.Position)
-                                .Select(w => new Widget(Guid.Empty)
-                                {
-                                    Type = w.Type,
-                                    Name = w.Name,
-                                    Color = w.Color,
-                                    Params = w.Params,
-                                    Wql = w.Wql
-                                })]
-                        })
-                ]);
-            }
+            ModelHub.CopyInsightBoard(sourceId, targetId, Guid.Empty, Guid.Empty);
 
             return this;
         }

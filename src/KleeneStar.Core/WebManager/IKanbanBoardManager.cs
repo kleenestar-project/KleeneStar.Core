@@ -22,8 +22,9 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The board, or <see langword="null"/> when none is persisted.</returns>
-        KanbanBoard GetBoard(Guid workspaceId, string kind);
+        KanbanBoard GetBoard(Guid workspaceId, string kind, Guid viewId = default);
 
         /// <summary>
         /// Returns the persisted Kanban board of a workspace/kind pair, creating an empty one
@@ -31,8 +32,9 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceId">The workspace the board belongs to.</param>
         /// <param name="kind">The object kind the board is scoped to.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <returns>The existing or newly created board.</returns>
-        KanbanBoard EnsureBoard(Guid workspaceId, string kind);
+        KanbanBoard EnsureBoard(Guid workspaceId, string kind, Guid viewId = default);
 
         /// <summary>
         /// Applies a column layout change (add / rename / recolor / reorder / delete) to a

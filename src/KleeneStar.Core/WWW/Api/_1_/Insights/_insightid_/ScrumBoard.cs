@@ -14,8 +14,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// <remarks>
     /// Sprints belong to workspaces and an insight may span several, so "the running sprint" is
     /// the running sprint of each workspace an object of the insight lives in. The board is the
-    /// insight's one Kanban configuration, shared with its Kanban tabs - as on the workspace
-    /// overview, where the sprint board and the Kanban tab share theirs.
+    /// selected Scrum tab's own Kanban configuration.
     /// </remarks>
     [Title("kleenestar.core:object.view.scrum.sprint.title")]
     [Cache]
@@ -33,7 +32,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         /// <returns>The board scope.</returns>
         protected override KanbanBoardScope ResolveScope(IRequest request)
         {
-            return InsightBoardScope.Resolve(request);
+            return InsightBoardScope.Resolve(request, Model.Entities.InsightViewTypes.Scrum);
         }
 
         /// <summary>

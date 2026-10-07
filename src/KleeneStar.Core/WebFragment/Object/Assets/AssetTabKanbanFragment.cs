@@ -64,7 +64,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
             // substituted by the master-detail controller
             // the ViewState declares the board resource and maps the shared state onto the
             // query parameters the endpoint reads: "q" for the search, "f" for the chips
-            var viewState = new ControlViewState<DataQueryState>(id + "-viewstate")
+            var viewState = new global::KleeneStar.Core.WebControl.TabBoardViewState(id + "-viewstate")
                 .State(_ => { })
                 .Service<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.Kanban>(service => service.Method(HttpMethod.Get))
                 .Resource<AssetKanbanResource>(resource => resource

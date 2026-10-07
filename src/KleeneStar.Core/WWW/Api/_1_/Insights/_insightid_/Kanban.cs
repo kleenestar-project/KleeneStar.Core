@@ -13,9 +13,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// as on a workspace's board.
     /// </summary>
     /// <remarks>
-    /// The board configuration (columns, swimlanes, filter) belongs to the insight and is stored
-    /// under its id and <see cref="InsightScope.BoardKind"/>; every Kanban tab of the insight
-    /// shows that one board. Arranging it needs the right to change the insight's content;
+    /// The board configuration belongs to the selected tab of the insight. Arranging it needs the right to change the insight's content;
     /// moving a card needs, as everywhere, the right to transition that object.
     /// </remarks>
     [Title("kleenestar.core:insight.view.kanban.label")]
@@ -68,8 +66,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         /// Resolves the board scope of the insight the route names.
         /// </summary>
         /// <param name="request">The request.</param>
+        /// <param name="viewType">The tab type that owns the board.</param>
         /// <returns>The scope, or <see langword="null"/> when there is no readable insight.</returns>
-        public static KanbanBoardScope Resolve(IRequest request)
+        public static KanbanBoardScope Resolve(IRequest request, string viewType = Model.Entities.InsightViewTypes.Kanban)
         {
             var insight = InsightScope.ResolveReadable(request);
 
@@ -86,6 +85,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             return new KanbanBoardScope
             {
                 OwnerId = insight.Id,
+                ViewId = BoardViewScope.Insight(request, insight.Id, viewType),
                 BoardKind = InsightScope.BoardKind,
                 Apply = query => InsightScope.Apply(insight, query),
                 Classes = Classes,

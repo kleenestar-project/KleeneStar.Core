@@ -63,7 +63,7 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
 
             // the ViewState declares the board resource and maps the shared state onto the
             // query parameters the endpoint reads: "q" for the search, "f" for the chips
-            var viewState = new ControlViewState<DataQueryState>(id + "-viewstate")
+            var viewState = new global::KleeneStar.Core.WebControl.TabBoardViewState(id + "-viewstate")
                 .State(_ => { })
                 .Service<WWW.Api._1_.Objects._workspacekey_.Kanban>(service => service.Method(HttpMethod.Get))
                 .Resource<IssueKanbanResource>(resource => resource

@@ -89,7 +89,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
         {
             var id = fragmentContext?.FragmentId?.ToString()?.Replace(".", "-");
 
-            var viewState = new ControlViewState<DataQueryState>(id + "-viewstate")
+            var viewState = new global::KleeneStar.Core.WebControl.TabBoardViewState(id + "-viewstate")
                 .State(_ => { })
                 .Service<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.Kanban>(service => service.Method(HttpMethod.Get))
                 .Resource<InsightKanbanResource>(resource => resource

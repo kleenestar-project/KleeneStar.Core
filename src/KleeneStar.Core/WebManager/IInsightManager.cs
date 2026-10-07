@@ -110,12 +110,13 @@ namespace KleeneStar.Core.WebManager
         /// the set are removed together with their widgets.
         /// </remarks>
         /// <param name="insightId">The id of the insight to update.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <param name="columns">
         /// The desired columns in their target order. Widgets on these instances are ignored. Must not
         /// be null.
         /// </param>
         /// <returns>The current instance to allow for method chaining.</returns>
-        IInsightManager SetColumns(Guid insightId, IReadOnlyList<DashboardColumn> columns);
+        IInsightManager SetColumns(Guid insightId, IReadOnlyList<DashboardColumn> columns, Guid viewId = default);
 
         /// <summary>
         /// Applies a full board update (a widget being added, deleted, reconfigured or moved) to a
@@ -129,12 +130,13 @@ namespace KleeneStar.Core.WebManager
         /// order defining their position.
         /// </remarks>
         /// <param name="insightId">The id of the insight to update.</param>
+        /// <param name="viewId">The owning tab identifier, or the legacy board when empty.</param>
         /// <param name="columns">
         /// The desired columns, each carrying the widgets it should hold, in their target order. Must
         /// not be null.
         /// </param>
         /// <returns>The current instance to allow for method chaining.</returns>
-        IInsightManager SetBoard(Guid insightId, IReadOnlyList<DashboardColumn> columns);
+        IInsightManager SetBoard(Guid insightId, IReadOnlyList<DashboardColumn> columns, Guid viewId = default);
 
         /// <summary>
         /// Returns the tabs of an insight in display order.

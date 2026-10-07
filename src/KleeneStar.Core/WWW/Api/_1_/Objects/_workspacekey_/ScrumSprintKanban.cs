@@ -26,6 +26,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         protected override string Kind => Model.Entities.ObjectKind.Issue;
 
         /// <summary>
+        /// Gets the Scrum tab type that owns the sprint board.
+        /// </summary>
+        protected override Model.Entities.ObjectViewType BoardViewType => Model.Entities.ObjectViewType.ScrumSprint;
+
+        /// <summary>
         /// Scopes the board to the workspace's active sprint. When no sprint is active the
         /// sentinel <see cref="Guid.Empty"/> is returned so the board renders empty (no
         /// object is committed to the empty sprint) rather than falling back to the whole

@@ -9,7 +9,7 @@ namespace KleeneStar.Core.WebRestApi
     /// made of. A workspace overview's board and an insight's board differ only here.
     /// </summary>
     /// <remarks>
-    /// The configuration (columns, swimlanes, filter) is stored per owner and kind
+    /// The configuration (columns, swimlanes, filter) is stored per owner, kind and tab
     /// (<see cref="Model.Entities.KanbanBoard"/>): a workspace's board is stored under the
     /// workspace and the object kind, an insight's under the insight and
     /// <see cref="WebInsight.InsightScope.BoardKind"/>. The kind keeps the two apart, so an
@@ -21,6 +21,11 @@ namespace KleeneStar.Core.WebRestApi
         /// Gets the id the board configuration is stored under - a workspace or an insight.
         /// </summary>
         public Guid OwnerId { get; init; }
+
+        /// <summary>
+        /// Gets the owning tab identifier, or an empty identifier for the legacy board.
+        /// </summary>
+        public Guid ViewId { get; init; }
 
         /// <summary>
         /// Gets the kind the board configuration is stored under.

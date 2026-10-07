@@ -1,3 +1,5 @@
+using WebExpress.WebApp.WebControl;
+using WebExpress.WebUI.WebControl;
 using KleeneStar.Model.Entities;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
@@ -10,8 +12,7 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Insight.Views
 {
     /// <summary>
-    /// Tab template of an insight's dashboard tab - what an insight was before it had tabs. The
-    /// board belongs to the insight, so every dashboard tab of an insight shows the same one.
+    /// Provides the template for an independently configured dashboard tab of an insight.
     /// </summary>
     [Section<WebExpress.WebUI.WebSection.SectionTabViewPrimary>]
     [Scope<InsightTabFragment>]
@@ -77,7 +78,10 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
                 visualTree.AddHeaderScript(script);
             }
 
-            return base.Render(renderContext, visualTree);
+            var html = base.Render(renderContext, visualTree);
+            new Binding().Add(new BindTemplate().Add("boardservice", TypeBindMode.Attr,
+                target: "wx-service", name: "base-uri")).ApplyUserAttributes(html);
+            return html;
         }
     }
 }

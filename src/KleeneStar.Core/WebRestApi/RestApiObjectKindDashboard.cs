@@ -66,9 +66,9 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var board = CoreHub.KindDashboardManager.GetBoard(workspace.Id, Kind);
+            var board = CoreHub.KindDashboardManager.GetBoard(workspace.Id, Kind, BoardViewScope.Workspace(request, workspace.Id, Kind, ObjectViewType.Dashboard));
 
-            if (board?.Columns is { Count: > 0 })
+            if (board is not null)
             {
                 foreach (var column in board.Columns.OrderBy(c => c.Position))
                 {
@@ -174,7 +174,7 @@ namespace KleeneStar.Core.WebRestApi
                 return;
             }
 
-            var board = CoreHub.KindDashboardManager.EnsureBoard(workspace.Id, Kind);
+            var board = CoreHub.KindDashboardManager.EnsureBoard(workspace.Id, Kind, BoardViewScope.Workspace(request, workspace.Id, Kind, ObjectViewType.Dashboard));
 
             var columns = layout.Columns
                 .Select(column => new KindDashboardColumn(ParseId(column.Id))
@@ -204,7 +204,7 @@ namespace KleeneStar.Core.WebRestApi
                 return;
             }
 
-            var kindBoard = CoreHub.KindDashboardManager.EnsureBoard(workspace.Id, Kind);
+            var kindBoard = CoreHub.KindDashboardManager.EnsureBoard(workspace.Id, Kind, BoardViewScope.Workspace(request, workspace.Id, Kind, ObjectViewType.Dashboard));
 
             var columns = board
                 .Select(column => new KindDashboardColumn(ParseId(column.Id))
