@@ -172,6 +172,25 @@ namespace KleeneStar.Core.WebManager
         bool RemoveView(Guid viewId);
 
         /// <summary>
+        /// Renames a tab. Unlike <see cref="AddView"/> the name is not made unique: a name
+        /// another tab of the insight carries is refused, so the tab shows the name its
+        /// author typed or keeps the one it had.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="name">The new name, trimmed and not blank.</param>
+        /// <returns><see langword="true"/> when the tab was renamed.</returns>
+        bool RenameView(Guid viewId, string name);
+
+        /// <summary>
+        /// Sets or clears the color of a tab.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="color">The color as a <c>#rrggbb</c> value, or <see langword="null"/>
+        /// to clear it.</param>
+        /// <returns><see langword="true"/> when the tab was found and changed.</returns>
+        bool SetViewColor(Guid viewId, string color);
+
+        /// <summary>
         /// Puts the tabs of an insight into the given order.
         /// </summary>
         /// <param name="insightId">The id of the insight.</param>

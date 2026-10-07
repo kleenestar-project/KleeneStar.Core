@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -82,6 +83,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_
                     Id = view.Id.ToString(),
                     Name = view.Name,
                     Title = view.Name,
+                    TabColor = view.Color,
                     Icon = (view.ViewType.Icon() as WebExpress.WebUI.WebIcon.Icon)?.Class,
                     TemplateId = ResolveTemplateId(view.ViewType),
                     Uri = ResolveContentUri(view.ViewType, request)?.ToString(),
@@ -104,6 +106,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_
             {
                 return null;
             }
+
+            ObjectViewTabs.DemandArrange(request);
 
             var viewType = ResolveViewType(templateId);
             var existing = CoreHub.ObjectViewManager.GetViewsForWorkspace(workspace.Id, Model.Entities.ObjectKind.Asset).ToList();
@@ -129,6 +133,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_
                 Id = view.Id.ToString(),
                 Name = view.Name,
                 Title = view.Name,
+                TabColor = view.Color,
                 Icon = (viewType.Icon() as WebExpress.WebUI.WebIcon.Icon)?.Class,
                 TemplateId = ResolveTemplateId(viewType),
                 Uri = ResolveContentUri(viewType, request)?.ToString(),
@@ -149,25 +154,55 @@ namespace KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_
         }
 
         /// <summary>
-        /// Removes the <see cref="ObjectView"/> identified by <paramref name="viewId"/>.
+        /// Removes the <see cref="ObjectView"/> identified by <paramref name="viewId"/>, a tab of
+        /// the workspace the route names, for a caller who may change its content.
         /// </summary>
         protected override bool RemoveView(string viewId)
         {
-            if (!Guid.TryParse(viewId, out var guid))
-            {
-                return false;
-            }
+            return ObjectViewTabs.Remove(viewId, Model.Entities.ObjectKind.Asset, WebExpress.WebCore.WebEx.CurrentRequest);
+        }
 
-            var view = CoreHub.ObjectViewManager.GetObjectView(guid);
+        /// <summary>
+        /// Persists the order the tabs were dragged into.
+        /// </summary>
+        /// <param name="order">The tab ids in their new order.</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the order was applied.</returns>
+        protected override bool ReorderViews(IReadOnlyList<string> order, IQueryContext context, IRequest request)
+        {
+            return ObjectViewTabs.Reorder(order, Model.Entities.ObjectKind.Asset, request);
+        }
 
-            if (view is null)
-            {
-                return false;
-            }
+        /// <summary>
+        /// Gets the maximum length of a tab label - the length of the name column.
+        /// </summary>
+        protected override int MaxLabelLength => ObjectViewTabs.MaxNameLength;
 
-            CoreHub.ObjectViewManager.RemoveObjectView(view);
+        /// <summary>
+        /// Renames a tab from its menu.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="label">The new label, trimmed and not empty.</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the tab was renamed.</returns>
+        protected override bool RenameView(string viewId, string label, IQueryContext context, IRequest request)
+        {
+            return ObjectViewTabs.Rename(viewId, label, Model.Entities.ObjectKind.Asset, request);
+        }
 
-            return true;
+        /// <summary>
+        /// Sets or clears the color of a tab from its menu.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="color">The color as a <c>#rrggbb</c> value, or <see langword="null"/>.</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the tab was changed.</returns>
+        protected override bool RecolorView(string viewId, string color, IQueryContext context, IRequest request)
+        {
+            return ObjectViewTabs.Recolor(viewId, color, Model.Entities.ObjectKind.Asset, request);
         }
 
         /// <summary>

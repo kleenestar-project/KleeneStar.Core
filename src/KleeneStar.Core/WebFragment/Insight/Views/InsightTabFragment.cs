@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebInsight;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -28,7 +29,13 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
         public InsightTabFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            // adding, moving and the tab menu (rename, color, delete) are offered to whoever
+            // may arrange the insight; a read-only control offers none of them, and the endpoint
+            // asks the same question again
+            Readonly = ctx => !InsightScope.MayArrange(InsightScope.Resolve(ctx?.Request), ctx?.Request);
             MovableTab = _ => true;
+            EditableTab = _ => true;
+            DeletableTab = _ => true;
             Layout = _ => TypeLayoutTab.Underline;
             ServiceFactory = _ => DataServiceDescriptor.TabData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.Tab>().ToString());
         }

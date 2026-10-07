@@ -161,6 +161,20 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Puts the tabs of one overview of a workspace into the given order.
+        /// </summary>
+        /// <param name="workspaceId">The owning workspace id.</param>
+        /// <param name="kind">The object kind of the overview.</param>
+        /// <param name="order">The tab ids in their new order. Cannot be null.</param>
+        /// <returns><see langword="true"/> when the order was applied.</returns>
+        public bool ReorderViews(Guid workspaceId, string kind, IReadOnlyList<Guid> order)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+
+            return ModelHub.SetObjectViewOrder(workspaceId, kind, order);
+        }
+
+        /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing,
         /// or resetting unmanaged resources.
         /// </summary>

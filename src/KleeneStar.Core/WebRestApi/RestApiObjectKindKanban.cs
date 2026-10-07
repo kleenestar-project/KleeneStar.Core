@@ -22,7 +22,7 @@ namespace KleeneStar.Core.WebRestApi
     /// By default, columns are the workflow status categories (To Do, In Progress, Waiting,
     /// Done) and swimlanes are the classes of the workspace that have at least one active
     /// object of the <see cref="Kind"/>. Once the board is customized through its "…" menus
-    /// (<see cref="UpdtaeColumns"/>, <see cref="UpdateSwimlanes"/>), the persisted
+    /// (<see cref="UpdateColumns"/>, <see cref="UpdateSwimlanes"/>), the persisted
     /// <see cref="KanbanBoard"/> (<see cref="CoreHub.KanbanBoardManager"/>) takes over: its
     /// columns/swimlanes own their display name, color and order independently of the shared
     /// <see cref="StatusCategory"/>/<see cref="Class"/> rows they place cards by by. Each
@@ -504,7 +504,7 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         /// <param name="layout">The layout payload carrying the full ordered column list.</param>
         /// <param name="request">The current HTTP request. Cannot be null.</param>
-        protected override void UpdtaeColumns(RestApiDashboardLayout layout, IRequest request)
+        protected override void UpdateColumns(RestApiDashboardLayout layout, IRequest request)
         {
             // the framework's save entry point is not virtual; the refusal reaches the user as the
             // board's own error message

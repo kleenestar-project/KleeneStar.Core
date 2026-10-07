@@ -15,7 +15,7 @@ namespace KleeneStar.Core.WebRestApi
     /// Project-wide base for the object dashboard endpoint of a kind's overview tab control. By
     /// default it is a small, read-only KPI dashboard (total / active / archived) aggregating
     /// the workspace's objects of the <see cref="Kind"/>. Once the board is customized through
-    /// its "…" menus (<see cref="UpdtaeColumns"/>, <see cref="UpdateBoard"/>), the persisted
+    /// its "…" menus (<see cref="UpdateColumns"/>, <see cref="UpdateBoard"/>), the persisted
     /// <see cref="KindDashboard"/> (<see cref="CoreHub.KindDashboardManager"/>) takes over and
     /// the board behaves like the standalone dashboard: columns and widgets can be added,
     /// renamed, recolored, reordered, reconfigured and deleted, all persisted through the
@@ -165,7 +165,7 @@ namespace KleeneStar.Core.WebRestApi
         /// </summary>
         /// <param name="layout">The layout payload carrying the full ordered column list.</param>
         /// <param name="request">The current HTTP request. Cannot be null.</param>
-        protected override void UpdtaeColumns(RestApiDashboardLayout layout, IRequest request)
+        protected override void UpdateColumns(RestApiDashboardLayout layout, IRequest request)
         {
             var workspace = GetWorkspace(request);
 

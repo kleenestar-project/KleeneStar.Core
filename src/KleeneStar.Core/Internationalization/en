@@ -691,6 +691,7 @@ object.summary.help=The summary provides a quick overview of the object's conten
 object.summary.label=Summary
 object.summary.placeholder=Enter a brief summary of the object.
 object.tab.header=Views
+object.tab.refused=You may not change the views of this workspace.
 object.template.help=Select a template to use as a starting point for the new object.
 object.template.label=Template
 object.view.assets.description=Most recently updated assets with personal filters.

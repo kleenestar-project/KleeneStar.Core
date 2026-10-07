@@ -9,7 +9,6 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
-using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -337,7 +336,7 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <param name="value">The recorded value.</param>
         /// <param name="renderContext">The render context used for translating.</param>
         /// <returns>The display text.</returns>
-        private static string Display(string name, Guid? fieldId, string value, IRenderControlContext renderContext)
+        private static new string Display(string name, Guid? fieldId, string value, IRenderControlContext renderContext)
         {
             var resolved = fieldId.HasValue ? value : ObjectProperty.Describe(name, value);
 

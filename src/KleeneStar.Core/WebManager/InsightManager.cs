@@ -320,6 +320,74 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Renames a tab, refusing a name another tab of the insight carries.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="name">The new name, trimmed and not blank.</param>
+        /// <returns><see langword="true"/> when the tab was renamed.</returns>
+        public bool RenameView(Guid viewId, string name)
+        {
+            var view = GetView(viewId);
+            name = name?.Trim();
+
+            if (view is null || string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            // (insight, name) is a unique index; a silent suffix would leave the client
+            // showing a label the store does not hold
+            if (GetViews(view.InsightId).Any(x => x.Id != view.Id && string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            view.Name = name;
+
+            return UpdateView(view);
+        }
+
+        /// <summary>
+        /// Sets or clears the color of a tab.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="color">The color as a <c>#rrggbb</c> value, or <see langword="null"/>
+        /// to clear it.</param>
+        /// <returns><see langword="true"/> when the tab was found and changed.</returns>
+        public bool SetViewColor(Guid viewId, string color)
+        {
+            var view = GetView(viewId);
+
+            if (view is null)
+            {
+                return false;
+            }
+
+            view.Color = string.IsNullOrWhiteSpace(color) ? null : color.ToLowerInvariant();
+
+            return UpdateView(view);
+        }
+
+        /// <summary>
+        /// Stores a changed tab and announces the change of its insight.
+        /// </summary>
+        /// <param name="view">The changed tab.</param>
+        /// <returns><see langword="true"/>.</returns>
+        private bool UpdateView(InsightView view)
+        {
+            ModelHub.Update(view);
+
+            var insight = GetInsight(view.InsightId);
+
+            if (insight is not null)
+            {
+                InsightUpdated?.Invoke(this, insight);
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Puts the tabs of an insight into the given order.
         /// </summary>
         /// <param name="insightId">The id of the insight.</param>
@@ -390,6 +458,7 @@ namespace KleeneStar.Core.WebManager
                     Name = view.Name,
                     ViewType = view.ViewType,
                     Configuration = view.Configuration,
+                    Color = view.Color,
                     State = view.State
                 };
                 AddView(copy);

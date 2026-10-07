@@ -105,7 +105,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         /// </summary>
         /// <param name="layout">The layout payload carrying the full ordered column list.</param>
         /// <param name="request">The current HTTP request. Cannot be null.</param>
-        protected override void UpdtaeColumns(RestApiDashboardLayout layout, IRequest request)
+        protected override void UpdateColumns(RestApiDashboardLayout layout, IRequest request)
         {
             if (layout?.Columns is null || !TryGetInsightId(request, out var insightId))
             {

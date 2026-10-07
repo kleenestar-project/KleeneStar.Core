@@ -21,8 +21,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// Each tab is bound to the tab template its view type names in the
     /// <see cref="InsightViewTypeCatalog"/>; a tab whose type nobody registers any more is left
     /// out (and kept), and a template the catalog does not know cannot be added. Reading needs the
-    /// right to read the insight's content, arranging - adding, removing, reordering - the right
-    /// to change it.
+    /// right to read the insight's content, arranging - adding, removing, reordering, renaming,
+    /// coloring - the right to change it.
     /// </remarks>
     [Title("kleenestar.core:insight.tab.header")]
     [Cache]
@@ -132,6 +132,59 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         }
 
         /// <summary>
+        /// Gets the maximum length of a tab label - the length of the name column.
+        /// </summary>
+        protected override int MaxLabelLength => 64;
+
+        /// <summary>
+        /// Renames a tab of the insight the route names from its menu.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="label">The new label, trimmed and not empty.</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the tab was renamed.</returns>
+        protected override bool RenameView(string viewId, string label, IQueryContext context, IRequest request)
+        {
+            return ResolveArrangeable(viewId, request) is { } view
+                && CoreHub.InsightManager.RenameView(view.Id, label);
+        }
+
+        /// <summary>
+        /// Sets or clears the color of a tab of the insight the route names from its menu.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="color">The color as a <c>#rrggbb</c> value, or <see langword="null"/>.</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the tab was changed.</returns>
+        protected override bool RecolorView(string viewId, string color, IQueryContext context, IRequest request)
+        {
+            return ResolveArrangeable(viewId, request) is { } view
+                && CoreHub.InsightManager.SetViewColor(view.Id, color);
+        }
+
+        /// <summary>
+        /// Resolves a tab of the insight the route names, if the caller may arrange that insight.
+        /// </summary>
+        /// <param name="viewId">The id of the tab.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The tab, or <see langword="null"/>.</returns>
+        private static InsightView ResolveArrangeable(string viewId, IRequest request)
+        {
+            var insight = InsightScope.Resolve(request);
+            var view = Guid.TryParse(viewId, out var id) ? CoreHub.InsightManager.GetView(id) : null;
+
+            // the route names the insight; a tab of another insight is not reachable through it
+            return view is not null
+                && insight is not null
+                && view.InsightId == insight.Id
+                && InsightScope.MayArrange(insight, request)
+                ? view
+                : null;
+        }
+
+        /// <summary>
         /// Persists the order the tabs were dragged into.
         /// </summary>
         /// <param name="order">The tab ids in their new order.</param>
@@ -169,6 +222,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 Id = view.Id.ToString(),
                 Name = view.Name,
                 Title = view.Name,
+                TabColor = view.Color,
                 Icon = (type.Icon as WebExpress.WebUI.WebIcon.Icon)?.Class,
                 TemplateId = InsightViewTypeCatalog.TemplateId(type),
                 Binding = BuildBinding(view, request)

@@ -333,7 +333,7 @@ namespace KleeneStar.Core.WebFragment.Audit
         /// <param name="value">The payload, or <c>null</c>.</param>
         /// <param name="renderContext">The render context used for translating.</param>
         /// <returns>The display text.</returns>
-        private static string Display(string value, IRenderControlContext renderContext)
+        private static new string Display(string value, IRenderControlContext renderContext)
         {
             return string.IsNullOrEmpty(value)
                 ? I18N.Translate(renderContext, "kleenestar.core:audit.value.empty")

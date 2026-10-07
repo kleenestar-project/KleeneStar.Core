@@ -80,5 +80,19 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="viewEntry">The view to remove. Cannot be null.</param>
         IObjectViewManager RemoveObjectView(ObjectView viewEntry);
+
+        /// <summary>
+        /// Puts the tabs of one overview of a workspace - its views of one object kind - into
+        /// the given order. A tab the list does not name keeps its place behind the named ones.
+        /// </summary>
+        /// <remarks>
+        /// Arranging tabs is live editing, like the insight tabs: no
+        /// <see cref="ObjectViewUpdated"/> is raised per moved tab.
+        /// </remarks>
+        /// <param name="workspaceId">The owning workspace id.</param>
+        /// <param name="kind">The object kind of the overview.</param>
+        /// <param name="order">The tab ids in their new order. Cannot be null.</param>
+        /// <returns><see langword="true"/> when at least one tab of the overview was named.</returns>
+        bool ReorderViews(Guid workspaceId, string kind, IReadOnlyList<Guid> order);
     }
 }

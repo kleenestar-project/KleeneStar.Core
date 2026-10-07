@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
@@ -31,7 +32,13 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         public IssueTabFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            // adding, moving and the tab menu (rename, color, delete) are offered to whoever
+            // may change the workspace's content; a read-only control offers none of them, and the endpoint
+            // asks the same question again
+            Readonly = ctx => !ObjectViewTabs.MayArrange(ctx?.Request);
             MovableTab = _ => true;
+            EditableTab = _ => true;
+            DeletableTab = _ => true;
             Layout = _ => TypeLayoutTab.Underline;
             ServiceFactory = _ => DataServiceDescriptor.TabData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_.Tab>().ToString());
         }

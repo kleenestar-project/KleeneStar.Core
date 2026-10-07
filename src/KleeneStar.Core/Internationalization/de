@@ -692,6 +692,7 @@ object.summary.help=Die Zusammenfassung hilft Ihnen, dieses Objekt schnell zu id
 object.summary.label=Zusammenfassung
 object.summary.placeholder=Geben Sie eine kurze Zusammenfassung des Objekts ein.
 object.tab.header=Ansichten
+object.tab.refused=Sie dürfen die Ansichten dieses Arbeitsbereichs nicht ändern.
 object.template.help=Wählen Sie eine Vorlage als Ausgangspunkt für das neue Objekt.
 object.template.label=Vorlage
 object.view.assets.description=Zuletzt aktualisierte Assets mit persönlichen Filtern.

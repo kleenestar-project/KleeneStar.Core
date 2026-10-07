@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebIcon;
@@ -26,7 +25,7 @@ namespace KleeneStar.Core.WebFragment.Landing
         /// <summary>
         /// Gets the route the link points at.
         /// </summary>
-        protected abstract IUri Target { get; }
+        protected new abstract IUri Target { get; }
 
         /// <summary>
         /// Gets the resource key of the link label.
