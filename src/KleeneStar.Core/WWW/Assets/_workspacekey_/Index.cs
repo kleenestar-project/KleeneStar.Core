@@ -1,6 +1,7 @@
 using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Core.WebUri;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
@@ -16,7 +17,10 @@ namespace KleeneStar.Core.WWW.Assets._workspacekey_
     /// the asset kind, most recently updated first, with search, personal quickfilters
     /// (starred, assigned to me, created by me, archived), and pagination — contributed
     /// by the standalone <see cref="WebFragment.Object.Assets.AssetTabViewFragment"/>. The
-    /// sidebar carries the kind links shared with the other kind overviews.
+    /// sidebar carries the kind links shared with the other kind overviews and the asset
+    /// classes as an inheritance tree; a class picked there travels as <c>?class=&lt;id&gt;</c>
+    /// and narrows the table, list and tile views to that class and its descendants
+    /// (<see cref="WebRestApi.ObjectClassFilter"/>).
     /// </summary>
     [WebIcon<IconCubes>]
     [WorkspaceKeySegment]
@@ -61,7 +65,12 @@ namespace KleeneStar.Core.WWW.Assets._workspacekey_
                 .BindParameters(renderContext.Request);
 
             visualTree.Title = workspace?.Name;
-            visualTree.Content.MainPanel.Headline.Title = I18N.Translate(renderContext.Request, "kleenestar.core:object.kind.assets.label");
+            // narrowed to a class of the sidebar's class tree, the overview is titled by it
+            var @class = ObjectClassFilter.Resolve(renderContext.Request);
+
+            visualTree.Content.MainPanel.Headline.Title = @class is not null
+                ? @class.Name
+                : I18N.Translate(renderContext.Request, "kleenestar.core:object.kind.assets.label");
 
             // a kind overview is workspace content, so it advances the workspace's
             // "recently used" ranking just like the other kind overviews do

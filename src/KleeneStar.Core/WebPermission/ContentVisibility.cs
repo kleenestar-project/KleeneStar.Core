@@ -144,6 +144,18 @@ namespace KleeneStar.Core.WebPermission
         }
 
         /// <summary>
+        /// Determines whether the caller may read the objects of a class - the single-record
+        /// answer of <see cref="Restrict(IQuery{ObjectEntity})"/>, for a list of classes that
+        /// leads to their objects.
+        /// </summary>
+        /// <param name="classId">The class.</param>
+        /// <returns><see langword="true"/> when the objects of the class may be shown.</returns>
+        public static bool MayReadObjectsOf(Guid classId)
+        {
+            return !Applies() || !Refused(Kind.Class, typeof(ObjectReadPermission)).Contains(classId);
+        }
+
+        /// <summary>
         /// Narrows an insight query to the insights the caller may read.
         /// </summary>
         /// <remarks>

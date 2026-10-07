@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
@@ -27,7 +28,12 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
         /// </summary>
         public ControlDataTile Tile { get; } = new ControlDataTile()
         {
-            ServiceFactory = _ => DataServiceDescriptor.Data(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.Tile>().ToString())
+            // narrowed to the class the page shows, when it shows one of the sidebar's class tree
+            ServiceFactory = renderContext => DataServiceDescriptor.Data(ObjectClassFilter.Carry
+            (
+                CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.Tile>().ToString(),
+                renderContext?.Request
+            ))
         };
 
         /// <summary>

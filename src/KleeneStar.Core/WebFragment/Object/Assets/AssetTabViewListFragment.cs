@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebControl;
+﻿using KleeneStar.Core.WebRestApi;
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
@@ -29,7 +30,12 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
         /// </summary>
         public ListDetailControl List { get; } = new ListDetailControl()
         {
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.List>().ToString())
+            // narrowed to the class the page shows, when it shows one of the sidebar's class tree
+            ServiceFactory = renderContext => DataServiceDescriptor.QueryData(ObjectClassFilter.Carry
+            (
+                CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.List>().ToString(),
+                renderContext?.Request
+            ))
         };
 
         /// <summary>

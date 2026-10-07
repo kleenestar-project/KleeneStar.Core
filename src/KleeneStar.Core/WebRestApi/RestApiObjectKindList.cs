@@ -134,7 +134,8 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Narrows a query to the workspace the request addresses and to the endpoint's kind;
+        /// Narrows a query to the workspace the request addresses, to the endpoint's kind and,
+        /// when the address names a class, to that class and its descendants;
         /// an insight's list overrides it with the objects its query selects.
         /// </summary>
         /// <remarks>
@@ -151,9 +152,13 @@ namespace KleeneStar.Core.WebRestApi
             var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);
             var id = workspace?.Id ?? Guid.Empty;
 
-            return query
-                .WhereEquals(x => x.WorkspaceId, id)
-                .WhereEquals(x => x.Kind, Kind);
+            return ObjectClassFilter.Apply
+            (
+                query
+                    .WhereEquals(x => x.WorkspaceId, id)
+                    .WhereEquals(x => x.Kind, Kind),
+                request
+            );
         }
 
         /// <summary>

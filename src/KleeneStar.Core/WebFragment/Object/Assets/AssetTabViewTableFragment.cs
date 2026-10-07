@@ -1,3 +1,5 @@
+using KleeneStar.Core.WebRestApi;
+using WebExpress.WebCore;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebMessageQueue;
@@ -45,9 +47,15 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
 
             // the endpoint is free-form and carries no generic argument, so the domain of the
             // objects this table lists is declared explicitly to get the same refresh behavior.
+            //
+            // while the page shows one class of the sidebar's class tree, the address names it,
+            // so the endpoint lists that class and its descendants and offers their columns. The
+            // service is built while the page renders, which is when the request is at hand.
             Table.DataService<global::KleeneStar.Core.WWW.Api._1_.Assets._workspacekey_.Table>
             (
-                descriptor => descriptor.WithDomain(DataChangedNotifier.DomainName(typeof(Model.Entities.Object)))
+                descriptor => descriptor
+                    .WithDomain(DataChangedNotifier.DomainName(typeof(Model.Entities.Object)))
+                    .WithBaseUri(ObjectClassFilter.Carry(descriptor.BaseUri, WebEx.CurrentRequest))
             );
             Table.Bind = _ => new Binding()
                 .Add(new BindSearch() { Source = AssetTabViewSearchFragment.ContentId })

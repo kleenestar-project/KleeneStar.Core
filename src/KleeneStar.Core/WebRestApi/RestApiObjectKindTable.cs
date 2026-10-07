@@ -392,7 +392,9 @@ namespace KleeneStar.Core.WebRestApi
         /// <summary>
         /// Fetches the objects the table lists, in every state - the archived chip decides which
         /// state is shown. The default is the objects of the <see cref="Kind"/> in the workspace
-        /// the route names; an insight's table overrides it with the objects its query selects.
+        /// the route names - of one class and its descendants when the address names a class
+        /// (<see cref="ObjectClassFilter"/>); an insight's table overrides it with the objects
+        /// its query selects.
         /// </summary>
         /// <param name="request">The incoming request.</param>
         /// <returns>The objects. The list may be empty.</returns>
@@ -409,30 +411,39 @@ namespace KleeneStar.Core.WebRestApi
                 .WhereEquals(x => x.WorkspaceId, workspace.Id)
                 .WhereEquals(x => x.Kind, Kind);
 
-            return [.. CoreHub.ObjectManager.GetObjects(query)];
+            return [.. CoreHub.ObjectManager.GetObjects(ObjectClassFilter.Apply(query, request))];
         }
 
         /// <summary>
         /// Builds the columns the table can offer. The default offers the fields of the classes
-        /// of the <see cref="Kind"/> in the workspace the route names.
+        /// of the <see cref="Kind"/> in the workspace the route names, and of the named class
+        /// and its descendants alone when the address names a class.
         /// </summary>
         /// <param name="request">The incoming request.</param>
         /// <returns>The column catalog.</returns>
         private protected virtual ObjectTableColumnCatalog BuildCatalog(IRequest request)
         {
-            return ObjectTableColumnCatalog.Build(ResolveWorkspace(request)?.Id, Kind, request);
+            var lineage = ObjectClassFilter.ResolveLineage(request);
+
+            return lineage is not null
+                ? ObjectTableColumnCatalog.Build(lineage, request)
+                : ObjectTableColumnCatalog.Build(ResolveWorkspace(request)?.Id, Kind, request);
         }
 
         /// <summary>
         /// Returns what the stored column layouts of the table are kept apart by besides the
         /// view - the workspace key by default, so two workspaces' tables of the same view name
-        /// never share a layout.
+        /// never share a layout. A table narrowed to a class keeps a layout per class, because
+        /// it offers the columns of that class rather than those of the whole kind.
         /// </summary>
         /// <param name="request">The incoming request.</param>
         /// <returns>The scope part of the layout key.</returns>
         protected virtual string LayoutScope(IRequest request)
         {
-            return request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+            var workspaceKey = request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+            var classId = ObjectClassFilter.Resolve(request)?.Id;
+
+            return classId is null ? workspaceKey : $"{workspaceKey}@class:{classId}";
         }
 
         /// <summary>
