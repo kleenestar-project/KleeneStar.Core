@@ -61,6 +61,7 @@ namespace KleeneStar.Core.WebFragment.Object
         {
             Register(new Renderers.ProseRenderer());
             Register(new Renderers.FormRenderer());
+            Register(new Renderers.SpreadsheetRenderer());
         }
 
         /// <summary>
@@ -287,6 +288,23 @@ namespace KleeneStar.Core.WebFragment.Object
                 Model.Entities.ObjectRenderer.Normalize(renderer),
                 StringComparison.OrdinalIgnoreCase
             );
+        }
+
+        /// <summary>
+        /// Determines whether the supplied class reads and writes its objects through its
+        /// fields and forms (<see cref="IObjectRenderer.Structured"/> of the effective
+        /// renderer) - the question the field and form administration asks.
+        /// </summary>
+        /// <param name="class">The class to test. May be null, which answers false.</param>
+        /// <returns>True when the effective renderer is a mask.</returns>
+        public static bool IsStructured(Model.Entities.Class @class)
+        {
+            if (@class is null)
+            {
+                return false;
+            }
+
+            return Resolve(@class)?.Structured ?? true;
         }
 
         /// <summary>

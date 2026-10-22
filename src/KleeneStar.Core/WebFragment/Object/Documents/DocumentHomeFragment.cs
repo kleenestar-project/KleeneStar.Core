@@ -111,7 +111,14 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 Format = _ => TypeFormatText.H2
             });
 
-            body.Add(new ControlContent("document-home-body-" + id)
+            // a home page rendered as a spreadsheet shows its workbook, read-only
+            body.Add(ObjectSpreadsheetView.Create
+            (
+                "document-home-sheet-" + id,
+                home.Description,
+                ObjectSpreadsheetView.PageHeight,
+                "kleenestar.core:object.kind.document.read.empty"
+            ) ?? new ControlContent("document-home-body-" + id)
             {
                 Content = _ => home.Description,
                 Format = _ => TypeFormatContent.RichText,

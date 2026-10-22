@@ -54,5 +54,10 @@ namespace KleeneStar.Core.WebFragment.Object.Renderers
             Model.Entities.ObjectKind.Document,
             Model.Entities.ObjectKind.Blog
         ];
+
+        /// <summary>
+        /// Gets <see langword="false"/>: prose is one text, it has no fields.
+        /// </summary>
+        public bool Structured => false;
     }
 }

@@ -96,7 +96,7 @@ The three form fragments are scoped to the matching `/blog/{key}` routes as well
 
 **This is what makes the concept extensible rather than merely configurable.** A third renderer is a descriptor, a condition, and a pair of fragments. Nothing already written is edited, because nothing already written asks what else exists — each fragment only knows whether it is the one.
 
-## The Two Core Renderers
+## The Core Renderers
 
 **Prose** is what a document and a post have always been, and it is unchanged: the WYSIWYG surface writing into an [unpublished draft](kleenestar.draft.md), the reading view showing the last published text, the publish button ending both. See that document; nothing about it moved.
 
@@ -123,6 +123,17 @@ One trap the sheet has to know about: a field whose name aliases a system attrib
 
 There is no draft on the form side, and that is deliberate rather than missing. A draft is prose's answer to writing a long text over several sittings; a field is finished when it is filled in.
 
+**Spreadsheet** (added 2026-10-22) makes a document a **workbook**, and it is offered on the document kind alone (`SpreadsheetRenderer.Kinds`; the blog kind names prose anyway, an issue has a mask). It was built exactly the way the paragraph above promises - a descriptor, a condition (`SpreadsheetRendererCondition`) and fragments scoped to the document routes:
+
+- *Reading* - `ObjectSpreadsheetReadFragment` shows the published workbook as the framework's `ControlSpreadsheet`, read-only, without toolbar, formula bar and status bar; the sheet tabs stay. `ObjectSpreadsheetView` builds that view for every surface that shows such a body: the reading view, the document home (`DocumentHomeFragment`), the preview pane (`ObjectPreviewDescriptionFragment`) and the draft comparison (`ObjectDraftChangesFragment`).
+- *Writing* - `ObjectSpreadsheetEditorFragmentBase` is the framework's `ControlDataModalSpreadsheet`, the workbook sibling of the prose editor's `ControlDataModalEditor`: draft, publish, discard, preview and the shared surface are the framework's. The two subclasses stand on the reading view (opened by `ObjectSpreadsheetEditButtonFragment`) and on `…/edit` (opened with the page).
+
+**The workbook is the description.** It is stored as its JSON in `Object.Description` and travels through the **same two endpoints** as prose - `/api/1/drafts/{objectkey}` autosaves, `/api/1/prose` loads draft-or-published and publishes - so the commit history, the audit and the one draft row per object need nothing new. Both endpoints ask whether the object's class renders as a spreadsheet and then accept only a workbook (`400` otherwise); it is stored with the formula results the client posted, so a server reads figures without a formula engine. A body that is **no** workbook - the text of a document whose class was switched, or a template's description preset - is answered to the dialog as nothing, so the sheet opens empty, and the reading view says the content is no spreadsheet; the text stays in the history and is replaced on the first publish.
+
+**Telling a workbook from a document is `WebControl/WorkbookText`'s job**, and it is not the framework's: `SpreadsheetWorkbook.IsWorkbook` and `EditorState.IsState` both answer "starts with a brace", and `SpreadsheetWorkbook.Parse` reads an editor document as one empty sheet. A workbook is the JSON object with a `sheets` array and no `doc`. `ProseText` asks it first, so every table, tile, teaser and tooltip shows the cell values (formula cells by their result, cut at 1000 characters) instead of the serialization, and `IsEmpty` counts filled cells.
+
+**Prose and spreadsheet have no fields.** `IObjectRenderer.Structured` (default `true`; `false` on both) is what the field and form administration asks through `ObjectRendererCatalog.IsStructured` - the class sidebar, the class overview's setup checks, the form editor's notice and the template structure (`TemplateStructure.IsProse`). They used to ask "not prose", which a third body renderer would have answered wrongly.
+
 ## Administration
 
 The renderer is picked on the class dialogs, beside the object type, from the catalog — so a plugin that ships a renderer becomes selectable without those dialogs knowing it exists.
@@ -141,7 +152,7 @@ The validation runs against the kind the class **will** carry, not the one it ha
 
 `ClassManager.Add` and `Update` normalize the key on the way in, exactly as they normalize the kind — to `null` rather than to a default, per the asymmetry above.
 
-The class administration follows the renderer too. A prose class has no mask a field could stand in or a form could arrange, so its sidebar offers neither the *Fields* nor the *Forms* link: `ClassStructuredRendererCondition` gates both on the **effective** renderer (`IsRenderedAs`), resolving the class from whichever segment the route carries - the class, or a form, workflow, SLA or calendar of it. A blog class therefore never shows them, a document class only once it is switched to the form renderer. A form opened by its own address still answers with `FormProseNoticeFragment`.
+The class administration follows the renderer too. A prose class has no mask a field could stand in or a form could arrange, so its sidebar offers neither the *Fields* nor the *Forms* link: `ClassStructuredRendererCondition` gates both on the **effective** renderer (`IsRenderedAs`), resolving the class from whichever segment the route carries - the class, or a form, workflow, SLA or calendar of it. A blog class therefore never shows them, a document class only once it is switched to the form renderer. The condition asks `IsStructured`, so a spreadsheet class is treated like a prose one. A form opened by its own address still answers with `FormProseNoticeFragment`.
 
 ## Seeded Example
 
@@ -151,5 +162,5 @@ The seed carries one document class of each renderer, so both surfaces are reach
 
 - [Classes](kleenestar.class.md) — the class carries both the kind and the renderer.
 - [Forms](kleenestar.form.md) — what the form renderer reads and writes through.
-- [Drafts and publication](kleenestar.draft.md) — what the prose renderer reads and writes through.
+- [Drafts and publication](kleenestar.draft.md) — what the prose and the spreadsheet renderer read and write through.
 - [Objects](kleenestar.object.md) — the kind, which the renderer is orthogonal to.

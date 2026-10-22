@@ -112,6 +112,7 @@ namespace KleeneStar.Core.Test.WebFragment
         [InlineData(ObjectKind.Document, null, false)]
         [InlineData(ObjectKind.Document, ObjectRenderer.Prose, false)]
         [InlineData(ObjectKind.Document, ObjectRenderer.Form, true)]
+        [InlineData(ObjectKind.Document, ObjectRenderer.Spreadsheet, false)]
         [InlineData(ObjectKind.Blog, null, false)]
         [InlineData(ObjectKind.Blog, ObjectRenderer.Form, false)]
         public void StructureLinks_FollowTheEffectiveRenderer(string kind, string renderer, bool offered)

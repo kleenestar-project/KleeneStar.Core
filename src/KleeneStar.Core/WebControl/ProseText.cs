@@ -18,7 +18,8 @@ namespace KleeneStar.Core.WebControl
     /// stored shows the reader the serialization instead. The document is rendered by the
     /// framework's own reader (<see cref="EditorState.ToHtml"/>), so what is stripped to text
     /// here is the same markup a reading view would show, and text that is not a document
-    /// passes through untouched.
+    /// passes through untouched. A document rendered as a spreadsheet stores a workbook in the
+    /// same column; <see cref="WorkbookText"/> recognises it first and answers its cells.
     /// </remarks>
     public static partial class ProseText
     {
@@ -32,6 +33,12 @@ namespace KleeneStar.Core.WebControl
         /// </returns>
         public static string ToPlainText(string value)
         {
+            // a workbook starts with a brace too, and the editor's reader refuses it
+            if (WorkbookText.Read(value) is { } workbook)
+            {
+                return WorkbookText.ToPlainText(workbook);
+            }
+
             if (string.IsNullOrWhiteSpace(value) || !EditorState.IsState(value))
             {
                 return value;
@@ -68,6 +75,11 @@ namespace KleeneStar.Core.WebControl
         /// </returns>
         public static string ToHtml(string value)
         {
+            if (WorkbookText.Read(value) is { } workbook)
+            {
+                return WebUtility.HtmlEncode(WorkbookText.ToPlainText(workbook));
+            }
+
             if (string.IsNullOrWhiteSpace(value) || !EditorState.IsState(value))
             {
                 return value;
@@ -100,6 +112,11 @@ namespace KleeneStar.Core.WebControl
             if (string.IsNullOrWhiteSpace(value))
             {
                 return null;
+            }
+
+            if (WorkbookText.Read(value) is { } workbook)
+            {
+                return WebUtility.HtmlEncode(WorkbookText.ToPlainText(workbook));
             }
 
             if (EditorState.IsState(value))
@@ -138,6 +155,12 @@ namespace KleeneStar.Core.WebControl
             if (string.IsNullOrWhiteSpace(value))
             {
                 return true;
+            }
+
+            // a workbook is empty when no cell carries anything
+            if (WorkbookText.Read(value) is { } workbook)
+            {
+                return workbook.IsEmpty;
             }
 
             if (!EditorState.IsState(value))

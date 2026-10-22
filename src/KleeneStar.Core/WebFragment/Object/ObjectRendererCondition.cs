@@ -121,4 +121,14 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <inheritdoc/>
         protected override string Renderer => Model.Entities.ObjectRenderer.Form;
     }
+
+    /// <summary>
+    /// Gates the surfaces of the spreadsheet renderer: the workbook dialog and the read-only
+    /// spreadsheet that presents what it published.
+    /// </summary>
+    public sealed class SpreadsheetRendererCondition : ObjectRendererCondition
+    {
+        /// <inheritdoc/>
+        protected override string Renderer => Model.Entities.ObjectRenderer.Spreadsheet;
+    }
 }

@@ -84,7 +84,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_
             return Ok(new DraftState
             {
                 Summary = summary,
-                Description = description,
+                Description = global::KleeneStar.Core.WWW.Api._1_.Prose.Index.IsSpreadsheet(@object)
+                    ? global::KleeneStar.Core.WebControl.WorkbookText.ForEditor(description)
+                    : description,
                 Draft = isDraft,
                 Updated = updated
             });
@@ -131,8 +133,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_
                 return Error("The request body must be a JSON document of the form { \"summary\": \"…\", \"description\": \"…\" }.");
             }
 
+            var body = payload.Description;
+
+            // the draft of a workbook is a workbook too, or the dialog would resume on nothing
+            if (global::KleeneStar.Core.WWW.Api._1_.Prose.Index.IsSpreadsheet(@object) && !global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize(body, out body))
+            {
+                return Error("The body of a spreadsheet document must be a workbook.");
+            }
+
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
-            var draft = CoreHub.ObjectDraftManager.Save(@object.Id, payload.Summary, payload.Description, identityId);
+            var draft = CoreHub.ObjectDraftManager.Save(@object.Id, payload.Summary, body, identityId);
 
             if (draft is null)
             {

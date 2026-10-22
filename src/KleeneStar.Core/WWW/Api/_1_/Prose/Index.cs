@@ -82,7 +82,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Prose
                 var (summary, description, _, _) = CoreHub.ObjectDraftManager.GetEffective(data.Id);
 
                 payload[nameof(Model.Entities.Object.Summary)] = summary;
-                payload[nameof(Model.Entities.Object.Description)] = description;
+                payload[nameof(Model.Entities.Object.Description)] = IsSpreadsheet(data)
+                    ? global::KleeneStar.Core.WebControl.WorkbookText.ForEditor(description)
+                    : description;
             }
 
             return result;
@@ -116,9 +118,30 @@ namespace KleeneStar.Core.WWW.Api._1_.Prose
             var summary = ReadText(payload, nameof(Model.Entities.Object.Summary));
             var description = ReadText(payload, nameof(Model.Entities.Object.Description));
 
+            // a workbook is published only as one: what the readers get is what the server read
+            if (IsSpreadsheet(existingItem) && !global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize(description, out description))
+            {
+                throw new ArgumentException("The body of a spreadsheet document must be a workbook.");
+            }
+
             CoreHub.ObjectDraftManager.Publish(existingItem.Id, summary, description, identityId);
 
             return new RestApiCrudResultUpdate();
+        }
+
+        /// <summary>
+        /// Determines whether the object is a document whose class renders it as a spreadsheet,
+        /// so its body is a workbook rather than an editor document.
+        /// </summary>
+        /// <param name="object">The object.</param>
+        /// <returns>True for a workbook body.</returns>
+        internal static bool IsSpreadsheet(Model.Entities.Object @object)
+        {
+            return @object is not null && global::KleeneStar.Core.WebFragment.Object.ObjectRendererCatalog.IsRenderedAs
+            (
+                CoreHub.ClassManager.GetClass(@object.ClassId),
+                Model.Entities.ObjectRenderer.Spreadsheet
+            );
         }
 
         /// <summary>

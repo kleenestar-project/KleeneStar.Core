@@ -175,6 +175,25 @@ namespace KleeneStar.Core.WebFragment.Object
             }
 
             section.Add(Label("object-draft-body-before-label-" + id, "kleenestar.core:object.draft.changes.published"));
+
+            // a workbook is compared as the two grids; the published body of a document switched
+            // to the spreadsheet renderer may still be prose and is shown as such
+            if (ObjectSpreadsheetView.Create("object-draft-body-after-" + id, draft.Description, ObjectSpreadsheetView.SectionHeight, "kleenestar.core:object.draft.changes.empty") is { } after)
+            {
+                section.Add(ObjectSpreadsheetView.Create("object-draft-body-before-" + id, @object.Description, ObjectSpreadsheetView.SectionHeight, "kleenestar.core:object.draft.changes.empty")
+                    ?? new ControlContent("object-draft-body-before-" + id)
+                    {
+                        Content = _ => @object.Description,
+                        Format = _ => TypeFormatContent.RichText,
+                        Placeholder = _ => "kleenestar.core:object.draft.changes.empty",
+                        Classes = ["ks-draft-changes-before"]
+                    });
+                section.Add(Label("object-draft-body-after-label-" + id, "kleenestar.core:object.draft.changes.draft"));
+                section.Add(after);
+
+                return section;
+            }
+
             section.Add(new ControlContent("object-draft-body-before-" + id)
             {
                 Content = _ => @object.Description,

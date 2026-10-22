@@ -47,7 +47,8 @@ namespace KleeneStar.Core.WebFragment.Form
                 return false;
             }
 
-            return ObjectRendererCatalog.IsRenderedAs(@class, Model.Entities.ObjectRenderer.Prose) == Prose;
+            // a workbook arranges no fields either, so it is answered like prose
+            return !ObjectRendererCatalog.IsStructured(@class) == Prose;
         }
 
         /// <summary>

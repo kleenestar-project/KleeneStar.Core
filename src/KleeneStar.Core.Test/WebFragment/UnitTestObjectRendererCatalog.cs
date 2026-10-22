@@ -312,5 +312,31 @@ namespace KleeneStar.Core.Test.WebFragment
 
             Assert.NotEqual(replaced, ObjectRendererCatalog.Version);
         }
+
+        /// <summary>
+        /// Verifies the spreadsheet renderer: offered on the document kind and on no other -
+        /// not on the blog, which names prose alone, nor on an issue or an add-on kind - and,
+        /// like prose, a renderer without fields.
+        /// </summary>
+        [Fact]
+        public void Spreadsheet_IsOfferedOnDocumentsAlone()
+        {
+            Assert.True(ObjectRendererCatalog.IsOffered(ObjectKind.Document, ObjectRenderer.Spreadsheet));
+            Assert.False(ObjectRendererCatalog.IsOffered(ObjectKind.Blog, ObjectRenderer.Spreadsheet));
+            Assert.False(ObjectRendererCatalog.IsOffered(ObjectKind.Issue, ObjectRenderer.Spreadsheet));
+            Assert.False(ObjectRendererCatalog.IsOffered(ObjectKind.Asset, ObjectRenderer.Spreadsheet));
+            Assert.False(ObjectRendererCatalog.IsOffered("kind-of-an-uninstalled-addon", ObjectRenderer.Spreadsheet));
+
+            var sheet = new Class { Kind = ObjectKind.Document, Renderer = ObjectRenderer.Spreadsheet };
+
+            Assert.True(ObjectRendererCatalog.IsRenderedAs(sheet, ObjectRenderer.Spreadsheet));
+            Assert.False(ObjectRendererCatalog.IsStructured(sheet));
+            Assert.False(ObjectRendererCatalog.IsStructured(new Class { Kind = ObjectKind.Document }));
+            Assert.True(ObjectRendererCatalog.IsStructured(new Class { Kind = ObjectKind.Document, Renderer = ObjectRenderer.Form }));
+            Assert.True(ObjectRendererCatalog.IsStructured(new Class { Kind = ObjectKind.Issue }));
+
+            // an issue class that carries the key reads as its kind's default
+            Assert.Equal(ObjectRenderer.Form, ObjectRendererCatalog.ResolveKey(new Class { Kind = ObjectKind.Issue, Renderer = ObjectRenderer.Spreadsheet }));
+        }
     }
 }

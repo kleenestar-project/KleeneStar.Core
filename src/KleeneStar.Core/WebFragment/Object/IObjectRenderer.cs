@@ -64,5 +64,13 @@ namespace KleeneStar.Core.WebFragment.Object
         /// class.
         /// </summary>
         IEnumerable<string> Kinds => [];
+
+        /// <summary>
+        /// Gets whether the renderer writes and reads the object through the fields and forms
+        /// of its class. A renderer that draws one body of its own - prose, a workbook - answers
+        /// <see langword="false"/>, and the field and form administration of such a class is
+        /// withheld, because nothing it arranges is ever drawn. The default is the mask.
+        /// </summary>
+        bool Structured => true;
     }
 }

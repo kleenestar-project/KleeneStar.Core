@@ -104,18 +104,18 @@ namespace KleeneStar.Core.WebFragment.Class
 
     /// <summary>
     /// Fulfilled when the addressed class reads its objects through a structured mask rather
-    /// than as prose - it gates the field and form links. A prose class has no mask a field
-    /// could stand in or a form could arrange: a blog class always, a document class unless it
-    /// was switched to the form renderer. The answer is the <em>effective</em> renderer
-    /// (<see cref="ObjectRendererCatalog.IsRenderedAs"/>), so a class that names none follows
-    /// its kind.
+    /// than as one body of their own (prose, a workbook) - it gates the field and form links. A
+    /// prose or spreadsheet class has no mask a field could stand in or a form could arrange: a
+    /// blog class always, a document class unless it was switched to the form renderer. The
+    /// answer is the <em>effective</em> renderer (<see cref="ObjectRendererCatalog.IsStructured"/>),
+    /// so a class that names none follows its kind.
     /// </summary>
     public sealed class ClassStructuredRendererCondition : ClassSidebarCondition
     {
         /// <inheritdoc/>
         protected override bool Offers(Model.Entities.Class @class)
         {
-            return !ObjectRendererCatalog.IsRenderedAs(@class, Model.Entities.ObjectRenderer.Prose);
+            return ObjectRendererCatalog.IsStructured(@class);
         }
     }
 }

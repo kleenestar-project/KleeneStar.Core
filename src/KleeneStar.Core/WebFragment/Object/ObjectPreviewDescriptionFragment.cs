@@ -88,6 +88,14 @@ namespace KleeneStar.Core.WebFragment.Object
                 return section.Render(renderContext, visualTree);
             }
 
+            // the body of a spreadsheet document is a workbook, read in a small grid
+            if (ObjectSpreadsheetView.Create("object-preview-description-sheet-" + id, @object.Description, ObjectSpreadsheetView.SectionHeight) is { } sheet)
+            {
+                section.Add(sheet);
+
+                return section.Render(renderContext, visualTree);
+            }
+
             // the description is stored as the editor's document, so it is handed to the
             // framework's reading view - the same way the document and blog reading views
             // render their prose; emitted as markup, the preview showed the serialization
