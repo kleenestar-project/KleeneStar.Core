@@ -95,5 +95,31 @@ namespace KleeneStar.Core.Test.WebControl
             Assert.False(WorkbookText.TryNormalize(Document, out _));
             Assert.False(WorkbookText.TryNormalize("A seeded sentence.", out _));
         }
+
+        /// <summary>
+        /// Verifies that autosave and publication keep the rows, columns and sheets the author
+        /// hid, so a reopened or published workbook does not reveal them.
+        /// </summary>
+        [Fact]
+        public void TryNormalize_PreservesHiddenRowsColumnsAndSheets()
+        {
+            // arrange
+            const string value = """
+                {"version":1,"sheets":[{"name":"Budget","rowCount":10,"colCount":4,"cells":{"A1":{"v":"Visible"},"B1":{"v":900}},"rows":{"0":{"hidden":true}},"cols":{"1":{"hidden":true}},"props":{"hidden":true}}]}
+                """;
+
+            // act
+            var accepted = WorkbookText.TryNormalize(value, out var stored);
+            var sheet = System.Text.Json.Nodes.JsonNode.Parse(stored)["sheets"][0];
+
+            // validation
+            Assert.True(accepted);
+            Assert.True((bool)sheet["rows"]["0"]["hidden"]);
+            Assert.True((bool)sheet["cols"]["1"]["hidden"]);
+            Assert.True((bool)sheet["props"]["hidden"]);
+            Assert.Equal("Visible", (string)sheet["cells"]["A1"]["v"]);
+            Assert.Equal(900, (int)sheet["cells"]["B1"]["v"]);
+            Assert.Equal(stored, WorkbookText.TryNormalize(stored, out var again) ? again : null);
+        }
     }
 }
