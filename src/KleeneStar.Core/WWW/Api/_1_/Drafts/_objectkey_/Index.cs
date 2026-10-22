@@ -138,7 +138,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Drafts._objectkey_
             // the draft of a workbook is a workbook too, or the dialog would resume on nothing
             if (global::KleeneStar.Core.WWW.Api._1_.Prose.Index.IsSpreadsheet(@object) && !global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize(body, out body))
             {
-                return Error("The body of a spreadsheet document must be a workbook.");
+                return Error($"The body of a spreadsheet document must be a workbook of at most {(global::KleeneStar.Core.WebControl.WorkbookText.MaxLength)} characters.");
             }
 
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);

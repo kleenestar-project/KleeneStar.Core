@@ -121,7 +121,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Prose
             // a workbook is published only as one: what the readers get is what the server read
             if (IsSpreadsheet(existingItem) && !global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize(description, out description))
             {
-                throw new ArgumentException("The body of a spreadsheet document must be a workbook.");
+                throw new ArgumentException($"The body of a spreadsheet document must be a workbook of at most {(global::KleeneStar.Core.WebControl.WorkbookText.MaxLength)} characters.");
             }
 
             CoreHub.ObjectDraftManager.Publish(existingItem.Id, summary, description, identityId);

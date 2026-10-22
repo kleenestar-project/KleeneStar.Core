@@ -656,7 +656,7 @@ object.renderer.prose.description=Das Objekt wird im WYSIWYG-Editor geschrieben 
 object.renderer.prose.label=Fließtext
 object.renderer.spreadsheet.description=Das Dokument ist eine Arbeitsmappe: Es wird in der Tabellenkalkulation bearbeitet und als schreibgeschützte Tabelle gelesen.
 object.renderer.spreadsheet.label=Tabelle
-object.renderer.spreadsheet.read.foreign=Der Inhalt dieses Dokuments ist keine Tabelle. Beim Bearbeiten beginnt eine leere Arbeitsmappe; der bisherige Text bleibt im Verlauf erhalten.
+object.renderer.spreadsheet.read.foreign=Der Inhalt dieses Dokuments ist keine Tabelle. Beim Bearbeiten wird der Text absatzweise in die erste Spalte einer Arbeitsmappe übernommen; die Formatierung bleibt im Verlauf erhalten.
 object.prose.edit.label=Bearbeiten
 object.prose.api.title=Text veröffentlichen
 

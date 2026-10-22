@@ -126,7 +126,10 @@ with the framework's `ChartCtrl` (SVG; WebUI stopped shipping Chart.js on 2026-1
 reader's choice is remembered in the browser per insight. A series a report puts on `y1` (the open
 count of *average age* and *created vs. resolved*, the resolved count of *resolution time*) is drawn
 on the control's second value axis at the right edge (`yAxisID: "y1"`, titled by `axisY1`; WebUI
-2026-10-22).
+2026-10-22). The stacked *cumulative flow* keeps its bands without Chart.js's `fill: "-1"`: on
+stacked axes the control draws a series filled to `"origin"` down to the curve of the series
+beneath it, at the summed height - pinned by WebUI's `control.chart.render.test.mjs` ("a stacked
+area rests on the series beneath it"), with the configuration `insightreports.js` builds.
 
 The reports are computed from the **history of the workflow field**, replayed from the commit
 chain (`ModelHub.GetFieldChanges`, one query for all workflow fields of the classes involved;

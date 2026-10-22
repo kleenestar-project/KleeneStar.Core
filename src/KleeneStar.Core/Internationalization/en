@@ -655,7 +655,7 @@ object.renderer.prose.description=The object is written in the WYSIWYG editor an
 object.renderer.prose.label=Prose
 object.renderer.spreadsheet.description=The document is a workbook: it is worked on in the spreadsheet and read as a read-only table.
 object.renderer.spreadsheet.label=Spreadsheet
-object.renderer.spreadsheet.read.foreign=The content of this document is no spreadsheet. Editing starts an empty workbook; the previous text stays in the history.
+object.renderer.spreadsheet.read.foreign=The content of this document is no spreadsheet. Editing carries the text into the first column of a workbook, one paragraph per row; the formatting stays in the history.
 object.prose.edit.label=Edit
 object.prose.api.title=Publish Prose
 

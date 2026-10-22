@@ -263,5 +263,50 @@ namespace KleeneStar.Core.Test.WebManager
 
             Assert.True(index.IsUnique);
         }
+        /// <summary>
+        /// Verifies that a normalized empty workbook replaces published content when a draft resumes.
+        /// </summary>
+        [Fact]
+        public void Save_EmptyWorkbook_ResumesEmptyBody()
+        {
+            // arrange
+            Seed(nameof(Save_EmptyWorkbook_ResumesEmptyBody));
+            Assert.True(global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize("", out var empty));
+
+            // act
+            CoreHub.ObjectDraftManager.Save(ObjectId, "empty draft", empty, AuthorId);
+            var effective = CoreHub.ObjectDraftManager.GetEffective(ObjectId);
+
+            // validation
+            Assert.True(effective.IsDraft);
+            Assert.True(global::KleeneStar.Core.WebControl.WorkbookText.Read(effective.Description)?.IsEmpty);
+            Assert.Equal(PublishedBody, CoreHub.ObjectManager.GetObject(ObjectId).Description);
+        }
+
+        /// <summary>
+        /// Verifies that publishing an empty workbook cannot resurrect an older draft body.
+        /// </summary>
+        /// <param name="hasDraft">Whether an older draft exists before publication.</param>
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Publish_EmptyWorkbook_ReplacesPreviousContent(bool hasDraft)
+        {
+            // arrange
+            Seed(nameof(Publish_EmptyWorkbook_ReplacesPreviousContent) + hasDraft);
+            if (hasDraft)
+            {
+                CoreHub.ObjectDraftManager.Save(ObjectId, "older draft", PublishedBody, AuthorId);
+            }
+            Assert.True(global::KleeneStar.Core.WebControl.WorkbookText.TryNormalize("", out var empty));
+
+            // act
+            var published = CoreHub.ObjectDraftManager.Publish(ObjectId, "empty workbook", empty, AuthorId);
+
+            // validation
+            Assert.True(global::KleeneStar.Core.WebControl.WorkbookText.Read(published.Description)?.IsEmpty);
+            Assert.True(global::KleeneStar.Core.WebControl.WorkbookText.Read(CoreHub.ObjectManager.GetObject(ObjectId).Description)?.IsEmpty);
+            Assert.False(CoreHub.ObjectDraftManager.HasDraft(ObjectId));
+        }
     }
 }
