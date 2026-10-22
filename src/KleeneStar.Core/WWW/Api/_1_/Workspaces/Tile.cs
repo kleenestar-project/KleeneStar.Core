@@ -17,6 +17,7 @@ using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 {
@@ -54,6 +55,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Retrieves a collection of tile items representing classes that match the 

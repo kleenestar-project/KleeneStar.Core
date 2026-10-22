@@ -79,8 +79,9 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
             }
 
             var html = base.Render(renderContext, visualTree);
+            // the target is resolved within the board, so only its own island is pointed at it
             new Binding().Add(new BindTemplate().Add("boardservice", TypeBindMode.Attr,
-                target: "wx-service", name: "base-uri")).ApplyUserAttributes(html);
+                target: ":scope > wx-service", name: "base-uri")).ApplyUserAttributes(html);
             return html;
         }
     }

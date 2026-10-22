@@ -11,6 +11,7 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebIcon;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WebRestApi
 {
@@ -78,6 +79,12 @@ namespace KleeneStar.Core.WebRestApi
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Returns the posts of the stream as feed entries.

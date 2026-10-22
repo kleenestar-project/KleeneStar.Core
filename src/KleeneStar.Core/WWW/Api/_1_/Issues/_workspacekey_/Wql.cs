@@ -10,8 +10,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Issues._workspacekey_
     /// <summary>
     /// Advanced-search prompt endpoint of the issue overview. The search control
     /// fetches its history and lookahead suggestions from this endpoint while the
-    /// plain-text query is forwarded to the <see cref="Table"/> endpoint as the
-    /// <c>q</c> parameter.
+    /// query is forwarded to the <see cref="Table"/> endpoint - plain text as <c>q</c>, an
+    /// expression as <c>wql</c>, which the table records in the history read back here.
     /// </summary>
     [Cache]
     public sealed class Wql : KleeneStarRestApiWqlPrompt<ObjectEntity>

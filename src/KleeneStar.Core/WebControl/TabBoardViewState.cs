@@ -9,6 +9,13 @@ namespace KleeneStar.Core.WebControl
     /// <summary>
     /// Binds the first service of a board view state to the address of its owning tab.
     /// </summary>
+    /// <remarks>
+    /// The tab control resolves a binding target within the element carrying the binding
+    /// (WebExpress, 2026-10-22). Before, it searched the whole pane, and a bare
+    /// <c>wx-service:first-of-type</c> pointed the search, the quickfilter and the sprint
+    /// header of a board pane at the board too. <c>:scope &gt;</c> keeps the target to this
+    /// view state's own islands.
+    /// </remarks>
     public sealed class TabBoardViewState : ControlViewState<DataQueryState>
     {
         /// <summary>
@@ -29,7 +36,7 @@ namespace KleeneStar.Core.WebControl
         {
             var html = base.Render(renderContext, visualTree);
             new Binding().Add(new BindTemplate().Add("boardservice", TypeBindMode.Attr,
-                target: "wx-service:first-of-type", name: "base-uri")).ApplyUserAttributes(html);
+                target: ":scope > wx-service:first-of-type", name: "base-uri")).ApplyUserAttributes(html);
             return html;
         }
     }

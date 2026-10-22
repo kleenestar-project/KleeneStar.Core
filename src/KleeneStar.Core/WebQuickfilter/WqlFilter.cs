@@ -130,8 +130,19 @@ namespace KleeneStar.Core.WebQuickfilter
         public static IEnumerable<TIndexItem> Apply<TIndexItem>(string wql, IEnumerable<TIndexItem> items)
             where TIndexItem : IIndexItem
         {
-            var predicate = Compile<TIndexItem>(wql);
+            return Apply(Compile<TIndexItem>(wql), items);
+        }
 
+        /// <summary>
+        /// Narrows a materialized sequence by a condition compiled with <see cref="Compile"/>.
+        /// </summary>
+        /// <typeparam name="TIndexItem">The type of the items.</typeparam>
+        /// <param name="predicate">The condition, or <see langword="null"/> for no narrowing.</param>
+        /// <param name="items">The sequence to narrow.</param>
+        /// <returns>The narrowed sequence; the sequence itself without a condition.</returns>
+        public static IEnumerable<TIndexItem> Apply<TIndexItem>(Expression<Func<TIndexItem, bool>> predicate, IEnumerable<TIndexItem> items)
+            where TIndexItem : IIndexItem
+        {
             if (predicate is null)
             {
                 return items;

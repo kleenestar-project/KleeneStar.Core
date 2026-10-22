@@ -7,6 +7,7 @@ using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Insights
 {
@@ -33,6 +34,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Retrieves the list items for all insights that match the specified query, 

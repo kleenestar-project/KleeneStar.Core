@@ -13,6 +13,7 @@ using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
 using WebExpress.WebIndex.Queries;
 using ScrumProjection = KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_.ScrumProjection;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
 {
@@ -40,6 +41,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Creates a sprint, for a caller who may read the insight.

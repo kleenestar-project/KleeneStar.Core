@@ -122,7 +122,11 @@ for `?report=cumulativeflow|velocity|averageage|createdresolved|resolutiontime`,
 for days is coarsened); velocity takes the last `sprints` sprints (default 8). The tab
 (`InsightReportControl` + `Assets/js/insightreports.js`, included on the insight page by
 `IncludeInsightReportsScript`) renders the translated toolbar on the server and draws the answer
-with the Chart.js the framework ships; the reader's choice is remembered in the browser per insight.
+with the framework's `ChartCtrl` (SVG; WebUI stopped shipping Chart.js on 2026-10-21); the
+reader's choice is remembered in the browser per insight. A series a report puts on `y1` (the open
+count of *average age* and *created vs. resolved*, the resolved count of *resolution time*) is drawn
+on the control's second value axis at the right edge (`yAxisID: "y1"`, titled by `axisY1`; WebUI
+2026-10-22).
 
 The reports are computed from the **history of the workflow field**, replayed from the commit
 chain (`ModelHub.GetFieldChanges`, one query for all workflow fields of the classes involved;

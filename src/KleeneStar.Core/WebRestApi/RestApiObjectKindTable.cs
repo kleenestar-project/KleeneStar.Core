@@ -44,7 +44,8 @@ namespace KleeneStar.Core.WebRestApi
     /// projection (the favorite flag lives on the caller's visit rows) that a WebIndex query
     /// cannot express — the base class would page the wrong set. Filtering, sorting and
     /// paging therefore run in memory over the workspace's objects. The endpoint honours the
-    /// same query parameters the other REST tables use: <c>q</c> (substring search), <c>f</c>
+    /// same query parameters the other REST tables use: <c>q</c> (substring search), <c>wql</c>
+    /// (an expression of the advanced search, which takes the place of <c>q</c>), <c>f</c>
     /// (comma-separated quickfilter ids), <c>p</c> (zero-based page number), <c>l</c> (page
     /// size), <c>o</c> (order column id) and <c>d</c> (order direction).
     ///
@@ -125,7 +126,6 @@ namespace KleeneStar.Core.WebRestApi
                 pageSize = DefaultPageSize;
             }
 
-            var search = request?.GetParameter("q")?.Value;
             var filters = request?.GetParameter("f")?.Value?
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [];
             var selected = new HashSet<string>(filters, StringComparer.OrdinalIgnoreCase);
@@ -158,13 +158,7 @@ namespace KleeneStar.Core.WebRestApi
                 objects = objects.Where(x => x.CreatorId == ownerId);
             }
 
-            if (!string.IsNullOrWhiteSpace(search) && search != "null")
-            {
-                objects = objects.Where(x =>
-                    (x.Key ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (x.Summary ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (x.Description ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase));
-            }
+            objects = Search(objects, request);
 
             // the filters the user defined are resolved from storage rather than from a chip
             // id handled above, and narrow further so they combine with the scopes and the
@@ -350,6 +344,66 @@ namespace KleeneStar.Core.WebRestApi
                 }));
 
             return layout;
+        }
+
+        /// <summary>
+        /// Narrows the objects by the search the request carries: an expression of the
+        /// advanced search (<c>wql</c>), which replaces the plain search as on every table of
+        /// the framework, or else the plain search (<c>q</c>) over key, summary and description.
+        /// </summary>
+        /// <param name="objects">The objects to narrow.</param>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The narrowed objects; the objects themselves without a search.</returns>
+        public static IEnumerable<ObjectEntity> Search(IEnumerable<ObjectEntity> objects, IRequest request)
+        {
+            var wql = request?.GetParameter("wql")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(wql))
+            {
+                return FilterWql(wql, objects, request);
+            }
+
+            var search = request?.GetParameter("q")?.Value;
+
+            if (string.IsNullOrWhiteSpace(search) || search == "null")
+            {
+                return objects;
+            }
+
+            return objects.Where(x =>
+                (x.Key ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (x.Summary ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (x.Description ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Narrows the objects by an expression of the advanced search and records it in the
+        /// caller's query history, under the subject the overview's WQL prompt reads back
+        /// (the queried type, see <see cref="KleeneStarRestApiWqlPrompt{TIndexItem}"/>).
+        /// </summary>
+        /// <remarks>
+        /// The objects are already in memory - the scope, the starred and lifecycle chips are
+        /// applied there - so the condition is evaluated exactly, the way the index reads it.
+        /// Only the condition is taken: the table sorts and pages by its own parameters. An
+        /// expression that does not parse narrows nothing and is not recorded, as on the
+        /// framework's tables.
+        /// </remarks>
+        /// <param name="wql">The expression.</param>
+        /// <param name="objects">The objects to narrow.</param>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The narrowed objects.</returns>
+        private static IEnumerable<ObjectEntity> FilterWql(string wql, IEnumerable<ObjectEntity> objects, IRequest request)
+        {
+            var predicate = WqlFilter.Compile<ObjectEntity>(wql);
+
+            if (predicate is null)
+            {
+                return objects;
+            }
+
+            CoreHub.WqlHistoryManager.Record(request, typeof(ObjectEntity).FullName, wql);
+
+            return WqlFilter.Apply(predicate, objects);
         }
 
         /// <summary>

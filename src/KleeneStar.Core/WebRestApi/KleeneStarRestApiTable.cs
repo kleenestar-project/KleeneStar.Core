@@ -29,6 +29,13 @@ namespace KleeneStar.Core.WebRestApi
         protected virtual string TableLayoutKey => GetType().FullName;
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// tables of the application query the database. A text search there selects a
+        /// superset of what the index would find (see <see cref="WqlQueryMode.Translatable"/>).
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Retrieves the column collection presented to the client. The default
         /// implementation calls <see cref="RetrieveDefaultColumns"/> and applies
         /// the layout previously stored for the current user (if any).

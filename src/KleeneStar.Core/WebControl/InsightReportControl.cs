@@ -16,7 +16,7 @@ namespace KleeneStar.Core.WebControl
     /// <remarks>
     /// The control renders the toolbar - translated, so the script needs no texts of its own -
     /// and an empty stage; <c>Assets/js/insightreports.js</c> loads the report from the address
-    /// in <c>data-uri</c> and draws it with the Chart.js the framework ships on every page. The
+    /// in <c>data-uri</c> and draws it with the framework's chart control into the stage. The
     /// tab template is rendered once and cloned per tab, so the script initializes every copy it
     /// finds, including the ones the tab control adds later. The picked report is remembered per
     /// reader and insight in the browser.
@@ -91,7 +91,7 @@ namespace KleeneStar.Core.WebControl
 
             html.Append("</div>");
             html.Append("<p class=\"ks-insight-reports-description\"></p>");
-            html.Append("<div class=\"ks-insight-reports-stage\"><canvas></canvas>");
+            html.Append("<div class=\"ks-insight-reports-stage\"><div class=\"ks-insight-reports-chart\"></div>");
             html.Append($"<div class=\"ks-insight-reports-empty\" hidden>{T("kleenestar.core:insight.report.empty")}</div>");
             html.Append($"<div class=\"ks-insight-reports-error\" hidden>{T("kleenestar.core:insight.report.error")}</div>");
             html.Append("</div>");

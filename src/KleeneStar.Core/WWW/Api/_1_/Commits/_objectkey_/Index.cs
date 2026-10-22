@@ -15,6 +15,7 @@ using WebExpress.WebIndex.Queries;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Commits._objectkey_
 {
@@ -64,6 +65,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Commits._objectkey_
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Returns the commits of the addressed object, newest first, as list items whose

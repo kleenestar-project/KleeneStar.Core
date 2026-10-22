@@ -13,6 +13,7 @@ using WebExpress.WebIndex.Queries;
 // the endpoints live in KleeneStar.Core.WWW.Api._1_.SecurityLevels, so the bare entity
 // name would resolve to the namespace rather than to the type
 using SecurityLevelEntity = KleeneStar.Model.Entities.SecurityLevel;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.SecurityLevels._classid_
 {
@@ -47,6 +48,12 @@ namespace KleeneStar.Core.WWW.Api._1_.SecurityLevels._classid_
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Narrows the offered levels by what was typed into the selection.
