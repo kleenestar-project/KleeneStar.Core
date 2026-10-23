@@ -39,7 +39,7 @@ namespace KleeneStar.Core.WebInsight.Reports
         /// </summary>
         public static IReadOnlyList<string> Keys { get; } =
         [
-            CumulativeFlow, Velocity, AverageAge, CreatedVsResolved, ResolutionTime
+            CumulativeFlow, Velocity, AverageAge, CreatedVsResolved, ResolutionTime, InsightSlaReport.Key
         ];
 
         /// <summary>

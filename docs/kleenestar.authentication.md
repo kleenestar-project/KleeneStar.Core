@@ -74,6 +74,14 @@ OpenID Connect sources are configured (see the settings readme) and registered a
 `OpenIdConnectAuthenticationSource`, which rides WebExpress's authorization-code flow and answers
 the stored account from `MapIdentity`, so the issued token carries the stored id.
 
+## LDAP and Active Directory
+
+Directories are a plugin, not part of the core: `KleeneStar.Ldap` registers one source per
+configured directory (`Plugins:kleenestar.ldap:Directories`) with `AcceptsPassword = true`, so
+the password sign-in above checks the directory. The protocol dependency
+(System.DirectoryServices.Protocols) ships with the plugin only. See
+`KleeneStar.Ldap/docs/kleenestar.ldap.md`.
+
 ## Who administers accounts
 
 The permission model's chains start at a workspace; an account belongs to none. Until there is an
@@ -91,6 +99,5 @@ administrator) are recorded; neither a password nor a secret reaches the log.
 - The WebExpress login page has no slot for *sign in with ...* buttons, and the OIDC callback
   answers JSON instead of redirecting into the application; the OIDC path works but is reachable
   only by hand until the framework offers both.
-- No LDAP source ships; it would be a plugin registering a source with `AcceptsPassword = true`.
 - A changed password does not revoke credentials already issued; they expire with their lifetime.
 - No two-factor authentication, no self-service "forgot password" (there is no mail delivery).

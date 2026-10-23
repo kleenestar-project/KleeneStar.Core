@@ -277,6 +277,55 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
+        /// Verifies that a child the caller may not read still counts - a decomposed order is not
+        /// done while a sub-task it cannot see is open - but anonymously: no id, no key.
+        /// </summary>
+        [Fact]
+        public void GetProgress_CountsAHiddenChildAnonymously()
+        {
+            var connectionString = nameof(GetProgress_CountsAHiddenChildAnonymously);
+            Seed(connectionString);
+
+            var levelId = Guid.NewGuid();
+
+            using (var db = CoreHubFixture.CreateDbContext(connectionString))
+            {
+                // a level that names no group is closed to everybody
+                db.SecurityLevels.Add(new SecurityLevel { Id = levelId, Name = "Confidential", ClassId = ClassId, State = SecurityLevelState.Active });
+                db.SaveChanges();
+            }
+
+            var parent = Object("PRG-HID-P", TodoId);
+            var visible = Object("PRG-HID-1", DoneId);
+            var hidden = Object("PRG-HID-2", ProgressId);
+
+            using (var db = CoreHubFixture.CreateDbContext(connectionString))
+            {
+                db.Objects.Single(x => x.Id == hidden).SecurityLevelId = levelId;
+                db.SaveChanges();
+            }
+
+            Aggregate(parent, visible);
+            Aggregate(parent, hidden);
+
+            using (CoreHub.SessionManager.BeginIdentity(Guid.NewGuid()))
+            {
+                var progress = CoreHub.ObjectProgressManager.GetProgress(parent);
+
+                Assert.Equal(75, progress.Percent);
+                Assert.Equal(2, progress.Contributions.Count);
+                Assert.Equal(1, progress.Completed);
+                Assert.Equal(1, progress.Started);
+                Assert.Equal(1, progress.Hidden);
+
+                var anonymous = Assert.Single(progress.Contributions, x => x.Hidden);
+                Assert.Equal(Guid.Empty, anonymous.ObjectId);
+                Assert.Null(anonymous.Key);
+                Assert.Contains(progress.Contributions, x => x.Key == "PRG-HID-1" && !x.Hidden);
+            }
+        }
+
+        /// <summary>
         /// Verifies that an object nobody can address answers zero rather than an error, the
         /// same reading a list gives a key that names nothing.
         /// </summary>

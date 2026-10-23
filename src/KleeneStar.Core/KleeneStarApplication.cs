@@ -1,9 +1,11 @@
-﻿using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebAutomation;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebTheme;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using KleeneStar.Model.Settings;
 using System;
+using System.Linq;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
 using WebExpress.WebCore.WebAttribute;
@@ -22,6 +24,11 @@ namespace KleeneStar.Core
     [ContextPath("/kleenestar")]
     public sealed class KleeneStarApplication : IApplication
     {
+        /// <summary>
+        /// The worker running the automation queue, started with the application.
+        /// </summary>
+        private AutomationWorker _automationWorker;
+
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -78,6 +85,84 @@ namespace KleeneStar.Core
             PublishRelationTypes();
 
             RecordStartup();
+
+            RecoverInterruptedCreations();
+
+            ConnectBlueprints();
+
+            StartAutomation();
+        }
+
+        /// <summary>
+        /// Subscribes the automation platform to the events its triggers are raised from and
+        /// starts the worker that runs its queue.
+        /// </summary>
+        /// <remarks>
+        /// The queue is in the database, so the jobs an earlier run left - pending, or held by a
+        /// worker that died with it - are picked up as soon as the worker starts.
+        /// </remarks>
+        private void StartAutomation()
+        {
+            try
+            {
+                CoreHub.AutomationManager.Connect();
+                CoreHub.ApprovalManager.Connect();
+
+                _automationWorker = new AutomationWorker();
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
+        }
+
+        /// <summary>
+        /// Subscribes the blueprints to the structure managers and brings every follower in step.
+        /// </summary>
+        /// <remarks>
+        /// A synchronization converges, so running it at start heals whatever a crash or a
+        /// failed earlier run left behind. A failure must not keep the application from
+        /// starting; it is logged and the next change of the blueprint tries again.
+        /// </remarks>
+        private static void ConnectBlueprints()
+        {
+            try
+            {
+                CoreHub.BlueprintManager.Connect();
+
+                foreach (var blueprint in CoreHub.ClassManager.GetClasses(new WebExpress.WebIndex.Queries.Query<Class>()).Where(x => x.IsBlueprint))
+                {
+                    CoreHub.BlueprintManager.SynchronizeFollowers(blueprint.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
+        }
+
+        /// <summary>
+        /// Takes back the object creations a crash interrupted and forgets the completed ones a
+        /// retry can no longer refer to.
+        /// </summary>
+        /// <remarks>
+        /// A work structure is written step by step, so a host that died half-way through one
+        /// left a fragment and a running record naming it. Nothing that ran it survives a
+        /// restart, so the record is abandoned and its objects are removed before anybody can
+        /// submit again (<see cref="ObjectCreationRun.RecoverAbandoned"/>). A failure here must
+        /// not keep the application from starting; it is logged.
+        /// </remarks>
+        private void RecoverInterruptedCreations()
+        {
+            try
+            {
+                ObjectCreationRun.RecoverAbandoned();
+                ModelHub.PruneObjectCreations(DateTime.UtcNow.AddDays(-7));
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
         }
 
         /// <summary>
@@ -86,6 +171,7 @@ namespace KleeneStar.Core
         /// </summary>
         public void Dispose()
         {
+            _automationWorker?.Dispose();
         }
 
         /// <summary>

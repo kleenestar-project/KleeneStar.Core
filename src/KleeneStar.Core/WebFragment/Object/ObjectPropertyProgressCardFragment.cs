@@ -110,6 +110,37 @@ namespace KleeneStar.Core.WebFragment.Object
                 Format = _ => TypeFormatText.Small
             });
 
+            // the summary of a decomposed order: how much is under way and how much has not
+            // started, which the done count alone does not say
+            Add(new ControlText()
+            {
+                Text = _ => string.Format
+                (
+                    I18N.Translate(renderContext, "kleenestar.core:object.progress.summary"),
+                    progress.Completed,
+                    progress.Started,
+                    progress.Contributions.Count - progress.Completed - progress.Started
+                ),
+                TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
+                Format = _ => TypeFormatText.Small
+            });
+
+            // sub-tasks in places the reader may not see count, and the reader is told so -
+            // without anything that names them
+            if (progress.Hidden > 0)
+            {
+                Add(new ControlText()
+                {
+                    Text = _ => string.Format
+                    (
+                        I18N.Translate(renderContext, "kleenestar.core:object.progress.hidden"),
+                        progress.Hidden
+                    ),
+                    TextColor = _ => new PropertyColorText(TypeColorText.Secondary),
+                    Format = _ => TypeFormatText.Small
+                });
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

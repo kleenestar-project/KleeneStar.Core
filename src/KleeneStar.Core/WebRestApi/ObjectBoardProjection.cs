@@ -269,8 +269,21 @@ namespace KleeneStar.Core.WebRestApi
                 return null;
             }
 
-            var data = CoreHub.ValueManager.GetValue(objectId, context.WorkflowField.Id)?.Data;
-            if (string.IsNullOrWhiteSpace(data))
+            return ResolveCategory(CoreHub.ValueManager.GetValue(objectId, context.WorkflowField.Id)?.Data, context, categories);
+        }
+
+        /// <summary>
+        /// Resolves the status category a stored workflow value stands for - the half of
+        /// <see cref="ResolveCategory(Guid, ObjectBoardClassContext, IReadOnlyDictionary{Guid, StatusCategory})"/>
+        /// a caller that read the values of many objects at once uses.
+        /// </summary>
+        /// <param name="data">The stored value of the workflow field.</param>
+        /// <param name="context">The board context of the object's class.</param>
+        /// <param name="categories">All status categories, keyed by id.</param>
+        /// <returns>The resolved category, or <see langword="null"/>.</returns>
+        public static StatusCategory ResolveCategory(string data, ObjectBoardClassContext context, IReadOnlyDictionary<Guid, StatusCategory> categories)
+        {
+            if (context?.WorkflowField is null || string.IsNullOrWhiteSpace(data))
             {
                 return null;
             }

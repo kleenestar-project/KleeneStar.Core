@@ -120,12 +120,25 @@ arrangement `DocumentHomeFormFragment` uses for the workspace home page), and
 plus an entry standing for *unclassified* (the empty guid, which the form binder reads as "clear
 this property").
 
-**The classification is deliberately not a field on any object content form.** The create
-wizard, the edit dialog and the clone dialog write what a record *says*; who may see it is not
-part of that, and it is set where the permissions it replaced were set. A new object starts on
-the default level of its class and is reclassified afterwards.
+**In the create wizard** (since 2026-10-22). Who may see a record is decided when it is
+filed: a request about a person must not be readable by everyone for the moments between
+creating and reclassifying it. The last step of the wizard (`/api/1/objects/form`) carries the
+same selection as the dialog, below the title, preset with the class default when the caller is
+cleared for it. A **blank** answer is no answer and gets the default (`IsAnswered` in
+`/api/1/objects`) - a selection that did not take its preset must not leave a classified class's
+record unclassified; the explicit *unclassified* entry (the empty guid) still declassifies.
 
-The two forms that *create* a record — the wizard and the clone dialog — do still *report* it:
+**The classification is not a field on the edit and clone forms.** They write what a record
+*says*; who may see it is changed where the permissions it replaced were set, and a clone keeps
+the classification of its original.
+
+**Every change of the classification is recorded** in the object's history: `securitylevel`
+(and the portal's `portalrestricted`) are system properties of `ObjectProperty`, so the commit
+chain and the audit log say who changed who may see the record, and when. A restore does **not**
+write them back - a restore of the content must not widen the audience as a side effect, and
+the dialog is where the clearance to assign a level is checked.
+
+The two forms that *create* a record — the wizard and the clone dialog — also *report* it:
 `ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning** on them, and on the
 classification dialog itself, in exactly two situations — both ones the form would otherwise
 leave to be discovered by the record disappearing:

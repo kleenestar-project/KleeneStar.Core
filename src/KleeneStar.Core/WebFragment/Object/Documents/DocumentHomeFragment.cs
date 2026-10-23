@@ -174,7 +174,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 "document-home-comments-" + id,
                 new ControlText
                 {
-                    Text = _ => CoreHub.CommentManager.GetComments(home.Id).Count().ToString()
+                    Text = _ => global::KleeneStar.Core.WebPermission.CommentAudience.Filter(home, CoreHub.CommentManager.GetComments(home.Id)).Count().ToString()
                 },
                 new ControlIcon
                 {

@@ -60,6 +60,12 @@ namespace KleeneStar.Core
         private static ObjectRelationTypeManager _objectRelationTypeManager;
         private static ObjectImpactManager _objectImpactManager;
         private static ObjectProgressManager _objectProgressManager;
+        private static BlueprintManager _blueprintManager;
+        private static AutomationManager _automationManager;
+        private static WebhookManager _webhookManager;
+        private static ApprovalManager _approvalManager;
+        private static PlanningManager _planningManager;
+        private static ValueCatalogManager _valueCatalogManager;
         private static WorkflowGuardManager _workflowGuardManager;
         private static WorkflowValidatorManager _workflowValidatorManager;
         private static WorkflowPostFunctionManager _workflowPostFunctionManager;
@@ -307,6 +313,36 @@ namespace KleeneStar.Core
         public static IObjectProgressManager ObjectProgressManager => _objectProgressManager ??= ComponentHub.GetComponentManager<ObjectProgressManager>();
 
         /// <summary>
+        /// Gets the manager keeping the classes that follow a blueprint in step with it.
+        /// </summary>
+        public static IBlueprintManager BlueprintManager => _blueprintManager ??= ComponentHub.GetComponentManager<BlueprintManager>();
+
+        /// <summary>
+        /// Gets the automation platform: its rules and its persistent job queue.
+        /// </summary>
+        public static IAutomationManager AutomationManager => _automationManager ??= ComponentHub.GetComponentManager<AutomationManager>();
+
+        /// <summary>
+        /// Gets the connections of the workspaces to other systems: incoming and outgoing webhooks.
+        /// </summary>
+        public static IWebhookManager WebhookManager => _webhookManager ??= ComponentHub.GetComponentManager<WebhookManager>();
+
+        /// <summary>
+        /// Gets the multi-step approvals: the policies and the approvals that follow them.
+        /// </summary>
+        public static IApprovalManager ApprovalManager => _approvalManager ??= ComponentHub.GetComponentManager<ApprovalManager>();
+
+        /// <summary>
+        /// Gets the personal planning: time tracking, estimates, capacities, milestones.
+        /// </summary>
+        public static IPlanningManager PlanningManager => _planningManager ??= ComponentHub.GetComponentManager<PlanningManager>();
+
+        /// <summary>
+        /// Gets the central value catalogs selection fields draw their options from.
+        /// </summary>
+        public static IValueCatalogManager ValueCatalogManager => _valueCatalogManager ??= ComponentHub.GetComponentManager<ValueCatalogManager>();
+
+        /// <summary>
         /// Gets the registry of the conditions that decide whether a workflow transition may be
         /// taken - the core's own guards plus whatever the plugins of the installation added.
         /// </summary>
@@ -524,35 +560,32 @@ namespace KleeneStar.Core
                 return null;
             }
 
+            // the toast is the actor's feedback and goes to the session of the request that
+            // acted. It used to be a global notification every connected client replayed - the
+            // subject's name included, so a customer's browser was told the title of a
+            // classified record somebody else had just changed. Work without a request (a
+            // scheduled job, the start-up) raises no toast; the center above is the record.
+            if (WebEx.CurrentRequest is not WebExpress.WebCore.WebMessage.Request request || request.Session is null)
+            {
+                return null;
+            }
+
             return notificationManager.AddNotification
             (
                 applicationContext: application,
+                request: request,
+                message: Compose(I18N.Translate(request, message), subject),
+                durability: durability,
+                heading: I18N.Translate(request, header),
 
                 // the icon of the record the notification is about, the same one the entry in
-                // the notification center carries. It is what makes a toast recognizable at a
-                // glance - and, for a toast that is global anyway (see the note below),
-                // recognizable as being about something the reader knows. The application icon
-                // is the fallback for the records that carry none, and it used to be the only
-                // thing shown: a class whose avatar had just been changed reported the change
-                // under the product logo.
+                // the notification center carries; the application icon is the fallback for the
+                // records that carry none
                 icon: subjectIcon ?? ApplicationContext?.Icon?.ToUri()?.ToString(),
 
-                // the page of the record, so the reader can go straight to what changed. It is
-                // the same address the notification center entry links to, and it is null for
-                // the records that have no page of their own - the toast is then plain text,
-                // as it was before.
-                link: targetUri,
-                heading: I18N.Translate(header),
-                // the toast names what it is about. It has to: the notification API this goes
-                // through has no per-session store reachable from here, so every toast is a
-                // global one that every connected client replays for as long as it lives. Two
-                // actions inside that window are both delivered to both clients, and a toast
-                // that says only "the object was updated" is then indistinguishable from
-                // somebody else's — which is exactly how a workspace edit came to be reported
-                // as an object edit. Naming the subject makes a stray toast recognizable as
-                // one; see the remedy note in the memory of this project for the real fix.
-                message: Compose(I18N.Translate(message), subject),
-                durability: durability
+                // the page of the record, the same address the notification center entry links
+                // to; null for the records that have no page of their own
+                link: targetUri
             );
         }
 

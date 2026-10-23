@@ -76,10 +76,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._templateid_
                 return list.AsQueryable();
             }
 
-            query = query.Where(x => x.Class.WorkspaceId == workspaceId.Value);
-
+            // a template of another workspace is offered where the caller administers it as
+            // well: a work structure may reach into other departments with the consent of both
+            // sides, which the endpoint checks again when the reference is saved
             list.AddRange(CoreHub.TemplateManager.GetTemplates(query, context)
                 .Where(x => x.Id != templateId)
+                .Where(x => x.Class?.WorkspaceId == workspaceId.Value
+                    || global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(x.ClassId, request))
                 .Where(x => !CoreHub.TemplateManager.WouldFormCycle(templateId, x.Id))
                 .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(x => new RestApiSelectionItem()

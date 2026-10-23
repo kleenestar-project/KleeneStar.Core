@@ -55,6 +55,26 @@ A template is applied by `/api/1/objects` when a create payload names it (`Templ
 
 The object row, its answered values, its presets and the children of a composite template are recorded in one genesis commit per object.
 
+### Work structures across workspaces
+
+A composite template describes a whole work structure: several objects, who does each, what waits for what, and in which department each part is done. The onboarding of a new colleague is the typical case - filed in HR, it creates the account request at the IT desk and the desk set-up in HR, and the set-up waits for the account.
+
+|Element of the structure |Template                                  |Created as
+|-------------------------|------------------------------------------|------------------------------------------------------------
+|A part of the work       |a child template (`ParentId`)             |an object of the child template's class, **in that class's workspace**
+|Its place in the order   |-                                         |an `AggregatesProgress` relation from the parent object (the order reports the progress of the whole structure, `kleenestar.relation.md`); additionally `ParentId` when the child stays in the parent's workspace and the parent's class allows it
+|Who does it              |`AssigneeId`                              |the object's assignee (operator-side accounts only)
+|What it waits for        |`PredecessorId` (a sibling below the same parent) |a `BlocksCompletion` relation from the predecessor's object to this one - the workflow refuses to finish it first
+|Classification           |-                                         |the default security level of the child's class
+
+**Both sides consent to a cross-workspace link.** Linking a template below a template of another workspace requires administering that one too (`ValidateHierarchy`; the parent candidates offer templates of other workspaces only where the caller administers them), because the link changes what it creates. The objects of a structure are then created on the template's authority, not on the filer's: an HR clerk filing an onboarding does not need write access to the IT desk.
+
+**Reliable and repeatable** (`WebManager/ObjectCreationRun`, entity `ObjectCreation`, since 2026-10-22). A creation writes through several managers that persist on their own, so there is no single transaction to roll back; the run compensates instead:
+
+- **Idempotent.** The wizard renders a fresh key into every dialog (`IdempotencyKey`), a REST client may pass `?idempotencykey=`. The key is unique: a second submission under a completed key is answered with the object of the first (no duplicate structure), one under a running key is refused with a readable message, a rolled-back key may run again. A dialog opened anew creates anew - that is what repeating a template means.
+- **Atomic.** Every object and relation is recorded in the run's row *as it is written*. A failure takes them back - relations first, objects in reverse order, unrestricted - records the error and rethrows. The audit log stays append-only and shows the created-and-removed objects.
+- **Crash-safe.** A host that dies half-way leaves a running record naming what was written; the next start rolls back running records older than 15 minutes (`RecoverAbandoned`, from `KleeneStarApplication.Run`) and prunes completed records older than a week.
+
 ## UI Concepts and Pages
 
 Template management is integrated into the workspace settings, typically accessible alongside classes and fields. For end-users, templates manifest as the starting point of the object creation journey.

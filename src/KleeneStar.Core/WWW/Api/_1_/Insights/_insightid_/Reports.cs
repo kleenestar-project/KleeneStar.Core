@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebInsight;
 using KleeneStar.Core.WebInsight.Reports;
+using KleeneStar.Core.WebReport;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -26,6 +27,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// default - or <c>month</c>); the velocity chart takes the last <c>sprints</c> sprints
     /// (default 8) instead. The objects are read through the object manager, so a report shows
     /// only what its reader may see; a caller who may not read the insight gets a 403.
+    /// <para>
+    /// <c>slacompliance</c> evaluates the service level targets of the objects created in the
+    /// period. <c>&amp;format=csv</c> answers any report as a CSV file - the series per period,
+    /// for <c>slacompliance</c> one row per object and target - with <c>&amp;delimiter=semicolon</c>
+    /// for spreadsheets that expect it.
+    /// </para>
     /// </remarks>
     [Cache]
     public sealed class Reports : IRestApi
@@ -85,6 +92,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 InsightReportPeriod.ParseInterval(request?.GetParameter("interval")?.Value)
             );
 
+            var csv = string.Equals(request?.GetParameter("format")?.Value, "csv", StringComparison.OrdinalIgnoreCase);
+
+            if (report == InsightSlaReport.Key)
+            {
+                var targets = InsightSlaReport.Collect(objects, now);
+
+                return csv
+                    ? SlaCsv(targets, period, request, insight.Name)
+                    : Json(InsightSlaReport.Build(targets, period, Text, culture));
+            }
+
             var result = report switch
             {
                 InsightReports.CumulativeFlow => InsightReports.BuildCumulativeFlow(items, period, now, InsightReportSource.Categories(), Text, culture),
@@ -103,7 +121,61 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 result.Notice = string.Format(culture, Text("kleenestar.core:insight.report.untracked"), untracked);
             }
 
-            return Json(result);
+            return csv ? Csv(result, request, insight.Name) : Json(result);
+        }
+
+        /// <summary>
+        /// Writes a chart report as a table: one row per period, one column per series, followed
+        /// by the summary figures.
+        /// </summary>
+        /// <param name="result">The report.</param>
+        /// <param name="request">The request.</param>
+        /// <param name="insight">The insight's name, for the file name.</param>
+        /// <returns>The CSV download.</returns>
+        private static IResponse Csv(InsightReportResult result, IRequest request, string insight)
+        {
+            var document = new CsvDocument(CsvDocument.DelimiterOf(request));
+
+            document.Row([string.Empty, .. result.Series.Select(x => x.Label)]);
+
+            for (var index = 0; index < result.Labels.Count; index++)
+            {
+                document.Row([result.Labels[index], .. result.Series.Select(x => index < x.Data.Count ? CsvDocument.Number(x.Data[index]) : string.Empty)]);
+            }
+
+            if (result.Summary.Count > 0)
+            {
+                document.Row();
+
+                foreach (var figure in result.Summary)
+                {
+                    document.Row(figure.Label, figure.Value);
+                }
+            }
+
+            return document.ToResponse($"{insight}-{result.Report}.csv");
+        }
+
+        /// <summary>
+        /// Writes the service level targets of the period, one row per object and target.
+        /// </summary>
+        /// <param name="targets">The evaluated targets.</param>
+        /// <param name="period">The period.</param>
+        /// <param name="request">The request.</param>
+        /// <param name="insight">The insight's name, for the file name.</param>
+        /// <returns>The CSV download.</returns>
+        private static IResponse SlaCsv(IReadOnlyList<InsightSlaItem> targets, InsightReportPeriod period, IRequest request, string insight)
+        {
+            var document = new CsvDocument(CsvDocument.DelimiterOf(request));
+
+            document.Row("object", "created", "agreement", "target", "outcome", "deadline");
+
+            foreach (var item in targets.Where(x => x.Created >= period.From && x.Created < period.To).OrderBy(x => x.Created))
+            {
+                document.Row(item.ObjectKey, CsvDocument.Date(item.Created), item.Policy, item.Target, item.Outcome, CsvDocument.Date(item.Deadline?.ToUniversalTime()));
+            }
+
+            return document.ToResponse($"{insight}-{InsightSlaReport.Key}.csv");
         }
 
         /// <summary>

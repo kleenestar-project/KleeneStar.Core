@@ -81,27 +81,26 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The progress.</returns>
         public ObjectProgress GetProgress(Guid objectId)
         {
-            return Measure(objectId, [], 0);
+            // the object itself is read the caller's way: a caller who may not see it is told
+            // nothing about it, its children included
+            var @object = CoreHub.ObjectManager?.GetObject(objectId);
+
+            return @object is null
+                ? new ObjectProgress()
+                : Measure(@object, [], 0);
         }
 
         /// <summary>
         /// Measures one object, rolling up where it aggregates.
         /// </summary>
-        /// <param name="objectId">The object to measure.</param>
+        /// <param name="object">The object to measure, as read without narrowing.</param>
         /// <param name="visited">The objects already on this branch of the walk.</param>
         /// <param name="depth">How many parents were followed to get here.</param>
         /// <returns>The progress.</returns>
-        private static ObjectProgress Measure(Guid objectId, HashSet<Guid> visited, int depth)
+        private static ObjectProgress Measure(Model.Entities.Object @object, HashSet<Guid> visited, int depth)
         {
-            var @object = CoreHub.ObjectManager?.GetObject(objectId);
-
-            if (@object is null)
-            {
-                return new ObjectProgress();
-            }
-
-            var children = depth < MaximumDepth && visited.Add(objectId)
-                ? Children(objectId).ToList()
+            var children = depth < MaximumDepth && visited.Add(@object.Id)
+                ? Children(@object.Id).ToList()
                 : [];
 
             if (children.Count == 0)
@@ -110,7 +109,16 @@ namespace KleeneStar.Core.WebManager
             }
 
             var contributions = children
-                .Select(child => new ObjectProgressContribution(child.Id, child.Key, Measure(child.Id, visited, depth + 1).Percent))
+                .Select(child =>
+                {
+                    var percent = Measure(child.Object, visited, depth + 1).Percent;
+
+                    // a child the caller may not read counts, but anonymously: its share of the
+                    // percentage and of the summary, never its id, key, title or assignee
+                    return child.Visible
+                        ? new ObjectProgressContribution(child.Object.Id, child.Object.Key, percent)
+                        : new ObjectProgressContribution(Guid.Empty, null, percent, Hidden: true);
+                })
                 .ToList();
 
             return new ObjectProgress()
@@ -120,16 +128,37 @@ namespace KleeneStar.Core.WebManager
                 Percent = (int)Math.Round(contributions.Average(x => (double)x.Percent), MidpointRounding.AwayFromZero),
                 Aggregated = true,
                 Contributions = contributions,
-                Completed = contributions.Count(x => x.Percent >= 100)
+                Completed = contributions.Count(x => x.Percent >= 100),
+                Started = contributions.Count(x => x.Percent > 0 && x.Percent < 100),
+                Hidden = contributions.Count(x => x.Hidden)
             };
         }
 
         /// <summary>
-        /// Returns the objects whose progress the supplied object reports.
+        /// Returns the objects whose progress the supplied object reports, each with whether
+        /// the caller may read it.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Every child counts, the ones the caller may not read too.</b> A decomposed order
+        /// keeps its sub-tasks where the departments doing them work - another workspace, often
+        /// one the requester cannot read - and a rollup over the visible ones alone reported such
+        /// an order as done while work on it was still open. Worse, the guard that refuses to
+        /// close a parent with unfinished children asked the same rollup, so the parent could be
+        /// closed past an open sub-task the person moving it happened not to see.
+        /// </para>
+        /// <para>
+        /// <b>What identifies or describes a hidden child is withheld.</b> It contributes its
+        /// share of the percentage and of the done/started/open summary, which is what the parent
+        /// is meant to report; its id, key, title, assignee and content never reach the caller
+        /// (<see cref="ObjectProgressContribution.Hidden"/>). The children are therefore read
+        /// without the caller's narrowing - a read the system performs to answer a question about
+        /// the parent - and their visibility is asked separately.
+        /// </para>
+        /// </remarks>
         /// <param name="objectId">The aggregating object.</param>
-        /// <returns>The children, as the caller is allowed to see them.</returns>
-        private static IEnumerable<Model.Entities.Object> Children(Guid objectId)
+        /// <returns>The children and whether the caller may read each.</returns>
+        private static IEnumerable<(Model.Entities.Object Object, bool Visible)> Children(Guid objectId)
         {
             var relations = CoreHub.ObjectRelationManager?.GetRelations(objectId) ?? [];
 
@@ -153,14 +182,16 @@ namespace KleeneStar.Core.WebManager
                     continue;
                 }
 
-                // a child the caller may not see is not counted, which is the same reading the
-                // object lists give it: it does not exist for this request, and counting it
-                // would leak its state through an average
-                var child = CoreHub.ObjectManager?.GetObject(targetId);
+                Model.Entities.Object child;
+
+                using (CoreHub.SecurityLevelManager?.BeginUnrestricted())
+                {
+                    child = CoreHub.ObjectManager?.GetObject(targetId);
+                }
 
                 if (child is not null)
                 {
-                    yield return child;
+                    yield return (child, CoreHub.ObjectManager.GetObject(targetId) is not null);
                 }
             }
         }
@@ -175,7 +206,7 @@ namespace KleeneStar.Core.WebManager
         /// </remarks>
         /// <param name="object">The object.</param>
         /// <returns>The percentage.</returns>
-        private static int OwnProgress(Model.Entities.Object @object)
+        internal static int OwnProgress(Model.Entities.Object @object)
         {
             var @class = @object.Class ?? CoreHub.ClassManager?.GetClass(@object.ClassId);
 

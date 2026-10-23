@@ -155,6 +155,7 @@
         const error = host.querySelector(".ks-insight-reports-error");
         const notice = host.querySelector(".ks-insight-reports-notice");
         const summary = host.querySelector(".ks-insight-reports-summary");
+        const csv = host.querySelector(".ks-insight-reports-csv");
         let chart = null;
         let sequence = 0;
 
@@ -189,6 +190,11 @@
 
             arrange();
             remember(host, { report: report.value, range: range.value, interval: interval.value, sprints: sprints.value });
+
+            if (csv) {
+                const base = host.dataset.uri || "";
+                csv.href = `${base}${base.includes("?") ? "&" : "?"}${params}&format=csv`;
+            }
             host.classList.add("ks-insight-reports-loading");
 
             try {

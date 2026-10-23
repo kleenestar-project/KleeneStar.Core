@@ -304,3 +304,29 @@ or workspace it needs anywhere else.
 
 The former gap - `/api/1/insights/{insightid}/view` checked no permission - is closed: the board
 is read with `insight_read_content` and saved with `insight_write_content`.
+
+## Service level compliance
+
+The report `slacompliance` evaluates the service level targets of the objects created in the
+period - now, the way the SLA card and the escalation rules see them (`SlaEvaluations.For`) - and
+stacks per interval how many were **met**, **breached**, are **at risk** or still **running**. The
+summary gives the compliance rate (met of decided), the counts and the most breached target
+(`WebInsight/Reports/InsightSlaReport`, a pure function over `InsightSlaItem`s).
+
+## Exports
+
+Every report and the objects themselves leave as CSV (`WebReport/CsvDocument`: RFC 4180, UTF-8 with
+byte order mark, `&delimiter=semicolon` for spreadsheets of comma-decimal locales, and a cell
+starting with `= + - @` defused with an apostrophe - summaries are written by whoever filed them).
+
+- **A report:** `/api/1/insights/{insightid}/reports?report=…&format=csv` - one row per interval,
+  one column per series, then the summary; `slacompliance` writes one row per object and target
+  (object, created, agreement, target, outcome, deadline). The reports tab links it as
+  *Report as CSV* with the current picks.
+- **The objects:** `/api/1/insights/{insightid}/export` (*Objects as CSV*) - `columns` picks and
+  orders `key, summary, kind, workspace, class, state, assignee, creator, created, updated, sla`
+  and `field:<name>`; `from`/`to` (ISO, `to` exclusive) narrow by `date=created` (default) or
+  `updated`; at most 200,000 rows.
+
+Both read the objects the insight shows its reader - across workspaces, narrowed by grants and
+clearance - so an export never holds more than the screen.

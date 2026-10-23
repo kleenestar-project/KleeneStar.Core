@@ -184,12 +184,22 @@ namespace KleeneStar.Core.WebManager
         /// or, when <paramref name="sprintId"/> is <c>null</c>, the product backlog of
         /// the workspace — ordered by rank.
         /// </summary>
+        /// <remarks>
+        /// The members are narrowed to what the caller may read, like every object read: the
+        /// sprint team's totals and the backlog are computed from them, and a classified record
+        /// or one of a workspace the caller may not read must not show up even as points.
+        /// </remarks>
         /// <param name="workspaceId">The owning workspace id.</param>
         /// <param name="sprintId">The sprint id, or <c>null</c> for the backlog.</param>
         /// <returns>The matching objects, ordered by rank.</returns>
         public IReadOnlyList<Model.Entities.Object> GetSprintObjects(Guid workspaceId, Guid? sprintId)
         {
-            return ModelHub.GetObjectsBySprint(workspaceId, sprintId);
+            var readable = CoreHub.ObjectManager
+                .GetObjects(new Query<Model.Entities.Object>().Where(x => x.WorkspaceId == workspaceId && x.SprintId == sprintId))
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            return [.. ModelHub.GetObjectsBySprint(workspaceId, sprintId).Where(x => readable.Contains(x.Id))];
         }
 
         /// <summary>

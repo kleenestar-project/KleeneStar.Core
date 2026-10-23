@@ -82,12 +82,13 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// </remarks>
         /// <param name="identity">The account the credentials belong to.</param>
         /// <param name="request">The request the sign-in was made with.</param>
+        /// <param name="rememberMe">Whether the browser keeps the credentials beyond its session.</param>
         /// <returns>The issued credentials, or null when they could not be issued.</returns>
-        protected override IdentityTokenPair EstablishIdentity(IIdentity identity, IRequest request)
+        protected override IdentityTokenPair EstablishIdentity(IIdentity identity, IRequest request, bool rememberMe = true)
         {
             try
             {
-                return base.EstablishIdentity(identity, request);
+                return base.EstablishIdentity(identity, request, rememberMe);
             }
             catch (Exception ex)
             {

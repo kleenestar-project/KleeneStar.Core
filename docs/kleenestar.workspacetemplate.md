@@ -199,3 +199,22 @@ A plugin has to declare an application — the framework refuses one that belong
 
 - [Workspaces](kleenestar.workspace.md) — what a template creates.
 - [Classes](kleenestar.class.md) — what a template fills it with.
+
+## Processes
+
+A template also brings the processes its domain runs on (`WorkspaceTemplateProcesses`, step 6 of `Apply`, after the structure they refer to):
+
+- **Approval policies** per class (`WorkspaceTemplateClass.Approvals`, `WorkspaceTemplateApproval`): steps in the policy syntax, request / approved / rejected state named as the class's workflow declares them and matched after translation.
+- **Automation rules** (`IWorkspaceTemplate.Automations`, `WorkspaceTemplateAutomation`, a default member - a template without rules declares nothing): class by name, trigger, parameter, condition, actions.
+
+Two placeholders bridge the template and the installation: `{creator}` becomes the user name of whoever creates the workspace - the one approver a new workspace is sure to have, to be replaced by the real change authority or group - and `{namespace:key}` becomes the translated text, so step names and the comments a rule writes arrive in the creator's language. Rules act as the creator; without one they are stored disabled and policies are skipped (nobody could approve). Everything passes the same validation as a hand-written policy or rule; what fails is skipped and logged (`WorkspaceTemplateResult.Processes.Skipped`), and applying a template again adds nothing twice.
+
+The shipped templates use it:
+
+|Template            |Approvals                                                         |Rules
+|--------------------|------------------------------------------------------------------|------------------------------------------------
+|Service Desk        |*Change authorization* (Authorization → Scheduled / Rejected); *Release go-live* on the new **Release** class (Go-live approval → Deployment / back to Build) |escalate incidents at risk (`sla.atrisk`) and notify the assignee; note missed targets (`sla.breached`); acknowledge new service requests
+|Finance             |*Payment approval* of invoices (Approval → Approved for Payment / Rejected) |-
+|Software Development|-                                                                  |note failed pipelines and deployments reported by GitLab, Jenkins or Automic (`integration.received`)
+
+The Service Desk's **Release** class (ITIL release management) runs Planned → Build → Test → Go-live approval → Deployment → Deployed, with Rolled back and Cancelled, and carries version, release type, planned date and rollback plan.

@@ -34,6 +34,11 @@ namespace KleeneStar.Core.WebControl
         public Func<IRenderControlContext, string> StorageKey { get; set; }
 
         /// <summary>
+        /// Gets or sets the address the insight's objects are exported from as CSV.
+        /// </summary>
+        public Func<IRenderControlContext, string> ExportUri { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="id">The id of the control.</param>
@@ -89,6 +94,15 @@ namespace KleeneStar.Core.WebControl
             }
             html.Append("</select></label>");
 
+            html.Append("<span class=\"ks-insight-reports-downloads\">");
+            html.Append($"<a class=\"ks-insight-reports-csv\" download>{T("kleenestar.core:insight.report.download.report")}</a>");
+
+            if (ExportUri?.Invoke(renderContext) is { Length: > 0 } export)
+            {
+                html.Append($"<a class=\"ks-insight-reports-export\" href=\"{A(export)}\" download>{T("kleenestar.core:insight.report.download.objects")}</a>");
+            }
+
+            html.Append("</span>");
             html.Append("</div>");
             html.Append("<p class=\"ks-insight-reports-description\"></p>");
             html.Append("<div class=\"ks-insight-reports-stage\"><div class=\"ks-insight-reports-chart\"></div>");

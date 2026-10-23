@@ -151,6 +151,41 @@ namespace KleeneStar.Core.WebFragment.Workspace
                     Uri =_ =>  CoreHub.GetUri<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>()?
                         .BindParameters(keyParameter)
                 },
+                new ControlDropdownItemLink()
+                {
+                    Text = _ => "kleenestar.core:automation.manage.label",
+                    Icon = _ => new IconBolt(),
+                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Automation._workspacekey_.Index>()?
+                        .BindParameters(keyParameter)
+                },
+                new ControlDropdownItemLink()
+                {
+                    Text = _ => "kleenestar.core:integration.manage.label",
+                    Icon = _ => new IconLink(),
+                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Integration._workspacekey_.Index>()?
+                        .BindParameters(keyParameter)
+                },
+                new ControlDropdownItemLink()
+                {
+                    Text = _ => "kleenestar.core:approval.manage.label",
+                    Icon = _ => new IconStamp(),
+                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.ApprovalPolicies._workspacekey_.Index>()?
+                        .BindParameters(keyParameter)
+                },
+                new ControlDropdownItemLink()
+                {
+                    Text = _ => "kleenestar.core:planning.manage.label",
+                    Icon = _ => new IconCalendarCheck(),
+                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Planning._workspacekey_.Index>()?
+                        .BindParameters(keyParameter)
+                },
+                new ControlDropdownItemLink()
+                {
+                    Text = _ => "kleenestar.core:catalog.manage.label",
+                    Icon = _ => new IconList(),
+                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Catalogs._workspacekey_.Index>()?
+                        .BindParameters(keyParameter)
+                },
                 new ControlDropdownItemDivider(),
                 new ControlDropdownItemLink("Delete")
                 {

@@ -56,6 +56,12 @@ namespace KleeneStar.Core.WebManager
         /// <summary>The story-point estimate of the object.</summary>
         public const string StoryPoints = "storypoints";
 
+        /// <summary>The security level the object is classified with.</summary>
+        public const string SecurityLevel = "securitylevel";
+
+        /// <summary>Whether the customer portal keeps the object to its participants.</summary>
+        public const string PortalRestricted = "portalrestricted";
+
         /// <summary>
         /// The system properties in the order the history presents them.
         /// </summary>
@@ -70,7 +76,9 @@ namespace KleeneStar.Core.WebManager
             Assignee,
             Sprint,
             SprintRank,
-            StoryPoints
+            StoryPoints,
+            SecurityLevel,
+            PortalRestricted
         ];
 
         /// <summary>
@@ -104,6 +112,8 @@ namespace KleeneStar.Core.WebManager
                 Sprint => "kleenestar.core:object.history.property.sprint",
                 SprintRank => "kleenestar.core:object.history.property.sprintrank",
                 StoryPoints => "kleenestar.core:object.history.property.storypoints",
+                SecurityLevel => "kleenestar.core:object.history.property.securitylevel",
+                PortalRestricted => "kleenestar.core:object.history.property.portalrestricted",
                 _ => null
             };
         }
@@ -133,6 +143,8 @@ namespace KleeneStar.Core.WebManager
                 Sprint => @object.SprintId?.ToString(),
                 SprintRank => @object.SprintRank == 0 ? null : @object.SprintRank.ToString(CultureInfo.InvariantCulture),
                 StoryPoints => @object.StoryPoints?.ToString(CultureInfo.InvariantCulture),
+                SecurityLevel => @object.SecurityLevelId?.ToString(),
+                PortalRestricted => @object.PortalRestricted ? bool.TrueString : null,
                 _ => null
             };
         }
@@ -145,7 +157,10 @@ namespace KleeneStar.Core.WebManager
         /// <see cref="Key"/> is deliberately not writable: the key is how every link, comment and
         /// external reference addresses the object, so rewinding it would break references the
         /// history has no claim over. Restoring an object therefore restores what it contained,
-        /// not what it is called.
+        /// not what it is called. <see cref="SecurityLevel"/> and <see cref="PortalRestricted"/>
+        /// are recorded but not restored either: who may see a record is decided in its own
+        /// dialog, which checks the clearance to assign it, and restoring the content must not
+        /// widen the audience as a side effect.
         /// </remarks>
         /// <param name="object">The object to write to.</param>
         /// <param name="name">The attribute name.</param>
@@ -237,6 +252,11 @@ namespace KleeneStar.Core.WebManager
                 case Sprint:
                     return ParseGuid(value) is Guid sprintId
                         ? CoreHub.SprintManager.GetSprint(sprintId)?.Name ?? value
+                        : value;
+
+                case SecurityLevel:
+                    return ParseGuid(value) is Guid levelId
+                        ? CoreHub.SecurityLevelManager.GetSecurityLevel(levelId)?.Name ?? value
                         : value;
 
                 default:

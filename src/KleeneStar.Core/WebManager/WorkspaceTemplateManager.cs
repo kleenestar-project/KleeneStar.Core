@@ -316,6 +316,15 @@ namespace KleeneStar.Core.WebManager
             var home = ApplyProse(workspace, template, all, ObjectKind.Document, identityId, culture);
             var openingPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture);
 
+            // the processes come after the structure they run on: a policy names states, a rule
+            // names classes, and both are validated against what now exists
+            var processes = WorkspaceTemplateProcesses.Apply(template, workspaceId, identityId, culture);
+
+            foreach (var skipped in processes.Skipped)
+            {
+                CoreHub.HttpServerContext?.Log?.Warning($"Workspace template '{key}': {skipped}");
+            }
+
             return new WorkspaceTemplateResult
             {
                 Classes = classes,
@@ -329,6 +338,7 @@ namespace KleeneStar.Core.WebManager
                 Views = views,
                 Home = home,
                 OpeningPost = openingPost,
+                Processes = processes,
                 // last, so everything above was set up while the workspace was still the
                 // creator's alone to shape, and the grants describe the finished workspace
                 Permissions = ApplyPermissions(workspaceId)

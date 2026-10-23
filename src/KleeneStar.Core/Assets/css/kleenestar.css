@@ -1302,6 +1302,15 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     color: var(--wx-secondary-color);
 }
 
+/* the downloads sit at the end of the toolbar, aligned with the selects */
+.ks-insight-reports-downloads {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    padding-bottom: 0.375rem;
+    font-size: 0.8125rem;
+}
+
 .ks-insight-reports-field[hidden] {
     display: none;
 }

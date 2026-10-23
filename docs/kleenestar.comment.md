@@ -276,6 +276,17 @@ Comments inherit the access rules of the object they are attached to. A user who
 
 Assignment is performed via the standard group-policy mechanism. Most deployments only need to grant `comment_moderate` to a dedicated moderator group and rely on the implied per-object grants for everyone else.
 
+### Audience: public comments and internal notes
+
+A comment carries its audience (`Comment.Visibility`): **public** - the default - reaches everyone who may read the object; **internal-team** is the service team's working note. `WebPermission/CommentAudience` is the one rule, asked by every surface that shows, counts or changes comments - the thread endpoint, the dock's badge, the document home and blog teasers, the key-based `CommentManager.GetComments` and the customer portal:
+
+- An internal note reaches the **service team** alone: an *internal* account (one that belongs to no tenant), active, holding `object_read` on the object's chain. An account with a tenant is a customer's - the requester, a colleague the issue was shared with, the client of an order - and **never** reads an internal note, whatever its groups are granted. Granting a customer group read access to a workspace must not hand them the team's notes about their own request. (The requester used to be part of the internal audience; a note the customer can read is a public comment.)
+- Only the service team **writes** one (`object_comment` on the chain, internal account). The composer offers the audiences as its categories (`RetrieveCategories`: *Public* to everybody, *Service team only* to the team), and the endpoint refuses an internal note from anybody else - also on the portal (`403`).
+- The paths that address a comment by id - edit, delete, reply, like, pin, react - refuse a note the caller was never shown. A reply inherits the audience of the comment it answers.
+- With nobody acting (start-up, background work) the system reads every comment, the way `ContentVisibility` narrows nothing then.
+
+The composer's and thread's own user marker is the signed-in reader's name (it was a fixed "Admin User").
+
 ## Conclusion
 
 This document describes the comment concept in **KleeneStar** as a thin, reusable conversation layer that lives directly on the object detail page. The reference implementation comprises the `Comment` entity, the `CommentManager` component, a single REST endpoint at `/api/1/comments/{objectkey}`, two object-scoped WebFragments hosting the existing `ControlRestComment` / `ControlRestCommentComposer` controls, and a seeded set of per-object class-flavoured threads that exercise both the top-level and the reply rendering paths. The model started deliberately narrow, and the additions it was left open for have since landed without revisiting the storage schema: pins, likes and emoji reactions (`IsPinned`, `CommentLike`, `CommentReaction`), a public / internal-team visibility per comment, and notifications on every change. Per-comment permissions beyond that visibility, attachments on a comment and @-mentions remain open.

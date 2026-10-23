@@ -63,6 +63,29 @@ namespace KleeneStar.Core.WebFragment.Workspace
         internal const string TemplateField = "TemplateKey";
 
         /// <summary>
+        /// The name of the field the chosen blueprint workspace travels to the create endpoint in.
+        /// </summary>
+        internal const string BlueprintField = "BlueprintWorkspaceId";
+
+        /// <summary>
+        /// Gets the selection of the blueprint workspace whose shared data structures the new
+        /// workspace follows.
+        /// </summary>
+        /// <remarks>
+        /// A template sets a workspace up once; a blueprint workspace keeps providing its blueprint
+        /// classes afterwards. Both can be combined: the template gives the workspace its pages and
+        /// views, the blueprint the structures several workspaces share.
+        /// </remarks>
+        public ControlDataFormItemInputSelection BlueprintSelection { get; } = new()
+        {
+            Name = _ => BlueprintField,
+            Label = _ => "kleenestar.core:workspace.blueprint.label",
+            Placeholder = _ => "kleenestar.core:workspace.blueprint.placeholder",
+            Help = _ => "kleenestar.core:workspace.blueprint.help",
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Blueprints>().ToString())
+        };
+
+        /// <summary>
         /// Gets the tile control for choosing the shape of the workspace.
         /// </summary>
         public ControlFormItemInputTile TemplateSelection { get; } = new()
@@ -212,6 +235,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
             step2.Add(Category);
             step2.Add(Description);
             step2.Add(InheritedSelection);
+            step2.Add(BlueprintSelection);
             step2.Add(AccessModifierSelection);
             step2.Add(WorkspaceSealed);
             step2.Add(Tenant);

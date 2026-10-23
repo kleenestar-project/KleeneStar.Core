@@ -196,7 +196,7 @@ namespace KleeneStar.Core.WebRestApi
                 new RestApiFeedMetric
                 {
                     Icon = new IconComment().Class,
-                    Value = CoreHub.CommentManager.GetComments(post.Id).Count().ToString(),
+                    Value = WebPermission.CommentAudience.Filter(post, CoreHub.CommentManager.GetComments(post.Id)).Count().ToString(),
                     Label = I18N.Translate("kleenestar.core:object.kind.blogs.metric.comments")
                 }
             ];

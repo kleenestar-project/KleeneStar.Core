@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
 using System.Globalization;
 using System.Linq;
 using WebExpress.WebApp.WebControl;
@@ -68,7 +69,7 @@ namespace KleeneStar.Core.WebFragment.Object
                     .BindParameters(renderContext.Request)
                     .ToString()
             ),
-            CurrentUser = _ => "Admin User"
+            CurrentUser = CurrentUserName
         };
 
         /// <summary>
@@ -86,7 +87,11 @@ namespace KleeneStar.Core.WebFragment.Object
                     .BindParameters(renderContext.Request)
                     .ToString()
             ),
-            CurrentUser = _ => "Admin User"
+            CurrentUser = CurrentUserName,
+
+            // the audiences the endpoint offers as categories; public is what a comment is
+            // unless its author says otherwise
+            DefaultCategory = _ => Model.Entities.CommentVisibilityExtensions.PublicToken
         };
 
         /// <summary>
@@ -105,6 +110,25 @@ namespace KleeneStar.Core.WebFragment.Object
             // link from the link dialog, like every other rich-text editor of the application
             Comments.LinksService<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
             Composer.LinksService<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
+        }
+
+        /// <summary>
+        /// Returns the name the comment controls mark the reader's own entries by.
+        /// </summary>
+        /// <remarks>
+        /// It is the signed-in reader's, read from the session like everything per-user. It used
+        /// to be a fixed "Admin User", so every reader saw the administrator's entries as their
+        /// own and their own as somebody else's. The endpoint never takes this name as the actor.
+        /// </remarks>
+        /// <param name="renderContext">The render context.</param>
+        /// <returns>The reader's display name, or an empty string for an anonymous reader.</returns>
+        private static string CurrentUserName(IRenderControlContext renderContext)
+        {
+            var identityId = CoreHub.SessionManager?.GetCurrentIdentityId(renderContext?.Request) ?? System.Guid.Empty;
+
+            return identityId == System.Guid.Empty
+                ? string.Empty
+                : CoreHub.IdentityManager?.GetIdentity(identityId)?.Name ?? string.Empty;
         }
 
         /// <summary>
@@ -138,7 +162,9 @@ namespace KleeneStar.Core.WebFragment.Object
             // the thread arrives from the rest endpoint, but the count is cheap to read here -
             // and it is what makes the folded thread still say whether there is one. It counts
             // what the thread shows: comments and replies, not the deleted ones it redacts
-            var count = _commentManager.GetComments(@object.Id).Count(x => x.State != Model.Entities.CommentState.Deleted);
+            var seesInternal = CommentAudience.SeesInternal(@object);
+            var count = _commentManager.GetComments(@object.Id)
+                .Count(x => x.State != Model.Entities.CommentState.Deleted && CommentAudience.Reaches(x, seesInternal));
 
             // objectcomments.js keeps the badge in step once a comment is added, answered or
             // deleted; it reads the thread from here

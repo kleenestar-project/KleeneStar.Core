@@ -50,11 +50,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         public override IResponse Update(IRequest request)
         {
             var workflowId = global::KleeneStar.Core.WebRestApi.ContentAuthorization.ReadId(request);
-            var classId = workflowId is { } id ? CoreHub.WorkflowManager.GetWorkflow(id)?.ClassId : null;
+            var stored = workflowId is { } id ? CoreHub.WorkflowManager.GetWorkflow(id) : null;
 
-            return global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(classId, request)
-                ? base.Update(request)
-                : new ResponseForbidden();
+            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayAdminister(stored?.ClassId, request))
+            {
+                return new ResponseForbidden();
+            }
+
+            // a workflow a follower received from its blueprint is edited in the blueprint, where
+            // the change reaches every follower; a local save would be overwritten by the next
+            // synchronization
+            if (stored?.BlueprintSourceId is not null)
+            {
+                var message = WebExpress.WebCore.Internationalization.I18N.Translate(request, "kleenestar.core:blueprint.managed");
+
+                return global::WebExpress.WebApp.WebRestApi.RestApiFault.BadRequest(request, new global::WebExpress.WebApp.WebRestApi.RestApiRefusal(message), message);
+            }
+
+            return base.Update(request);
         }
 
         /// <summary>
@@ -179,6 +192,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
             entity.Updated = timestamp;
 
             db.SaveChanges();
+
+            // the editor writes the graph itself rather than through the workflow manager, so it
+            // tells the blueprints - a workflow of a blueprint class reaches its followers
+            CoreHub.BlueprintManager?.OnStructureChanged(entity.ClassId);
         }
 
         /// <summary>

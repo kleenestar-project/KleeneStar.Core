@@ -98,5 +98,10 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// Gets the service-level agreements of the class.
         /// </summary>
         public IReadOnlyList<WorkspaceTemplateSla> Slas { get; init; } = [];
+
+        /// <summary>
+        /// Gets the approval policies of the class.
+        /// </summary>
+        public IReadOnlyList<WorkspaceTemplateApproval> Approvals { get; init; } = [];
     }
 }

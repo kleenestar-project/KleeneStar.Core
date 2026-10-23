@@ -60,7 +60,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
             var inputs = new List<IControlFormItemInput>();
             var items = BuildItems(form, classId, identityId, inputs).ToList();
-            var content = Render(request, items, inputs, Presets(templateId));
+            var content = Render(request, items, inputs, WithDefaultSecurityLevel(Presets(templateId), classId, identityId));
 
             return new ResponseOK { Content = content }
                 .AddHeaderContentType("text/html; charset=utf-8");
@@ -83,16 +83,25 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
             yield return summary;
 
-            // the wizard collects the content of the record, not who may see it: a new object
-            // starts on the default level of its class and is reclassified afterwards through
-            // the dialog of the overflow menu. What the step does say is when the caller is
-            // cleared for none of the class's levels - the record they are about to file may
-            // then leave their own lists the moment it exists
+            // who may see the record is decided when it is filed, not only afterwards: a request
+            // about a person must not be readable by everyone for the moments between creating
+            // and reclassifying it. The selection offers the levels the caller may assign and
+            // starts on the class default (see Presets); the notice says when the caller is
+            // cleared for none of them
             var notice = ObjectFormLayout.CreateSecurityLevelNotice(classId, identityId, null);
 
             if (notice is not null)
             {
                 yield return notice;
+            }
+
+            var securityLevel = ObjectFormLayout.CreateSecurityLevelInput(classId, identityId);
+
+            if (securityLevel is not null)
+            {
+                inputs.Add(securityLevel);
+
+                yield return securityLevel;
             }
 
             var structure = ObjectFormLayout.BuildItems(form, classId, inputs).ToList();
@@ -170,6 +179,36 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             return template is null || template.State != TemplateState.Active
                 ? new Dictionary<string, string>()
                 : CoreHub.TemplateManager.GetPresets(templateId);
+        }
+
+        /// <summary>
+        /// Adds the class's default security level to the presets, so the selection starts on
+        /// the classification a create that names none would get anyway.
+        /// </summary>
+        /// <param name="presets">The presets of the chosen template.</param>
+        /// <param name="classId">The class the object is created in.</param>
+        /// <param name="identityId">The identity filling the step in.</param>
+        /// <returns>The presets, with the default level where the caller may assign it.</returns>
+        private static IReadOnlyDictionary<string, string> WithDefaultSecurityLevel(IReadOnlyDictionary<string, string> presets, Guid classId, Guid identityId)
+        {
+            var name = nameof(ObjectEntity.SecurityLevelId);
+
+            if (classId == Guid.Empty || presets.ContainsKey(name))
+            {
+                return presets;
+            }
+
+            var level = CoreHub.SecurityLevelManager.GetDefaultSecurityLevel(classId);
+
+            if (level is null || !CoreHub.SecurityLevelManager.IsCleared(identityId, level.Id))
+            {
+                return presets;
+            }
+
+            return new Dictionary<string, string>(presets, StringComparer.OrdinalIgnoreCase)
+            {
+                [name] = level.Id.ToString()
+            };
         }
 
         /// <summary>

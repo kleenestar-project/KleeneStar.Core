@@ -84,6 +84,29 @@ namespace KleeneStar.Core.WebFragment.Class
                 .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
 
         /// <summary>
+        /// Gets the input selection for the blueprint the class follows.
+        /// </summary>
+        public ControlDataFormItemInputSelection BlueprintSelection { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Class.BlueprintId),
+            Label = _ => "kleenestar.core:class.blueprint.label",
+            Placeholder = _ => "kleenestar.core:class.blueprint.placeholder",
+            Help = _ => "kleenestar.core:class.blueprint.help",
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.Blueprints>().ToString())
+        };
+
+        /// <summary>
+        /// Gets the switch offering the class as a blueprint other workspaces follow.
+        /// </summary>
+        public ControlFormItemInputCheck ClassIsBlueprint { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Class.IsBlueprint),
+            Label = _ => "kleenestar.core:class.isblueprint.label",
+            Layout = _ => TypeLayoutCheck.Switch,
+            Help = _ => "kleenestar.core:class.isblueprint.help"
+        };
+
+        /// <summary>
         /// Gets the checkbox control for the abstract flag.
         /// </summary>
         public ControlFormItemInputCheck ClassIsAbstract { get; } = new()
@@ -190,6 +213,8 @@ namespace KleeneStar.Core.WebFragment.Class
             Add(KindSelection);
             Add(RendererSelection);
             Add(InheritedSelection);
+            Add(BlueprintSelection);
+            Add(ClassIsBlueprint);
             Add(ClassIsAbstract);
             Add(ParentSelection);
             Add(AllowedChildren);

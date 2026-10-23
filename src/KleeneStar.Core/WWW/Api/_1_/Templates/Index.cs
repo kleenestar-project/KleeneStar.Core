@@ -98,6 +98,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
                 State = TemplateState.Active,
                 Presets = data?.Presets,
                 ParentId = data?.ParentId,
+                AssigneeId = data?.AssigneeId,
+                PredecessorId = data?.PredecessorId,
                 Order = data?.Order ?? 0,
                 ClassId = data?.ClassId ?? Guid.Empty
             };
@@ -189,6 +191,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             // the parent reference is rejected here rather than at the database, which knows only
             // that the row exists and nothing about workspaces or cycles
             errors.Add(ValidateHierarchy(existingItem, payload, nameof(Model.Entities.Template.ParentId), request));
+            errors.Add(ValidatePredecessor(existingItem, payload, request));
+            errors.Add(ValidateAssignee(payload, request));
 
             errors.RemoveAll(x => x is null);
 
@@ -368,7 +372,25 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
                     ? CoreHub.ClassManager.GetClass(classId)?.WorkspaceId
                     : null);
 
-            if (reference is null || (workspaceId is not null && reference.Class?.WorkspaceId != workspaceId))
+            if (reference is null)
+            {
+                return new RestApiError
+                (
+                    I18N.Translate(request, "kleenestar.core:template.hierarchy.workspace"),
+                    field: field
+                );
+            }
+
+            // a work structure may reach into other workspaces - the onboarding of HR creates the
+            // account request at the IT desk - but only with the consent of both sides: whoever
+            // links a template of their workspace below a template of another must administer
+            // that one too, because the link changes what it creates. The objects are later
+            // created on the template's authority, so this is where that authority is checked.
+            var referenceClass = reference.Class ?? CoreHub.ClassManager.GetClass(reference.ClassId);
+
+            if (workspaceId is not null
+                && referenceClass?.WorkspaceId != workspaceId
+                && !ContentAuthorization.MayAdminister(reference.ClassId, request))
             {
                 return new RestApiError
                 (
@@ -388,6 +410,67 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Validates the predecessor of the payload: a sibling - a template below the same parent
+        /// - other than the template itself.
+        /// </summary>
+        /// <remarks>
+        /// The dependency becomes a blocking relation between two objects one instantiation
+        /// creates, so it can only point at a template that instantiation creates as well.
+        /// </remarks>
+        /// <param name="existingItem">The template being edited, or null while one is created.</param>
+        /// <param name="payload">The payload carrying the reference.</param>
+        /// <param name="request">The request, for localizing the message.</param>
+        /// <returns>The validation error, or null when the reference is valid or absent.</returns>
+        private static RestApiError ValidatePredecessor(Model.Entities.Template existingItem, RestApiCrudFormData payload, IRequest request)
+        {
+            var field = nameof(Model.Entities.Template.PredecessorId);
+
+            if (!payload.TryGetGuidReference(field, out var predecessorId) || predecessorId is null)
+            {
+                return null;
+            }
+
+            var parentId = payload.TryGetGuidReference(nameof(Model.Entities.Template.ParentId), out var payloadParent)
+                ? payloadParent
+                : existingItem?.ParentId;
+            var predecessor = CoreHub.TemplateManager.GetTemplate(predecessorId.Value);
+
+            if (predecessor is null
+                || predecessor.Id == existingItem?.Id
+                || parentId is null
+                || predecessor.ParentId != parentId)
+            {
+                return new RestApiError
+                (
+                    I18N.Translate(request, "kleenestar.core:template.predecessor.sibling"),
+                    field: field
+                );
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Validates the assignee of the payload: an active account.
+        /// </summary>
+        /// <param name="payload">The payload carrying the reference.</param>
+        /// <param name="request">The request, for localizing the message.</param>
+        /// <returns>The validation error, or null when the reference is valid or absent.</returns>
+        private static RestApiError ValidateAssignee(RestApiCrudFormData payload, IRequest request)
+        {
+            var field = nameof(Model.Entities.Template.AssigneeId);
+
+            if (!payload.TryGetGuidReference(field, out var assigneeId) || assigneeId is null)
+            {
+                return null;
+            }
+
+            return CoreHub.IdentityManager.GetIdentity(assigneeId.Value) is { State: IdentityState.Active }
+                ? null
+                : new RestApiError(I18N.Translate(request, "kleenestar.core:template.assignee.unknown"), field: field);
         }
 
         /// <summary>

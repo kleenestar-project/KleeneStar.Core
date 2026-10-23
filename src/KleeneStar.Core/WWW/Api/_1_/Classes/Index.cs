@@ -129,7 +129,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 ParentId = data.ParentId,
                 AccessModifier = data.AccessModifier,
                 Kind = data.Kind,
-                Renderer = data.Renderer
+                Renderer = data.Renderer,
+
+                // a copy follows the blueprint its original follows - it is the same structure -
+                // but is not a blueprint itself, which is a decision of its own
+                BlueprintId = data.BlueprintId
             };
 
             return RetrieveForClone(request, newItem);
@@ -259,7 +263,50 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 );
             }
 
+            ValidateBlueprint(result, payload, existingItem, request);
+
             return result;
+        }
+
+        /// <summary>
+        /// Validates the blueprint a class follows and whether it is a blueprint itself.
+        /// </summary>
+        /// <remarks>
+        /// A class follows a class marked as blueprint, and only one in a workspace the caller may
+        /// read: the structure is copied into the follower, so following a blueprint would
+        /// otherwise disclose a structure the caller cannot see. A blueprint follows nothing -
+        /// chains would make a change travel through classes whose administrators never agreed to
+        /// pass it on - and a class does not follow itself.
+        /// </remarks>
+        /// <param name="result">The validation result to add to.</param>
+        /// <param name="payload">The payload.</param>
+        /// <param name="existingItem">The class being edited, or null while one is created.</param>
+        /// <param name="request">The request.</param>
+        private static void ValidateBlueprint(IRestApiValidationResult result, RestApiCrudFormData payload, Model.Entities.Class existingItem, IRequest request)
+        {
+            var blueprintSent = payload.TryGetGuidReference(nameof(Model.Entities.Class.BlueprintId), out var submittedBlueprint);
+            var blueprintId = blueprintSent ? submittedBlueprint : existingItem?.BlueprintId;
+            var (flag, flagSent) = payload.TryRead(nameof(Model.Entities.Class.IsBlueprint));
+            var isBlueprint = flagSent
+                ? string.Equals(flag, bool.TrueString, StringComparison.OrdinalIgnoreCase)
+                : existingItem?.IsBlueprint == true;
+
+            if (blueprintId is not Guid id)
+            {
+                return;
+            }
+
+            var blueprint = CoreHub.ClassManager.GetClass(id);
+
+            if (blueprint is null
+                || !blueprint.IsBlueprint
+                || blueprint.Id == existingItem?.Id
+                || blueprint.BlueprintId is not null
+                || isBlueprint
+                || !WebPermission.ContentVisibility.MayRead(blueprint.WorkspaceId))
+            {
+                result.Add(Translate(request, "kleenestar.core:class.blueprint.invalid"), nameof(Model.Entities.Class.BlueprintId));
+            }
         }
 
         /// <summary>

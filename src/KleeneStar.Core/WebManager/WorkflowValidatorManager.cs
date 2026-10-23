@@ -38,6 +38,7 @@ namespace KleeneStar.Core.WebManager
             Register(new AssigneeSetValidator());
             Register(new ScreenNoteGivenValidator());
             Register(new AttachmentPresentValidator());
+            Register(new WebApproval.ApprovalGrantedValidator());
         }
     }
 }

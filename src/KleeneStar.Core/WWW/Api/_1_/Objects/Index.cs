@@ -460,29 +460,173 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 ? new Dictionary<string, string>()
                 : CoreHub.TemplateManager.GetPresets(template.Id);
 
+            // the creation runs under the client's key: a second submission of the same dialog
+            // is answered with what the first created, and a failure half-way through a work
+            // structure takes back what was written instead of leaving a fragment
+            var run = ObjectCreationRun.Claim(ReadIdempotencyKey(fieldMap, request), template?.Id, currentUser, out var existing);
+
+            if (run is null)
+            {
+                if (existing.State == ObjectCreationState.Completed
+                    && existing.RootObjectId is Guid rootId
+                    && CoreHub.ObjectManager.GetObject(rootId) is { } created)
+                {
+                    newItem = created;
+
+                    return Created(created);
+                }
+
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.create.running"));
+            }
+
             // the summary and the description are columns of the object row, not value rows,
             // so a preset on them has to land before the row is written - the genesis commit
             // then records the object the way the template meant it
             ApplyPresetProperties(newItem, presets);
 
-            // the object row, its field values and the presets of its template are one act of
-            // creation; the scope makes them one genesis commit rather than a create followed by
-            // a handful of edits nobody performed
-            using (CoreHub.CommitManager.BeginCommit(newItem.Id, CommitType.Created, currentUser))
+            try
             {
-                CoreHub.ObjectManager.Add(newItem);
+                // the object row, its field values and the presets of its template are one act
+                // of creation; the scope makes them one genesis commit rather than a create
+                // followed by a handful of edits nobody performed
+                using (CoreHub.CommitManager.BeginCommit(newItem.Id, CommitType.Created, currentUser))
+                {
+                    CoreHub.ObjectManager.Add(newItem);
+                    run.TrackObject(newItem.Id);
 
-                UpsertFieldValues(newItem, fieldMap);
+                    UpsertFieldValues(newItem, fieldMap);
 
-                ApplyPresetValues(newItem, presets, fieldMap);
+                    ApplyPresetValues(newItem, presets, fieldMap);
+                }
 
                 if (template is not null)
                 {
-                    CreateChildren(newItem, template.Id, request, new HashSet<Guid> { template.Id });
+                    CreateChildren(newItem, template.Id, request, new HashSet<Guid> { template.Id }, run);
                 }
+
+                RelateToAggregate(fieldMap, newItem, request, currentUser, run);
+
+                run.Complete(newItem.Id);
+            }
+            catch (Exception ex)
+            {
+                run.RollBack(ex);
+
+                throw;
             }
 
             return Created(newItem);
+        }
+
+        /// <summary>
+        /// Reads the idempotency key a creation was submitted under: the wizard's hidden field,
+        /// or the <c>idempotencykey</c> query parameter of a REST client.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The key, or <see langword="null"/> when the client sent none.</returns>
+        private static string ReadIdempotencyKey(RestApiCrudFormData fieldMap, IRequest request)
+        {
+            var field = Convert.ToString
+            (
+                fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.IdempotencyKeyField, StringComparison.OrdinalIgnoreCase)).Value,
+                CultureInfo.InvariantCulture
+            );
+
+            if (!string.IsNullOrWhiteSpace(field))
+            {
+                return field;
+            }
+
+            // the framework exposes no arbitrary request header, so a client that cannot put the
+            // key into the payload names it in the query
+            return request?.GetParameter("idempotencykey")?.Value;
+        }
+
+        /// <summary>
+        /// Files a new object as a sub-task of the object the wizard was opened from.
+        /// </summary>
+        /// <remarks>
+        /// The sub-task is joined to its order by the first active relation type whose effect
+        /// aggregates progress - the relation model's answer to "is part of", which, unlike the
+        /// containment of <c>ParentId</c>, crosses workspaces: an order filed in one department
+        /// reports the progress of the sub-tasks the others work on in theirs. The order must be
+        /// one the caller may read and relate (<see cref="global::KleeneStar.Core.WebPermissions.ObjectRelationPermission"/>); otherwise
+        /// the object is created on its own, which is what the caller asked for first.
+        /// </remarks>
+        /// <param name="fieldMap">The payload, which may name the order.</param>
+        /// <param name="object">The object just created.</param>
+        /// <param name="request">The request.</param>
+        /// <param name="identityId">The identity creating it.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void RelateToAggregate(RestApiCrudFormData fieldMap, Model.Entities.Object @object, IRequest request, Guid identityId, ObjectCreationRun run)
+        {
+            var key = Convert.ToString
+            (
+                fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.SubtaskOfField, StringComparison.OrdinalIgnoreCase)).Value,
+                System.Globalization.CultureInfo.InvariantCulture
+            );
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            var order = CoreHub.ObjectManager.GetObjectByKey(key);
+
+            if (order is null || order.Id == @object.Id
+                || !ContentAuthorization.MayWrite(order, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectRelationPermission)))
+            {
+                return;
+            }
+
+            Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, order.Id, @object.Id, identityId, run);
+        }
+
+        /// <summary>
+        /// Relates two objects by the first active relation type carrying an effect.
+        /// </summary>
+        /// <remarks>
+        /// The relation catalog is the installation's, and nothing here knows a relation by
+        /// name: "is part of" is whichever type aggregates progress, "has to wait for" whichever
+        /// blocks completion. An installation without such a type gets no relation rather than
+        /// an error - the objects exist either way.
+        /// </remarks>
+        /// <param name="effect">The effect the relation carries.</param>
+        /// <param name="sourceId">The source end - the order, the predecessor.</param>
+        /// <param name="targetId">The target end - the sub-task, the successor.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(WebExpress.WebApp.WebRelation.RelationEffect effect, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            var type = CoreHub.ObjectRelationTypeManager
+                .GetRelationTypes()
+                .Where(x => x.Active && x.Effect == effect
+                    && string.Equals(x.System, WebExpress.WebApp.WebRelation.RelationSystem.Object, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => x.Order)
+                .FirstOrDefault();
+
+            if (type is null)
+            {
+                return;
+            }
+
+            var relation = new ObjectRelation
+            {
+                Id = Guid.NewGuid(),
+                System = WebExpress.WebApp.WebRelation.RelationSystem.Object,
+                TypeKey = type.Key,
+                Direction = WebExpress.WebApp.WebRelation.RelationDirection.Bidirectional,
+                Status = WebExpress.WebApp.WebRelation.RelationStatus.Active,
+                SourceObjectId = sourceId,
+                TargetObjectId = targetId,
+                CreatedById = identityId == Guid.Empty ? null : identityId,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            };
+
+            CoreHub.ObjectRelationManager.Add(relation);
+            run?.TrackRelation(relation.Id);
         }
 
         /// <summary>
@@ -580,6 +724,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Determines whether the payload answers a key with something other than a blank.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="key">The key, matched ignoring case.</param>
+        /// <returns><see langword="true"/> when the payload carries a non-blank value.</returns>
+        private static bool IsAnswered(RestApiCrudFormData fieldMap, string key)
+        {
+            return fieldMap.Any(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(Convert.ToString(x.Value, System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        /// <summary>
         /// Puts the class's default classification on an object the payload left unclassified.
         /// </summary>
         /// <remarks>
@@ -599,9 +755,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         private static void ApplyDefaultSecurityLevel(RestApiCrudFormData fieldMap, Model.Entities.Object @object, Guid identityId)
         {
             // an explicit answer wins, including the explicit "unclassified" the selection
-            // submits as the empty guid
-            if (fieldMap.ContainsKey(nameof(Model.Entities.Object.SecurityLevelId).ToLowerInvariant())
-                || fieldMap.ContainsKey(nameof(Model.Entities.Object.SecurityLevelId))
+            // submits as the empty guid; a blank one is no answer - the wizard posts every input
+            // of its last step, and a selection that did not take its preset must not leave a
+            // classified class's record unclassified
+            if (IsAnswered(fieldMap, nameof(Model.Entities.Object.SecurityLevelId))
                 || @object.SecurityLevelId.HasValue
                 || @object.ClassId == Guid.Empty)
             {
@@ -853,24 +1010,49 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
-        /// Creates one object per active child template below the supplied object, depth first and
-        /// in the order the child templates define.
+        /// Creates one object per active child template of the supplied object, depth first and
+        /// in the order the child templates define - a work structure.
         /// </summary>
         /// <remarks>
-        /// A child whose class the parent's class does not allow is skipped rather than created,
-        /// so a composite template cannot build a hierarchy the object model would reject. The
-        /// visited set carries the templates already instantiated along this branch, which keeps a
-        /// cycle in the template hierarchy from creating objects without end.
+        /// <para>
+        /// <b>A child is filed where its class lives.</b> A composite template may name classes
+        /// of other workspaces - an onboarding filed in HR creates the account request in the IT
+        /// desk and the access card in facility management - so the child takes the workspace of
+        /// its class. It is placed below its parent (<c>ParentId</c>) only inside the same
+        /// workspace and where the parent's class allows the child's; the containment is
+        /// workspace-bound on purpose. Every child is joined to its parent by the aggregating
+        /// relation as well, so the parent reports the progress of the whole structure across
+        /// workspaces. A same-workspace child the parent's class does not allow is skipped, as
+        /// before, so a composite template cannot build a hierarchy the object model rejects.
+        /// </para>
+        /// <para>
+        /// <b>Who does it and what it waits for.</b> A child template's assignee is the child's
+        /// (<see cref="Template.AssigneeId"/>), and a predecessor among the siblings becomes a
+        /// blocking relation from the predecessor's object to the child's
+        /// (<see cref="Template.PredecessorId"/>), so the workflow refuses to finish the child
+        /// first.
+        /// </para>
+        /// <para>
+        /// The children are created on the template's authority: the cross-workspace classes
+        /// were authorized when the template was saved (the author had to be allowed to create
+        /// in them), not by the person filing the structure. Every object and relation is tracked
+        /// by the run, which takes them back if anything fails. The visited set carries the
+        /// templates already instantiated along this branch, which keeps a cycle in the template
+        /// hierarchy from creating objects without end.
+        /// </para>
         /// </remarks>
-        /// <param name="parent">The object the created objects are placed below.</param>
+        /// <param name="parent">The object the created objects belong to.</param>
         /// <param name="templateId">The template whose children are instantiated.</param>
         /// <param name="request">The request, for resolving the acting identity.</param>
         /// <param name="visited">The templates already instantiated along this branch.</param>
-        private static void CreateChildren(Model.Entities.Object parent, Guid templateId, IRequest request, ISet<Guid> visited)
+        /// <param name="run">The creation the objects are part of.</param>
+        private static void CreateChildren(Model.Entities.Object parent, Guid templateId, IRequest request, ISet<Guid> visited, ObjectCreationRun run)
         {
             var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
             var author = ResolveAuthor(request);
+            var createdBy = new Dictionary<Guid, Guid>();
+            var dependencies = new List<(Guid PredecessorTemplateId, Guid ObjectId)>();
 
             foreach (var childTemplate in CoreHub.TemplateManager.GetChildTemplates(templateId))
             {
@@ -879,7 +1061,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                if (parentClass?.AllowedChildren is { Count: > 0 }
+                var childClass = CoreHub.ClassManager.GetClass(childTemplate.ClassId);
+
+                if (childClass is null)
+                {
+                    continue;
+                }
+
+                var contained = childClass.WorkspaceId == parent.WorkspaceId;
+
+                if (contained
+                    && parentClass?.AllowedChildren is { Count: > 0 }
                     && parentClass.AllowedChildren.All(c => c.Id != childTemplate.ClassId))
                 {
                     continue;
@@ -901,8 +1093,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     Icon = childTemplate.Icon ?? CoreHub.GenerateIcon(id),
                     State = WorkspaceState.Active,
                     ClassId = childTemplate.ClassId,
-                    WorkspaceId = parent.WorkspaceId,
-                    ParentId = parent.Id,
+                    WorkspaceId = childClass.WorkspaceId,
+                    ParentId = contained ? parent.Id : null,
+                    AssigneeId = childTemplate.AssigneeId,
+                    SecurityLevelId = CoreHub.SecurityLevelManager?.GetDefaultSecurityLevel(childTemplate.ClassId)?.Id,
                     CreatorId = author,
                     UpdaterId = author
                 };
@@ -914,11 +1108,31 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 using (CoreHub.CommitManager.BeginCommit(child.Id, CommitType.Created, currentUser))
                 {
                     CoreHub.ObjectManager.Add(child);
+                    run?.TrackObject(child.Id);
 
                     ApplyPresetValues(child, presets, null);
                 }
 
-                CreateChildren(child, childTemplate.Id, request, visited);
+                Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, parent.Id, child.Id, currentUser, run);
+
+                createdBy[childTemplate.Id] = child.Id;
+
+                if (childTemplate.PredecessorId is Guid predecessorId)
+                {
+                    dependencies.Add((predecessorId, child.Id));
+                }
+
+                CreateChildren(child, childTemplate.Id, request, visited, run);
+            }
+
+            // the dependencies are drawn once all siblings exist, so a predecessor ordered after
+            // its successor is found all the same
+            foreach (var (predecessorTemplateId, objectId) in dependencies)
+            {
+                if (createdBy.TryGetValue(predecessorTemplateId, out var predecessorObjectId) && predecessorObjectId != objectId)
+                {
+                    Relate(WebExpress.WebApp.WebRelation.RelationEffect.BlocksCompletion, predecessorObjectId, objectId, currentUser, run);
+                }
             }
         }
 

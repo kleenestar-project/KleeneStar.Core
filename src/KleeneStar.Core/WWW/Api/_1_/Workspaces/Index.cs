@@ -475,6 +475,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             CoreHub.WorkspaceManager.Add(newItem);
 
             ApplyTemplate(fieldMap, newItem, request);
+            ApplyBlueprint(fieldMap, newItem);
             RecordCreationAsVisit(newItem, request);
 
             return new RestApiCrudResultCreate();
@@ -558,6 +559,31 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
                 // was just filled in in
                 request?.Culture
             );
+        }
+
+        /// <summary>
+        /// Sets a new workspace up to follow the blueprint classes of the blueprint workspace the
+        /// payload names.
+        /// </summary>
+        /// <remarks>
+        /// Only a workspace the caller may read is followed - its structures are copied into the new
+        /// workspace. A class the template already created under the same name is adopted rather
+        /// than doubled (<see cref="IBlueprintManager.ApplyWorkspace"/>).
+        /// </remarks>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="workspace">The new workspace.</param>
+        private static void ApplyBlueprint(RestApiCrudFormData fieldMap, Workspace workspace)
+        {
+            if (fieldMap is null
+                || !fieldMap.TryGetValue(WebFragment.Workspace.WorkspaceAddFormFragment.BlueprintField.ToLowerInvariant(), out var value)
+                || !Guid.TryParse(value?.ToString(), out var blueprintWorkspaceId)
+                || blueprintWorkspaceId == Guid.Empty
+                || !WebPermission.ContentVisibility.MayRead(blueprintWorkspaceId))
+            {
+                return;
+            }
+
+            CoreHub.BlueprintManager.ApplyWorkspace(blueprintWorkspaceId, workspace.Id);
         }
 
         /// <summary>

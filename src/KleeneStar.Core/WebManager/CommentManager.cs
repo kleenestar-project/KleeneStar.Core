@@ -89,14 +89,16 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(objectKey);
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == objectKey.Value);
+            // through the object manager, so a key the caller may not read - by its grants
+            // or its security level - has nothing to show
+            var obj = CoreHub.ObjectManager.GetObjectByKey(objectKey.Value);
             if (obj is null)
             {
                 return [];
             }
 
-            return GetComments(obj.Id);
+            // the thread a caller reads is the one the audience rule leaves them
+            return WebPermission.CommentAudience.Filter(obj, GetComments(obj.Id)).ToList();
         }
 
         /// <summary>

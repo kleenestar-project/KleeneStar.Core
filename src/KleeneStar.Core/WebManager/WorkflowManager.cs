@@ -442,7 +442,8 @@ namespace KleeneStar.Core.WebManager
                     FieldId = fieldId,
                     Source = source,
                     Target = target,
-                    Transition = transition
+                    Transition = transition,
+                    IdentityId = identityId
                 };
 
                 RunPostFunctions(objectEntity, identityId, executed, context);

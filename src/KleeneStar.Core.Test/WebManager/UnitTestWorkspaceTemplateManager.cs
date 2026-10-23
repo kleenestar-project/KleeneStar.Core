@@ -53,6 +53,12 @@ namespace KleeneStar.Core.Test.WebManager
 
             public int Order => 1;
 
+            public IEnumerable<WorkspaceTemplateAutomation> Automations =>
+            [
+                new WorkspaceTemplateAutomation { Name = "Welcome", Class = "Ticket", Trigger = "object.created", Actions = "comment Welcome." },
+                new WorkspaceTemplateAutomation { Name = "Lost", Class = "Missing", Trigger = "object.created", Actions = "comment Lost." }
+            ];
+
             public IEnumerable<WorkspaceTemplateClass> Classes =>
             [
                 new WorkspaceTemplateClass
@@ -119,6 +125,24 @@ namespace KleeneStar.Core.Test.WebManager
                             Name = "Elsewhere",
                             Calendar = "Mars",
                             Targets = [new WorkspaceTemplateSlaTarget("Resolution", SlaTargetKind.Resolution, 2, SlaTargetUnit.BusinessDays)]
+                        }
+                    ],
+                    Approvals =
+                    [
+                        new WorkspaceTemplateApproval
+                        {
+                            Name = "Ticket approval",
+                            Steps = "Lead: any {creator}",
+                            RequestState = "Waiting",
+                            ApprovedState = "Done",
+                            RejectedState = "Open"
+                        },
+                        new WorkspaceTemplateApproval
+                        {
+                            // names a state the workflow does not have, and is skipped
+                            Name = "Broken approval",
+                            Steps = "Lead: any {creator}",
+                            RequestState = "Limbo"
                         }
                     ]
                 },
@@ -682,6 +706,58 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Empty(result.Views);
             Assert.Null(result.Home);
             Assert.Null(result.OpeningPost);
+        }
+
+        /// <summary>
+        /// Applying a template sets up its approval policies and automation rules - acting as and
+        /// approved by the creator - skips what does not validate, and adds nothing twice.
+        /// </summary>
+        [Fact]
+        public void ApplySetsUpTheProcesses()
+        {
+            var database = nameof(ApplySetsUpTheProcesses);
+            Seed(database);
+
+            using (var db = CoreHubFixture.CreateDbContext(database))
+            {
+                db.Identities.Add(new Identity { Id = AuthorId, Name = "Author", UserName = "author", Email = "author@example.com", PasswordHash = "x" });
+                db.SaveChanges();
+            }
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId, AuthorId);
+
+            var policy = Assert.Single(result.Processes.ApprovalPolicies);
+            Assert.Equal("Ticket approval", policy.Name);
+            Assert.Equal("Lead: any author", policy.Steps);
+            Assert.NotNull(policy.RequestStatusId);
+
+            var rule = Assert.Single(result.Processes.AutomationRules);
+            Assert.Equal(AuthorId, rule.RunAsId);
+            Assert.Equal(AutomationRuleState.Active, rule.State);
+
+            Assert.Contains(result.Processes.Skipped, x => x.StartsWith("Broken approval", StringComparison.Ordinal));
+            Assert.Contains(result.Processes.Skipped, x => x.StartsWith("Lost", StringComparison.Ordinal));
+
+            var again = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId, AuthorId);
+
+            Assert.Empty(again.Processes.ApprovalPolicies);
+            Assert.Empty(again.Processes.AutomationRules);
+            Assert.Single(CoreHub.AutomationManager.GetRules(WorkspaceId));
+        }
+
+        /// <summary>
+        /// Without a creator, there is nobody to approve and nobody to act as: the policies are
+        /// skipped and the rules wait disabled.
+        /// </summary>
+        [Fact]
+        public void ApplyWithoutCreatorDisablesTheRules()
+        {
+            Seed(nameof(ApplyWithoutCreatorDisablesTheRules));
+
+            var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
+
+            Assert.Empty(result.Processes.ApprovalPolicies);
+            Assert.Equal(AutomationRuleState.Disabled, Assert.Single(result.Processes.AutomationRules).State);
         }
     }
 }

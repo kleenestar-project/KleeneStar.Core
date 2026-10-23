@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -69,6 +70,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return [];
             }
 
+            // the service team's notes stay with the service team: a customer reading the same
+            // object is shown the public part of the conversation only
+            var seesInternal = CommentAudience.SeesInternal(CoreHub.ObjectManager.GetObject(objectId));
+
             using var db = ModelHub.CreateDbContext();
             var all = db.Comments
                 .Include(c => c.Author)
@@ -76,6 +81,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 .Include(c => c.Reactions).ThenInclude(r => r.Author)
                 .AsNoTracking()
                 .Where(c => c.ObjectId == objectId)
+                .ToList()
+                .Where(c => CommentAudience.Reaches(c, seesInternal))
                 .ToList();
 
             var byParent = all.Where(c => c.ParentCommentId.HasValue)
@@ -114,6 +121,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return null;
             }
 
+            var visibility = ResolveVisibility(payload);
+
+            if (visibility == CommentVisibility.InternalTeam && !CommentAudience.MayWriteInternal(CoreHub.ObjectManager.GetObject(objectId)))
+            {
+                return null;
+            }
+
             var comment = new Comment
             {
                 Id = Guid.NewGuid(),
@@ -121,7 +135,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 AuthorId = authorId,
                 Content = payload.Body.Trim(),
                 State = CommentState.Active,
-                Visibility = ResolveVisibility(payload),
+                Visibility = visibility,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
             };
@@ -150,7 +164,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null || !MayCommentOn(existing.ObjectId, request))
+            if (existing is null || !CommentAudience.Reaches(existing) || !MayCommentOn(existing.ObjectId, request))
             {
                 return null;
             }
@@ -181,7 +195,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null || !MayCommentOn(existing.ObjectId, request))
+            if (existing is null || !CommentAudience.Reaches(existing) || !MayCommentOn(existing.ObjectId, request))
             {
                 return false;
             }
@@ -209,7 +223,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             var authorId = ResolveAuthorId(request);
             var parent = CoreHub.CommentManager.GetComment(parentId);
 
-            if (parent is null || authorId == Guid.Empty || !MayCommentOn(parent.ObjectId, request))
+            if (parent is null || authorId == Guid.Empty || !CommentAudience.Reaches(parent) || !MayCommentOn(parent.ObjectId, request))
             {
                 return null;
             }
@@ -317,6 +331,48 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
+        /// Returns the audiences the composer offers as its categories: the public one to
+        /// everybody who may comment, the service team's to the service team alone.
+        /// </summary>
+        /// <remarks>
+        /// The composer posts the chosen category id as <see cref="RestApiCommentPayload.Category"/>,
+        /// which is where the endpoint reads the audience from, so the ids are the visibility
+        /// tokens. The framework's six topical categories are not offered: they were stored
+        /// nowhere and only hid the one choice the comment does carry.
+        /// </remarks>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The audiences the caller may address.</returns>
+        protected override IEnumerable<RestApiCommentCategory> RetrieveCategories(IQueryContext context, IRequest request)
+        {
+            var categories = new List<RestApiCommentCategory>
+            {
+                new()
+                {
+                    Id = CommentVisibilityExtensions.PublicToken,
+                    I18n = CommentVisibility.Public.Text(),
+                    Color = "var(--wx-webapp-cat-general, #6b7280)",
+                    Background = "var(--wx-webapp-cat-general-bg, #f3f4f6)"
+                }
+            };
+
+            var @object = CoreHub.ObjectManager.GetObject(ResolveObjectId(request));
+
+            if (@object is not null && CommentAudience.MayWriteInternal(@object))
+            {
+                categories.Add(new()
+                {
+                    Id = CommentVisibilityExtensions.InternalTeamToken,
+                    I18n = CommentVisibility.InternalTeam.Text(),
+                    Color = "var(--wx-webapp-cat-question, #b45309)",
+                    Background = "var(--wx-webapp-cat-question-bg, #fef3c7)"
+                });
+            }
+
+            return categories;
+        }
+
+        /// <summary>
         /// Resolves the object id from the URL <c>{objectkey}</c> path segment by
         /// looking up the object by its <see cref="Object.Key"/>.
         /// </summary>
@@ -359,7 +415,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         /// <returns><see langword="true"/> when the caller may comment on its object.</returns>
         private static bool MayCommentOnComment(Guid commentId, IRequest request)
         {
-            return CoreHub.CommentManager.GetComment(commentId) is { } comment && MayCommentOn(comment.ObjectId, request);
+            return CoreHub.CommentManager.GetComment(commentId) is { } comment
+                && CommentAudience.Reaches(comment)
+                && MayCommentOn(comment.ObjectId, request);
         }
 
         /// <summary>

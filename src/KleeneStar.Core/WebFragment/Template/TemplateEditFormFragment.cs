@@ -84,6 +84,32 @@ namespace KleeneStar.Core.WebFragment.Template
 
 
         /// <summary>
+        /// Gets the input selection for the identity the created objects are assigned to.
+        /// </summary>
+        public ControlDataFormItemInputSelection AssigneeSelection { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Template.AssigneeId),
+            Label = _ => "kleenestar.core:template.assignee.label",
+            Placeholder = _ => "kleenestar.core:template.assignee.placeholder",
+            Help = _ => "kleenestar.core:template.assignee.help",
+            StickySelection = _ => true,
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Assignees>().ToString())
+        };
+
+        /// <summary>
+        /// Gets the input selection for the sibling template this one has to wait for.
+        /// </summary>
+        public ControlDataFormItemInputSelection PredecessorSelection { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Template.PredecessorId),
+            Label = _ => "kleenestar.core:template.predecessor.label",
+            Placeholder = _ => "kleenestar.core:template.predecessor.placeholder",
+            Help = _ => "kleenestar.core:template.predecessor.help",
+            StickySelection = _ => true,
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Predecessors>().ToString())
+        };
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="fragmentContext">The context of the fragment.</param>
@@ -94,6 +120,8 @@ namespace KleeneStar.Core.WebFragment.Template
             Add(Description);
             Add(Category);
             Add(ParentSelection);
+            Add(AssigneeSelection);
+            Add(PredecessorSelection);
             Add(TemplateState);
 
             // the class a template instantiates is chosen once, when the template is created:

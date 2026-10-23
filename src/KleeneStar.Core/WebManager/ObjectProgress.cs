@@ -39,6 +39,18 @@ namespace KleeneStar.Core.WebManager
         /// as <em>3 of 6</em>.
         /// </summary>
         public int Completed { get; init; }
+
+        /// <summary>
+        /// Gets how many of the contributions are under way - started, not finished - so the
+        /// summary of a decomposed order reads <em>2 done, 1 in progress, 3 open</em>.
+        /// </summary>
+        public int Started { get; init; }
+
+        /// <summary>
+        /// Gets how many of the contributions the caller may not read. They count in the
+        /// percentage and the summary, and are listed without anything that names them.
+        /// </summary>
+        public int Hidden { get; init; }
     }
 
     /// <summary>
@@ -48,5 +60,7 @@ namespace KleeneStar.Core.WebManager
     /// <param name="Key">Its key, so a caller can name it without reading it again.</param>
     /// <param name="Percent">How far along it is - its own aggregate where it has children of
     /// its own.</param>
-    public sealed record ObjectProgressContribution(Guid ObjectId, string Key, int Percent);
+    /// <param name="Hidden">Whether the caller may not read the child: its id is then
+    /// <see cref="Guid.Empty"/> and its key <see langword="null"/>, so nothing names it.</param>
+    public sealed record ObjectProgressContribution(Guid ObjectId, string Key, int Percent, bool Hidden = false);
 }

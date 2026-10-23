@@ -44,6 +44,12 @@ namespace KleeneStar.Core.WebManager
         public Guid FieldId { get; init; }
 
         /// <summary>
+        /// Gets on whose behalf the change was made, or <see cref="Guid.Empty"/> when unknown -
+        /// whoever reacts to the change (an approval it requests) learns who asked.
+        /// </summary>
+        public Guid IdentityId { get; init; }
+
+        /// <summary>
         /// Gets the state the object was in before the change, or <c>null</c> when the object
         /// carried no resolvable state and the change entered the workflow.
         /// </summary>

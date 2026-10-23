@@ -51,7 +51,10 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
                 Uri = renderContext => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.Reports>()?
                     .BindParameters(renderContext.Request)?
                     .ToString(),
-                StorageKey = renderContext => $"kleenestar.insight.report.{renderContext.Request?.GetParameter<InsightIdParameter>()?.Value}"
+                StorageKey = renderContext => $"kleenestar.insight.report.{renderContext.Request?.GetParameter<InsightIdParameter>()?.Value}",
+                ExportUri = renderContext => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Insights._insightid_.Export>()?
+                    .BindParameters(renderContext.Request)?
+                    .ToString()
             });
         }
     }

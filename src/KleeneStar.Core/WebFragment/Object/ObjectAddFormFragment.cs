@@ -102,6 +102,58 @@ namespace KleeneStar.Core.WebFragment.Object
         };
 
         /// <summary>
+        /// The query parameter the "create sub-task" entry names the aggregating object with.
+        /// </summary>
+        public const string SubtaskOfParameter = "subtaskof";
+
+        /// <summary>
+        /// The payload field that carries the key of that object to the create endpoint, which
+        /// relates the new object to it once it exists.
+        /// </summary>
+        public const string SubtaskOfField = "SubtaskOf";
+
+        /// <summary>
+        /// Gets the hidden input carrying the object the new one is a sub-task of - only an
+        /// object the caller may read.
+        /// </summary>
+        /// <remarks>
+        /// A sub-task is filed wherever the work is done, in any workspace the caller may create
+        /// in, and joined to its order by the aggregating relation rather than by the
+        /// workspace-bound containment of <c>ParentId</c>: the order then reports the progress of
+        /// sub-tasks spread over several departments.
+        /// </remarks>
+        public PresetHiddenInput SubtaskOf { get; } = new()
+        {
+            Name = _ => SubtaskOfField,
+            Value = ctx =>
+            {
+                var key = ctx?.Request?.GetParameter(SubtaskOfParameter)?.Value;
+
+                return string.IsNullOrWhiteSpace(key) ? null : CoreHub.ObjectManager.GetObjectByKey(key)?.Key;
+            }
+        };
+
+        /// <summary>
+        /// The payload field that carries the idempotency key of the dialog.
+        /// </summary>
+        public const string IdempotencyKeyField = "IdempotencyKey";
+
+        /// <summary>
+        /// Gets the hidden input carrying a key minted when the dialog is rendered.
+        /// </summary>
+        /// <remarks>
+        /// Every submission of one dialog carries the same key, so the create endpoint answers a
+        /// second one - a double click, a retry after a timeout whose first attempt did arrive -
+        /// with what the first created instead of creating it again. A dialog opened anew gets a
+        /// key of its own and creates anew, which is what repeating a template means.
+        /// </remarks>
+        public PresetHiddenInput IdempotencyKey { get; } = new()
+        {
+            Name = _ => IdempotencyKeyField,
+            Value = _ => Guid.NewGuid().ToString("N")
+        };
+
+        /// <summary>
         /// Gets the tile control for selecting the workspace the object is created in.
         /// </summary>
         public ControlFormItemInputTile WorkspaceSelection { get; } = new()
@@ -165,7 +217,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 Subtitle = _ => "kleenestar.core:object.add.step.workspace.subtitle",
                 SummarySource = _ => nameof(ObjectEntity.WorkspaceId)
             };
-            step1.Add(WorkspaceSelection, ParentKey);
+            step1.Add(WorkspaceSelection, ParentKey, SubtaskOf, IdempotencyKey);
 
             var step2 = new ControlDataWizardPage(StepClass)
             {

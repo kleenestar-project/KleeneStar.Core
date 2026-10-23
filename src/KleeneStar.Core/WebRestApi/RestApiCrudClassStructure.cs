@@ -96,9 +96,39 @@ namespace KleeneStar.Core.WebRestApi
         [Method(RequestMethod.PATCH)]
         public override IResponse Update(IRequest request)
         {
-            return ContentAuthorization.MayAdminister(ClassOfId(ContentAuthorization.ReadId(request), request), request)
-                ? base.Update(request)
-                : new ResponseForbidden();
+            var id = ContentAuthorization.ReadId(request);
+
+            if (!ContentAuthorization.MayAdminister(ClassOfId(id, request), request))
+            {
+                return new ResponseForbidden();
+            }
+
+            return RefuseManaged(id, request) ?? base.Update(request);
+        }
+
+        /// <summary>
+        /// Refuses to change a managed copy of a blueprint element locally.
+        /// </summary>
+        /// <remarks>
+        /// A field, status, priority or workflow a follower received from its blueprint is changed
+        /// in the blueprint, where the change reaches every follower alike; a local change would
+        /// be overwritten by the next synchronization and, until then, make the workspaces
+        /// disagree about a structure they are meant to share. The refusal names the reason, so
+        /// the dialog can show it.
+        /// </remarks>
+        /// <param name="id">The record id, may be absent.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The refusal, or <see langword="null"/> when the record is the class's own.</returns>
+        private IResponse RefuseManaged(Guid? id, IRequest request)
+        {
+            if (Resolve(id, request) is not Model.Entities.IBlueprintManaged { BlueprintSourceId: not null })
+            {
+                return null;
+            }
+
+            var message = WebExpress.WebCore.Internationalization.I18N.Translate(request, "kleenestar.core:blueprint.managed");
+
+            return RestApiFault.BadRequest(request, new RestApiRefusal(message), message);
         }
 
         /// <summary>
@@ -109,9 +139,14 @@ namespace KleeneStar.Core.WebRestApi
         [Method(RequestMethod.DELETE)]
         public override IResponse Delete(IRequest request)
         {
-            return ContentAuthorization.MayAdminister(ClassOfId(ContentAuthorization.ReadId(request), request), request)
-                ? base.Delete(request)
-                : new ResponseForbidden();
+            var id = ContentAuthorization.ReadId(request);
+
+            if (!ContentAuthorization.MayAdminister(ClassOfId(id, request), request))
+            {
+                return new ResponseForbidden();
+            }
+
+            return RefuseManaged(id, request) ?? base.Delete(request);
         }
 
         /// <summary>
@@ -122,16 +157,28 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The class id, or <see langword="null"/> when nothing resolves.</returns>
         private Guid? ClassOfId(Guid? id, IRequest request)
         {
+            var item = Resolve(id, request);
+
+            return item is null ? null : ClassOf(item);
+        }
+
+        /// <summary>
+        /// Resolves the record an id addresses.
+        /// </summary>
+        /// <param name="id">The record id, may be absent.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The record, or <see langword="null"/>.</returns>
+        private TIndexItem Resolve(Guid? id, IRequest request)
+        {
             if (id is not { } recordId)
             {
-                return null;
+                return default;
             }
 
             using var context = CreateContext();
-            var item = Retrieve(new Query<TIndexItem>().WhereEquals(x => x.Id, recordId), context, request)
-                .FirstOrDefault();
 
-            return item is null ? null : ClassOf(item);
+            return Retrieve(new Query<TIndexItem>().WhereEquals(x => x.Id, recordId), context, request)
+                .FirstOrDefault();
         }
     }
 }

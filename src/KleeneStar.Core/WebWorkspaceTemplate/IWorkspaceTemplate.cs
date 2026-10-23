@@ -82,5 +82,11 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// customers.
         /// </remarks>
         IEnumerable<WorkspaceTemplateClass> Classes { get; }
+
+        /// <summary>
+        /// Gets the automation rules the workspace starts with: the routine a domain runs on its
+        /// own - escalating what is at risk, acknowledging what arrived.
+        /// </summary>
+        IEnumerable<WorkspaceTemplateAutomation> Automations => [];
     }
 }
