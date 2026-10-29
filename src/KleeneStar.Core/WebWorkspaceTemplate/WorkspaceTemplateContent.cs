@@ -35,14 +35,17 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
     /// language, and the page they get should be in that one.
     /// </para>
     /// <para>
-    /// The illustration is an inline <c>data:</c> SVG rather than a file: it needs no route, no
-    /// directory, and no cleanup when the workspace is deleted, and it survives a database that
-    /// is copied to another installation. It is drawn from the product's own mark - the flat
-    /// accent field with the white star of <c>Assets/img/kleenestar.svg</c>, in the workspace's
-    /// own accent colour, which is the same colour its generated icon carries. It is emitted as
-    /// an <c>&lt;img&gt;</c> rather than as an inline <c>&lt;svg&gt;</c> element because the
-    /// pages are editable: a contenteditable surface handles an image as one atom, while inline
-    /// SVG is a tree the editor would let a caret walk into.
+    /// The illustration is drawn on request by <see cref="WWW.Api._1_.Workspaces.Banner"/>, and
+    /// the page stores only its address - relative, with the workspace id and the caption. It
+    /// used to be an inline <c>data:</c> SVG, which needed no route at all; since WebExpress
+    /// 2026-10-29 the reading view cleans stored markup and, like the editor, keeps an image
+    /// address only when it is http(s) or relative, so the banner of every page went blank.
+    /// It is drawn from the product's own mark - the flat accent field with the white star of
+    /// <c>Assets/img/kleenestar.svg</c>, in the workspace's own accent colour, which is the same
+    /// colour its generated icon carries. It is emitted as an <c>&lt;img&gt;</c> rather than as
+    /// an inline <c>&lt;svg&gt;</c> element because the pages are editable: a contenteditable
+    /// surface handles an image as one atom, while inline SVG is a tree the editor would let a
+    /// caret walk into (and the cleaning drops inline SVG as well).
     /// </para>
     /// </remarks>
     internal static partial class WorkspaceTemplateContent
@@ -240,13 +243,43 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         }
 
         /// <summary>
+        /// Builds the image paragraph that shows the banner of a workspace.
+        /// </summary>
+        /// <remarks>
+        /// The address is stored as a path without the server: a page is kept for years, and an
+        /// installation moves to another host name (<c>WebExpress:ExternalUri</c>) or is copied.
+        /// </remarks>
+        /// <param name="workspace">The workspace the banner stands for.</param>
+        /// <param name="caption">The line set under the key.</param>
+        /// <returns>The banner as an image paragraph.</returns>
+        private static string Banner(Workspace workspace, string caption)
+        {
+            // without a running host there is no sitemap; the route is then the application's
+            // own plus the endpoint's folder, which is what the sitemap would answer
+            var address = CoreHub.ComponentHub?.SitemapManager is null
+                ? (CoreHub.ApplicationContext?.Route?.ToString()?.TrimEnd('/') ?? string.Empty) + "/api/1/workspaces/banner"
+                : CoreHub.GetUri<WWW.Api._1_.Workspaces.Banner>()?.ToString() ?? string.Empty;
+
+            if (Uri.TryCreate(address, UriKind.Absolute, out var absolute))
+            {
+                address = absolute.AbsolutePath;
+            }
+
+            var src = address
+                + "?" + WWW.Api._1_.Workspaces.Banner.WorkspaceParameter + "=" + (workspace?.Id ?? Guid.Empty)
+                + "&" + WWW.Api._1_.Workspaces.Banner.CaptionParameter + "=" + Uri.EscapeDataString(caption ?? string.Empty);
+
+            return "<p><img src=\"" + Escape(src) + "\" alt=\"" + Escape(caption) + "\"></p>";
+        }
+
+        /// <summary>
         /// Draws the banner of a workspace: the product's star on the workspace's own accent
         /// colour, with the workspace key set beside it.
         /// </summary>
         /// <param name="workspace">The workspace the banner stands for.</param>
         /// <param name="caption">The line set under the key.</param>
-        /// <returns>The banner as an image paragraph.</returns>
-        private static string Banner(Workspace workspace, string caption)
+        /// <returns>The banner as an SVG document.</returns>
+        internal static string DrawBanner(Workspace workspace, string caption)
         {
             var accent = CoreHub.AccentColor(workspace?.Id ?? Guid.Empty);
             var glyph = Glyph.Value;
@@ -283,9 +316,7 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
 
             svg.Append("</svg>");
 
-            var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(svg.ToString()));
-
-            return "<p><img src=\"data:image/svg+xml;base64," + encoded + "\" alt=\"" + Escape(caption) + "\"></p>";
+            return svg.ToString();
         }
 
         /// <summary>

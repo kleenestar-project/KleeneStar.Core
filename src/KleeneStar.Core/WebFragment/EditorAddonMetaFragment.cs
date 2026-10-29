@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment
     /// The add-ons run wherever a document is edited or read - an object page, a dialog, a
     /// preview pane - and the application's base path is not something a script can know.
     /// The meta reaches the head although the fragment renders in the body, the same way the
-    /// session deadline does (<see cref="SessionMetaFragmentBase"/>); the fragment itself
+    /// object id does (<see cref="Object.ObjectRefreshFragment"/>); the fragment itself
     /// renders nothing.
     /// </remarks>
     [Section<SectionContentPrimary>]

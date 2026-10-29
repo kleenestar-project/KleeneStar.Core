@@ -74,6 +74,23 @@ OpenID Connect sources are configured (see the settings readme) and registered a
 `OpenIdConnectAuthenticationSource`, which rides WebExpress's authorization-code flow and answers
 the stored account from `MapIdentity`, so the issued token carries the stored id.
 
+The framework's login controls (`ControlLogin`, so the welcome page and the login dialog) offer a
+*sign in with ...* button per OpenID Connect provider registered for the application, labelled with
+the source's configured `Name` (handed over as the provider's `DisplayName`). The flow returns the
+browser to the page it started on; a refused sign-in comes back with `?wx-auth-error` and the
+control says so. The providers are registered for the **core** application only, so the portal's
+login dialog shows none.
+
+## Keeping a sign-in alive
+
+The access credential is renewed by WebExpress (`webexpress.webui.session.js`, on every page): login
+and refresh leave the readable hint cookie `wx-auth-renew` (`__Host-` over https) with
+`<application>:<access deadline>`, and the script calls `POST /api/auth/refresh` shortly before it,
+under a Web Lock across tabs, and reloads a page rendered after the deadline once. KleeneStar's own
+`sessionrefresh.js` and the `kleenestar.session` meta it read are gone (2026-10-29): two renewers
+presenting the same single-use refresh credential would end the grant as a replay. *Stay signed
+in* is the login controls' checkbox; without it the cookies live for the browser session.
+
 ## LDAP and Active Directory
 
 Directories are a plugin, not part of the core: `KleeneStar.Ldap` registers one source per
@@ -96,8 +113,5 @@ administrator) are recorded; neither a password nor a secret reaches the log.
 
 ## Known gaps
 
-- The WebExpress login page has no slot for *sign in with ...* buttons, and the OIDC callback
-  answers JSON instead of redirecting into the application; the OIDC path works but is reachable
-  only by hand until the framework offers both.
 - A changed password does not revoke credentials already issued; they expire with their lifetime.
 - No two-factor authentication, no self-service "forgot password" (there is no mail delivery).

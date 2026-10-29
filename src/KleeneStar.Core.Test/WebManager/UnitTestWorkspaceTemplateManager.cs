@@ -395,10 +395,17 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Equal(AuthorId, created.Home.CreatorId);
             Assert.Equal(AuthorId, created.OpeningPost.CreatorId);
 
-            // the illustration is carried in the page rather than pointing at a file, so a
-            // database that is copied to another installation keeps its pictures
-            Assert.Contains("data:image/svg+xml;base64,", created.Home.Description);
-            Assert.Contains("data:image/svg+xml;base64,", created.OpeningPost.Description);
+            // the illustration points at the banner route by a relative address: the reading
+            // view drops a data: image, and an absolute one would break when the host moves
+            foreach (var body in new[] { created.Home.Description, created.OpeningPost.Description })
+            {
+                var src = System.Text.RegularExpressions.Regex.Match(body, "<img src=\"([^\"]+)\"").Groups[1].Value;
+
+                Assert.StartsWith("/", src);
+                Assert.Contains("/api/1/workspaces/banner?workspace=" + WorkspaceId, src, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("data:", body);
+                Assert.DoesNotContain(" ", src);
+            }
 
             // the page says what the workspace holds, so a class name has to appear in it
             Assert.Contains("Ticket", created.Home.Description);

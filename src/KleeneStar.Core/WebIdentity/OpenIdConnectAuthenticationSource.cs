@@ -78,6 +78,9 @@ namespace KleeneStar.Core.WebIdentity
             : base(new OpenIdConnectSettings
             {
                 ProviderId = IdentitySource.Normalize(settings?.Key),
+                // the framework's login controls label the "sign in with" button with it, and
+                // fall back to the provider id - the key, not what an administrator called it
+                DisplayName = string.IsNullOrWhiteSpace(settings?.Name) ? null : settings.Name,
                 Authority = settings?.Authority,
                 ClientId = settings?.ClientId,
                 ClientSecret = settings?.ClientSecret,
