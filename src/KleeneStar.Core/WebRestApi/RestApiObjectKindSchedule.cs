@@ -135,7 +135,7 @@ namespace KleeneStar.Core.WebRestApi
                     End = Format(end.Date),
                     AllDay = true,
                     Category = classContext?.Class?.Name,
-                    ColorCss = ObjectBoardProjection.CategoryColorCss(category),
+                    ColorCss = ObjectBoardProjection.CategoryBackgroundCss(category),
                     Uri = ResolveDetailUri(entity),
                     Meta = new Dictionary<string, string>
                     {

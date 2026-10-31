@@ -374,6 +374,20 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
+        /// Returns the framework background class of a status category, for an entry
+        /// drawn as a filled chip or bar (the calendar). The <c>wx-color-*</c> tokens of
+        /// <see cref="CategoryColorCss"/> are KleeneStar's tone names and no stylesheet
+        /// defines them; a <c>bg-*</c> class fills the entry and publishes the text color
+        /// that reads on it.
+        /// </summary>
+        /// <param name="category">The category.</param>
+        /// <returns>The CSS class.</returns>
+        public static string CategoryBackgroundCss(StatusCategory category)
+        {
+            return CategoryColorCss(category).Replace("wx-color-", "bg-");
+        }
+
+        /// <summary>
         /// Returns the collapsed Scrum item status string of a status category as the
         /// scrum controls expect it ("todo", "doing", "waiting", "done").
         /// </summary>
