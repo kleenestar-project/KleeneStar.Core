@@ -8,6 +8,14 @@ namespace KleeneStar.Core.WebRestApi
     /// <summary>
     /// The cell template of an object overview table column.
     /// </summary>
+    /// <remarks>
+    /// The cell names the stock renderer of its <see cref="Kind"/> directly, not the
+    /// framework's generic <c>inline-edit</c> renderer: that one draws a permanent
+    /// "edit" button (with Bootstrap classes the framework no longer ships) and a bare
+    /// text input for every kind. The stock renderers mount the smart edit - pencil on
+    /// hover, double click, the kind's own editor - and persist through the row's <c>restApi</c> (<c>/api/1/objects?id=…</c>) as a PUT of
+    /// <c>{ name: value }</c> themselves (<c>TableTemplates.bindInlineEdit</c>).
+    /// </remarks>
     internal sealed class ObjectTableColumnTemplate : IRestApiTableColumnTemplate
     {
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -17,9 +25,9 @@ namespace KleeneStar.Core.WebRestApi
         };
 
         /// <summary>
-        /// Gets the framework inline editor template identifier.
+        /// Gets the stock renderer identifier, which is the cell's kind.
         /// </summary>
-        public string Type => "inline-edit";
+        public string Type => Kind ?? "text";
 
         /// <summary>
         /// Gets a value indicating whether the cell offers an inline editor.
@@ -103,27 +111,17 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The JSON representation.</returns>
         public string ToJson()
         {
-            var template = new RestApiTableColumnTemplateInlineEdit(Editable)
+            var options = new Dictionary<string, object>
             {
-                Endpoint = Endpoint,
-                Kind = Kind,
-                Editor = Kind switch
-                {
-                    "numeric" => "number",
-                    "date" => "date",
-                    "combo" => "select",
-                    _ => "text"
-                },
-                Method = "PUT"
+                ["editable"] = Editable,
+                ["format"] = Format
             };
-            template.Options["format"] = Format;
             if (Items.Count > 0)
             {
                 var items = Items.Select(item => new { value = item.Id, text = item.Text }).ToArray();
-                template.Options["items"] = items;
-                template.Options["options"] = JsonSerializer.Serialize(items, _jsonOptions);
+                options["options"] = JsonSerializer.Serialize(items, _jsonOptions);
             }
-            return template.ToJson();
+            return JsonSerializer.Serialize(new { type = Type, options }, _jsonOptions);
         }
     }
 }
