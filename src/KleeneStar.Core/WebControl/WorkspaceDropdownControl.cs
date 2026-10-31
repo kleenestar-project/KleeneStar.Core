@@ -20,7 +20,7 @@ namespace KleeneStar.Core.WebControl
         /// Offered only to a caller who is signed in - the one condition under which a workspace
         /// may be created at all (<see cref="WebPermission.RouteAuthorization.IsSignedIn"/>).
         /// </remarks>
-        public ConditionalDropdownItemLink AddWorkspace { get; } = new()
+        public ControlDropdownItemLink AddWorkspace { get; } = new()
         {
             Visible = ctx => WebPermission.RouteAuthorization.IsSignedIn(ctx?.Request),
             Text = _ => "kleenestar.core:workspace.add.label",
@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WebControl
         /// Offered only when the overview has something for the caller - a workspace they may
         /// read, or the right to create one - the same rule its page is guarded by.
         /// </remarks>
-        public ConditionalDropdownItemLink ManageWorkspace { get; } = new()
+        public ControlDropdownItemLink ManageWorkspace { get; } = new()
         {
             Visible = ctx => WebPermission.RouteAuthorization.MayListWorkspaces(ctx?.Request),
             Text = _ => "kleenestar.core:workspace.manage.label",

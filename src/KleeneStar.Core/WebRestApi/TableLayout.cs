@@ -8,8 +8,7 @@ using WebExpress.WebApp.WebRestApi;
 namespace KleeneStar.Core.WebRestApi
 {
     /// <summary>
-    /// Reads, writes and applies the column layout of a REST table - which columns show, in which
-    /// order and how wide.
+    /// Adapts persisted application layouts to the framework table layout contract.
     /// </summary>
     /// <remarks>
     /// A layout is kept in two places with the same shape: per user and table in the session
@@ -55,11 +54,11 @@ namespace KleeneStar.Core.WebRestApi
 
             return entries is null || entries.Count == 0
                 ? null
-                : JsonSerializer.Serialize(entries, _jsonOptions);
+                : new RestApiTableLayout { Columns = entries }.ToJson();
         }
 
         /// <summary>
-        /// Reads a layout.
+        /// Reads versioned layouts and legacy array snapshots without rewriting stored data.
         /// </summary>
         /// <param name="json">The stored layout.</param>
         /// <returns>The entries, or null when nothing usable is stored.</returns>
@@ -72,7 +71,9 @@ namespace KleeneStar.Core.WebRestApi
 
             try
             {
-                var stored = JsonSerializer.Deserialize<List<RestApiTableColumnUpdate>>(json, _jsonOptions);
+                var stored = json.TrimStart().StartsWith("[")
+                    ? JsonSerializer.Deserialize<List<RestApiTableColumnUpdate>>(json, _jsonOptions)
+                    : RestApiTableLayout.Parse(json).Columns.ToList();
 
                 return stored?.Where(c => !string.IsNullOrWhiteSpace(c?.Id)).ToList();
             }
@@ -92,59 +93,8 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The columns in the stored order, visibility and width.</returns>
         public static IEnumerable<RestApiTableColumn> Apply(IReadOnlyList<RestApiTableColumnUpdate> stored, IEnumerable<RestApiTableColumn> defaultColumns)
         {
-            if (defaultColumns is null)
-            {
-                yield break;
-            }
-
-            var defaults = defaultColumns.ToList();
-
-            if (stored is null || stored.Count == 0)
-            {
-                foreach (var column in defaults)
-                {
-                    yield return column;
-                }
-
-                yield break;
-            }
-
-            var lookup = defaults.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // emit columns in the stored order, copying visibility/width
-            foreach (var update in stored)
-            {
-                if (string.IsNullOrWhiteSpace(update.Id) ||
-                    !lookup.TryGetValue(update.Id, out var template) ||
-                    !seen.Add(template.Id))
-                {
-                    continue;
-                }
-
-                yield return new RestApiTableColumn
-                {
-                    Id = template.Id,
-                    Name = template.Name,
-                    Label = template.Label,
-                    Icon = template.Icon,
-                    Template = template.Template,
-                    Visible = update.Visible ?? template.Visible,
-                    Width = update.Width ?? template.Width
-                };
-            }
-
-            // append any column the stored layout does not know about (e.g. a
-            // column added in a newer build) at the tail with its default state
-            foreach (var column in defaults)
-            {
-                if (seen.Contains(column.Id))
-                {
-                    continue;
-                }
-
-                yield return column;
-            }
+            return new RestApiTableLayout { Columns = stored?.ToList() ?? [] }
+                .Apply(defaultColumns ?? []);
         }
     }
 }

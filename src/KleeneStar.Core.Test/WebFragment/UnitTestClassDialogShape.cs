@@ -44,7 +44,7 @@ namespace KleeneStar.Core.Test.WebFragment
 
             Assert.IsType<ControlDataFormItemInputUnique>(fragment.ClassName);
             Assert.DoesNotContain(fragment.ClassName, Items(fragment));
-            Assert.Contains(FormTitleInput.Mark, fragment.ClassName.Classes);
+            Assert.Contains("wx-modal-title-input", fragment.ClassName.Classes);
             Assert.Null(fragment.ClassName.Label);
             Assert.Null(fragment.ClassName.Help);
             Assert.True(fragment.ClassName.Required(null));

@@ -1173,31 +1173,6 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     font-size: 0.875rem;
 }
 
-/* -------------------------------------------------------------- table of contents */
-
-.ks-addon-toc-title {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--wx-secondary-color);
-    margin-bottom: 0.25rem;
-}
-
-.ks-addon-toc ol {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.ks-addon-toc li {
-    padding: 0.1rem 0;
-}
-
-.ks-addon-toc-level-1 { padding-left: 1rem !important; }
-.ks-addon-toc-level-2 { padding-left: 2rem !important; }
-.ks-addon-toc-level-3 { padding-left: 3rem !important; }
-
 /* -------------------------------------------------------------- notice (container) */
 
 /* the notice's class (bodyClass) sits on the editable body in the editor and on the reading

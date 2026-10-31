@@ -727,18 +727,15 @@ namespace KleeneStar.Core
         /// <param name="ownerId">
         /// The entity the picture belongs to; names the file and scopes the cleanup.
         /// </param>
-        /// <param name="payload">
-        /// The value submitted by the avatar control. An empty or unparsable payload yields
-        /// <see langword="null"/>, which the caller reads as "no picture given".
+        /// <param name="image">
+        /// The upload decoded and validated by the framework.
         /// </param>
         /// <returns>
         /// The icon serving the stored picture, or <see langword="null"/> when the payload
         /// carried no image.
         /// </returns>
-        public static ImageIcon StoreIcon(Guid ownerId, string payload)
+        public static ImageIcon StoreIcon(Guid ownerId, WebExpress.WebApp.WebRestApi.RestApiAvatarUpload image)
         {
-            var image = ImagePayload.Parse(payload);
-
             if (image is null)
             {
                 return null;
@@ -749,9 +746,8 @@ namespace KleeneStar.Core
             var outputPath = Path.Combine(iconDirectory, fileName);
 
             Directory.CreateDirectory(iconDirectory);
-            RemoveStoredIcons(ownerId, outputPath);
-
             File.WriteAllBytes(outputPath, image.Content);
+            RemoveStoredIcons(ownerId, outputPath);
 
             return new ImageIcon(ApplicationContext.Route.Concat($"/assets/icons/{fileName}").ToUri());
         }

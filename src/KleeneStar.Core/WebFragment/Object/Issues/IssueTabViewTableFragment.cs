@@ -80,30 +80,6 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
             Add(Table);
         }
 
-        /// <summary>
-        /// Renders the control as an HTML node, first injecting the cell renderer the
-        /// columns are drawn and edited with into the page head (see
-        /// <see cref="IssueTableInlineEditScript"/>).
-        /// </summary>
-        /// <param name="renderContext">
-        /// The context in which the control is rendered.
-        /// </param>
-        /// <param name="visualTree">
-        /// The visual tree representing the control's structure.
-        /// </param>
-        /// <returns>
-        /// An HTML node representing the rendered control.
-        /// </returns>
-        public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
-        {
-            var script = IssueTableInlineEditScript.Value;
 
-            if (!string.IsNullOrEmpty(script))
-            {
-                visualTree.AddHeaderScript(script);
-            }
-
-            return base.Render(renderContext, visualTree);
-        }
     }
 }

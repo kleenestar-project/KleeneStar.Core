@@ -1,4 +1,5 @@
-﻿using KleeneStar.Model;
+﻿using WebExpress.WebCore.WebRestApi;
+using KleeneStar.Model;
 using System.Collections.Generic;
 using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
@@ -52,6 +53,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         }
 
         /// <summary>
+        /// Validates the complete request before binding or storing an avatar.
+        /// </summary>
+        /// <param name="existingItem">The existing record, or null for creation.</param>
+        /// <param name="payload">The submitted fields.</param>
+        /// <param name="request">The current request.</param>
+        /// <returns>The field validation result.</returns>
+        protected override IRestApiValidationResult Validate(Model.Entities.Branding existingItem, RestApiCrudFormData payload, IRequest request)
+        {
+            return AvatarStorage.Validate(payload, nameof(Model.Entities.Branding.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
+        }
+
+        /// <summary>
         /// Creates a new instance of an object that implements the IQueryContext interface.
         /// </summary>
         /// <returns>An IQueryContext instance.</returns>
@@ -96,7 +109,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         {
             // the icon is taken out of the payload and stored separately: the icon control submits
             // it inline as a data url, which the binder would hand to RestValueConverterImageIcon
-            // and end up as the URI "http:///". See RestApiCrudFormDataAvatarExtensions.
+            // and end up as the URI "http:///". See AvatarStorage.
             var avatarSent = payload.Detach(nameof(Model.Entities.Branding.Icon), out var avatar);
 
             var res = base.Update(existingItem, payload, request);
@@ -107,7 +120,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
                 // application then falls back to the icon it declared through its [Icon]
                 // attribute, which is what the field's help text promises - so there is no
                 // generated icon to fall back to here, unlike everywhere else
-                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                existingItem.Icon = AvatarStorage.Resolve
                 (
                     Model.Entities.Branding.SingletonId,
                     avatar,

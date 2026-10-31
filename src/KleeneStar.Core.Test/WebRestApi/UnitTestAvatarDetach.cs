@@ -4,7 +4,7 @@ using WebExpress.WebApp.WebRestApi;
 namespace KleeneStar.Core.Test.WebRestApi
 {
     /// <summary>
-    /// Provides unit tests for <see cref="RestApiCrudFormDataAvatarExtensions.Detach"/> — the
+    /// Provides unit tests for <see cref="AvatarStorage.Detach"/> — the
     /// step that takes the inline picture out of a CRUD payload before the binder can see it.
     /// </summary>
     /// <remarks>
@@ -12,7 +12,7 @@ namespace KleeneStar.Core.Test.WebRestApi
     /// silent: the binder hands the data url to <c>RestValueConverterImageIcon</c>, the icon
     /// collapses to <c>http:///</c>, and the request still answers 200 — so the picture is lost
     /// with nothing anywhere reporting a fault. Hence a test on the removal itself rather than
-    /// only on the parsing beside it (<c>UnitTestImagePayload</c>).
+    /// only on the framework upload parser.
     /// </remarks>
     public class UnitTestAvatarDetach
     {

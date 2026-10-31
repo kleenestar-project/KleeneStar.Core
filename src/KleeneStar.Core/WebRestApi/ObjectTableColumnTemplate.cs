@@ -8,21 +8,6 @@ namespace KleeneStar.Core.WebRestApi
     /// <summary>
     /// The cell template of an object overview table column.
     /// </summary>
-    /// <remarks>
-    /// The stock templates of <c>WebExpress.WebApp</c> render an editor when their
-    /// <c>editable</c> option is set, but they wire it to no endpoint: the inline editor
-    /// they mount announces the new value through the save event and leaves the storing
-    /// to whoever listens, and the table listens to nothing. A table built from them can
-    /// be edited but never saves.
-    ///
-    /// This template therefore names its own renderer (<c>kleenestar-cell</c>, registered
-    /// by <c>assets/js/tableinlineedit.js</c>), which points the inline editor at the
-    /// object endpoint the row carries in <see cref="RestApiTableRow.RestApi"/> and gives
-    /// the editor the column's property name, so a finished edit is a PUT of
-    /// <c>{ name: value }</c> against that object. The read-only side is delegated to the
-    /// stock renderer named by <see cref="Kind"/>, so a cell looks exactly like the same
-    /// cell of any other table.
-    /// </remarks>
     internal sealed class ObjectTableColumnTemplate : IRestApiTableColumnTemplate
     {
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -32,10 +17,9 @@ namespace KleeneStar.Core.WebRestApi
         };
 
         /// <summary>
-        /// Gets the renderer id. The client registry resolves it to the KleeneStar cell
-        /// renderer rather than to one of the stock ones.
+        /// Gets the framework inline editor template identifier.
         /// </summary>
-        public string Type => "kleenestar-cell";
+        public string Type => "inline-edit";
 
         /// <summary>
         /// Gets a value indicating whether the cell offers an inline editor.
@@ -62,14 +46,6 @@ namespace KleeneStar.Core.WebRestApi
         /// Gets the address of the object CRUD endpoint an inline edit writes through.
         /// The renderer appends the row's object id to it.
         /// </summary>
-        /// <remarks>
-        /// The address belongs on the row rather than on the column, and
-        /// <see cref="RestApiTableRow.RestApi"/> is where it is sent. The REST table
-        /// control drops that property while normalising the response, though, so a cell
-        /// renderer never sees it; carrying the address on the column as well is what
-        /// makes the editor reach the endpoint at all. Remove this once the control
-        /// forwards the row property.
-        /// </remarks>
         public string Endpoint { get; private set; }
 
         /// <summary>
@@ -127,28 +103,27 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The JSON representation.</returns>
         public string ToJson()
         {
-            var options = new Dictionary<string, object>
+            var template = new RestApiTableColumnTemplateInlineEdit(Editable)
             {
-                ["kind"] = Kind,
-                ["editable"] = Editable,
-                ["format"] = Format,
-                ["endpoint"] = Endpoint
+                Endpoint = Endpoint,
+                Kind = Kind,
+                Editor = Kind switch
+                {
+                    "numeric" => "number",
+                    "date" => "date",
+                    "combo" => "select",
+                    _ => "text"
+                },
+                Method = "PUT"
             };
-
+            template.Options["format"] = Format;
             if (Items.Count > 0)
             {
-                options["options"] = JsonSerializer.Serialize(Items.Select(x => new
-                {
-                    value = x.Id,
-                    text = x.Text
-                }), _jsonOptions);
+                var items = Items.Select(item => new { value = item.Id, text = item.Text }).ToArray();
+                template.Options["items"] = items;
+                template.Options["options"] = JsonSerializer.Serialize(items, _jsonOptions);
             }
-
-            return JsonSerializer.Serialize(new
-            {
-                type = Type,
-                options
-            }, _jsonOptions);
+            return template.ToJson();
         }
     }
 }

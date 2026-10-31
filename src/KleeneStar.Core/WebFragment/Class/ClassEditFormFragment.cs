@@ -47,12 +47,12 @@ namespace KleeneStar.Core.WebFragment.Class
         /// title bar; the gate is the endpoint's validation, which every caller passes.
         /// </para>
         /// </remarks>
-        public ControlDataFormItemInputUnique ClassName { get; } = new()
+        public ControlDataFormItemInputUnique ClassName => new()
         {
             Name = _ => nameof(Model.Entities.Class.Name),
             Placeholder = _ => "kleenestar.core:class.name.placeholder",
             Required = _ => true,
-            Classes = [FormTitleInput.Mark],
+            Classes = ["wx-modal-title-input"],
             ServiceFactory = ctx => DataServiceDescriptor
                 .QueryData(UniqueNameUri(ctx))
                 .BindPathVariables(ClassFormBindings.WorkspaceKeyOfClass(ctx))};
@@ -237,6 +237,8 @@ namespace KleeneStar.Core.WebFragment.Class
             // The form's REST service is declared by the endpoint type so the
             // client loads and submits the class through the emitted
             // wx-service island. ItemId addresses the row in the body.
+            TitleInputFactory = _ => ClassName;
+
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
 
             ItemId = renderContext =>
@@ -246,24 +248,6 @@ namespace KleeneStar.Core.WebFragment.Class
             };
         }
 
-        /// <summary>
-        /// Renders the control as an HTML node.
-        /// </summary>
-        /// <param name="renderContext">
-        /// The context in which the control is rendered.
-        /// </param>
-        /// <param name="visualTree">
-        /// The visual tree representing the control's structure.
-        /// </param>
-        /// <returns>
-        /// An HTML node representing the rendered control.
-        /// </returns>
-        public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
-        {
-            // the name titles the form: it goes onto the header, which the dialog lifts onto
-            // its title bar, rather than among the fields of the class
-            return FormTitleInput.Place(base.Render(renderContext, visualTree), ClassName, renderContext, visualTree);
-        }
 
         /// <summary>
         /// Builds the address of the availability check, naming the class being edited so

@@ -15,11 +15,13 @@ The WYSIWYG editor every document, blog entry and description is written in is t
 | `ks-callout` *Notice* | container | A box the author writes into, as info, tip, warning or danger, with an optional title. |
 | `ks-status` *Status label* | inline | A coloured label in the text - *In progress*, *Approved*. |
 
+The framework migration delegates `ks-toc` and `ks-status` to WebExpress's `toc` and `status` definitions while preserving the identifiers in existing documents. The legacy `ks-callout` definition remains available because stored notices use `variant`, including `tip`, whereas the framework notice uses `tone`. New documents can use the framework definitions directly. The compatibility registrations do not rewrite persisted content.
+
 ## How an add-on lives
 
 The document stores an add-on as a node `{ type: "addon", attrs: { name, data, inline, container } }` - its **name and its properties, nothing it displays**. The editor and the reading view (`ControlContent`, client side) both draw it anew through the add-on's `renderer`, and a controller registered for the rendered element (`webexpress.webui.Controller.registerClass`) brings it to life. So a list in a page is as current as the issues it names, every time the page is opened, and a saved document never carries a stale copy of somebody else's data.
 
-Everything lives in `Assets/js/editoraddons.js`, included on every page of the application with the client translations it is labelled with (`IncludeEditorAddonsScript`: `Assets/js/i18n/en.js`, `de.js`, keys `kleenestar.core:editor.addon.*`) - every page, because documents are edited in dialogs and read in panes on pages that are no object page, and an add-on the registry does not know is drawn as nothing. The looks are in `kleenestar.css` under *editor add-ons*.
+The application definitions live in `Assets/js/editoraddons.js`, included on every page of the application with the client translations it is labelled with (`IncludeEditorAddonsScript`: `Assets/js/i18n/en.js`, `de.js`, keys `kleenestar.core:editor.addon.*`) - every page, because documents are edited in dialogs and read in panes on pages that are no object page, and an add-on the registry does not know is drawn as nothing. The looks are in `kleenestar.css` under *editor add-ons*.
 
 ## Where the data comes from
 
@@ -51,4 +53,4 @@ Workspace, class, kind and assignee are columns and narrow the query. The **stat
 
 - The portal (a second application) does not include the add-ons; a portal page showing a description with an add-on draws it as nothing.
 - The filter names a workspace by key and a class by name as typed text - the framework's property dialog knows text, number and fixed choices, not a lookup.
-- The server-side plain text of a description (`ProseText.ToPlainText`, used by tables and teasers) knows nothing of add-ons: a widget contributes no words, a notice its text.
+- The server-side preview delegates to `EditorState.ToPlainText`. Stored titles, text properties and child content contribute words; live object query results are not fetched during extraction.

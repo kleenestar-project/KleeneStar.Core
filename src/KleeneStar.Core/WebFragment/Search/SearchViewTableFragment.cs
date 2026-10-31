@@ -28,7 +28,7 @@ namespace KleeneStar.Core.WebFragment.Search
         /// <summary>
         /// Gets the table that displays the objects matching the search across all workspaces.
         /// </summary>
-        public ControlDataTable Table { get; } = new ColumnChoosingDataTable();
+        public ControlDataTable Table { get; } = new ControlDataTable();
 
         /// <summary>
         /// Initializes a new instance of the class.

@@ -15,15 +15,8 @@ namespace KleeneStar.Core.WebControl
     /// spreadsheet - and tells it apart from an editor document.
     /// </summary>
     /// <remarks>
-    /// A workbook and a prose document are both stored as JSON in
-    /// <see cref="Model.Entities.Object.Description"/>, and the framework's own tests cannot tell
-    /// them apart: <see cref="SpreadsheetWorkbook.IsWorkbook"/> and
-    /// <c>EditorState.IsState</c> both answer "starts with a brace", and
-    /// <see cref="SpreadsheetWorkbook.Parse"/> reads an editor document as a workbook with one
-    /// empty sheet. A workbook is therefore recognised here by what only it carries - a
-    /// <c>sheets</c> array and no <c>doc</c> - before anything reads it as one.
-    /// <see cref="ProseText"/> asks this class first, so every list, tile and teaser shows the
-    /// words of a sheet instead of its serialization.
+    /// The framework recognizes and reads workbook content. This adapter retains the
+    /// application's preview limit, draft semantics and renderer conversion policy.
     /// </remarks>
     public static partial class WorkbookText
     {
@@ -59,22 +52,7 @@ namespace KleeneStar.Core.WebControl
         /// <returns>True when the value is a JSON object with sheets and no editor document.</returns>
         public static bool IsWorkbook(string value)
         {
-            // a cheap look before the parse, because every prose description passes through here
-            if (!SpreadsheetWorkbook.IsWorkbook(value) || !value.Contains("\"sheets\"", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            try
-            {
-                return JsonNode.Parse(value, documentOptions: new JsonDocumentOptions { MaxDepth = 64 }) is JsonObject root
-                    && root["sheets"] is JsonArray
-                    && root["doc"] is null;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
+            return SpreadsheetWorkbook.IsWorkbook(value);
         }
 
         /// <summary>
@@ -196,47 +174,10 @@ namespace KleeneStar.Core.WebControl
                 return null;
             }
 
-            var builder = new StringBuilder();
-
-            foreach (var text in workbook.Sheets
-                .SelectMany(sheet => sheet.EnumerateCells())
-                .Select(cell => Format(cell.Cell.EffectiveValue))
-                .Where(text => !string.IsNullOrWhiteSpace(text)))
-            {
-                if (builder.Length > 0)
-                {
-                    builder.Append(' ');
-                }
-
-                builder.Append(text.Trim());
-
-                if (builder.Length >= MaxPlainTextLength)
-                {
-                    return builder.ToString(0, MaxPlainTextLength).TrimEnd() + "…";
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// Formats a cell value for reading.
-        /// </summary>
-        /// <param name="value">The effective value of a cell.</param>
-        /// <returns>The text.</returns>
-        private static string Format(object value)
-        {
-            return value switch
-            {
-                null => null,
-                string text => text,
-
-                // a typed cell (a link) carries its caption beside its address
-                JsonObject node => node["text"] is JsonValue caption && caption.TryGetValue<string>(out var text) ? text : null,
-                JsonNode node => node.ToJsonString(),
-                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-                _ => value.ToString()
-            };
+            var text = workbook.ToPlainText();
+            return text.Length >= MaxPlainTextLength
+                ? text[..MaxPlainTextLength].TrimEnd() + "…"
+                : text;
         }
 
         [GeneratedRegex(@"</(?:(?<cell>t[dh])|p|h[1-6]|li|div|blockquote|pre|tr|figcaption)>|<br\s*/?>", RegexOptions.IgnoreCase)]

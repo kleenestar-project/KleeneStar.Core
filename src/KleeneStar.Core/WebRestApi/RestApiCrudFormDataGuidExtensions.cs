@@ -29,26 +29,9 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>True when a guid could be read; otherwise false.</returns>
         public static bool TryGetGuid(this RestApiCrudFormData fieldMap, string name, out Guid value)
         {
-            value = Guid.Empty;
-
-            if (fieldMap is null || string.IsNullOrEmpty(name))
-            {
-                return false;
-            }
-
-            if (!fieldMap.TryGetValue(name.ToLowerInvariant(), out var raw) || raw is null)
-            {
-                return false;
-            }
-
-            if (raw is Guid guid)
-            {
-                value = guid;
-
-                return value != Guid.Empty;
-            }
-
-            return Guid.TryParse(raw.ToString(), out value) && value != Guid.Empty;
+            var field = fieldMap?.TryRead<Guid>(name);
+            value = field?.Value ?? Guid.Empty;
+            return field?.State == RestApiFormFieldState.Valid;
         }
 
         /// <summary>
@@ -70,19 +53,9 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>True when the payload carries the field at all; otherwise false.</returns>
         public static bool TryGetGuidReference(this RestApiCrudFormData fieldMap, string name, out Guid? value)
         {
-            value = null;
-
-            if (fieldMap is null || string.IsNullOrEmpty(name) || !fieldMap.ContainsKey(name.ToLowerInvariant()))
-            {
-                return false;
-            }
-
-            if (fieldMap.TryGetGuid(name, out var guid))
-            {
-                value = guid;
-            }
-
-            return true;
+            var field = fieldMap?.ReadOptionalGuid(name);
+            value = field?.Value;
+            return field?.State is RestApiFormFieldState.Valid or RestApiFormFieldState.Empty;
         }
     }
 }

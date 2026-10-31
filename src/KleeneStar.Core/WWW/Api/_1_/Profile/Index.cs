@@ -1,4 +1,5 @@
-﻿using KleeneStar.Model;
+﻿using WebExpress.WebCore.WebRestApi;
+using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,6 +58,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Validates the complete request before binding or storing an avatar.
+        /// </summary>
+        /// <param name="existingItem">The existing record, or null for creation.</param>
+        /// <param name="payload">The submitted fields.</param>
+        /// <param name="request">The current request.</param>
+        /// <returns>The field validation result.</returns>
+        protected override IRestApiValidationResult Validate(Model.Entities.Identity existingItem, RestApiCrudFormData payload, IRequest request)
+        {
+            return AvatarStorage.Validate(payload, nameof(Model.Entities.Identity.Avatar), base.Validate(existingItem, payload, request), existingItem?.Avatar);
         }
 
         /// <summary>
@@ -156,7 +169,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
             // the picture is taken out of the payload and stored separately: the avatar control
             // submits it inline as a data url, which the binder would hand to
             // RestValueConverterImageIcon and end up as the URI "http:///" - while the request
-            // still answers 200. See RestApiCrudFormDataAvatarExtensions.
+            // still answers 200. See AvatarStorage.
             var avatarSent = editable.Detach(nameof(Model.Entities.Identity.Avatar), out var avatar);
 
             // the item handed in came through Sanitize, which blanked the password hash on its
@@ -168,7 +181,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
 
             if (avatarSent)
             {
-                persisted.Avatar = RestApiCrudFormDataAvatarExtensions.Resolve
+                persisted.Avatar = AvatarStorage.Resolve
                 (
                     persisted.Id,
                     avatar,

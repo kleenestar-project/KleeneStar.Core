@@ -275,15 +275,15 @@
         renderer: () => `<div class="ks-addon-children wx-kleenestar-addon-children"><span class="ks-addon-quiet">${esc(t("loading"))}</span></div>`
     });
 
-    ui.EditorAddOns.register("ks-toc", {
-        label: t("toc.label"),
-        description: t("toc.description"),
-        icon: "list-ol",
-        type: "block",
-        category: CATEGORY,
-        renderer: () => `<nav class="ks-addon-toc wx-kleenestar-addon-toc" aria-label="${esc(t("toc.label"))}"></nav>`
-    });
+    // legacy identifiers delegate to the framework while stored documents retain their names
+    for (const name of ["toc", "status"]) {
+        const definition = ui.EditorAddOns.get(name);
+        if (definition) {
+            ui.EditorAddOns.register("ks-" + name, { ...definition });
+        }
+    }
 
+    // existing notices retain their variant property, including the legacy tip value
     ui.EditorAddOns.register("ks-callout", {
         label: t("callout.label"),
         description: t("callout.description"),
@@ -302,23 +302,6 @@
             { name: "title", label: t("callout.title"), type: "text", default: "" }
         ],
         content: `<p>${esc(t("callout.content"))}</p>`
-    });
-
-    ui.EditorAddOns.register("ks-status", {
-        label: t("status.label"),
-        description: t("status.description"),
-        icon: "tag",
-        type: "inline",
-        category: CATEGORY,
-        properties: [
-            { name: "text", label: t("status.text"), type: "text", default: t("status.text.default") },
-            {
-                name: "tone", label: t("status.tone"), type: "select", default: "primary",
-                options: ["secondary", "primary", "success", "warning", "danger"].map((value) => ({ value, label: t("status.tone." + value) }))
-            }
-        ],
-        // the tone is one of the listed options, and the renderer only ever sees escaped values
-        renderer: (data) => `<span class="ks-addon-status ks-co-chip ks-co-tone-${/^[a-z]+$/.test(data.tone) ? data.tone : "secondary"}">${data.text || ""}</span>`
     });
 
     // ------------------------------------------------------------------ controllers
@@ -473,102 +456,6 @@
     };
 
     /**
-     * A table of contents from the headings of the document it stands in. In the reading view
-     * the headings get anchors and the entries link to them; in the editor the entries are
-     * plain text, because an id written into the working surface would end up in the document,
-     * and the list follows the author's typing.
-     */
-    ui.KleeneStarTocAddonCtrl = class extends ui.Ctrl {
-        constructor(element) {
-            super(element);
-
-            this._onInput = () => {
-                window.clearTimeout(this._timer);
-                this._timer = window.setTimeout(() => this.render(), 400);
-            };
-
-            // the reading view builds the document detached and inserts it in one piece, and
-            // the registry adopts the element while it is still detached - the headings are
-            // only there, and the document only found, once it has arrived on the page
-            this._attach(0);
-        }
-
-        _attach(attempt) {
-            if (!this._element.isConnected) {
-                if (attempt < 50) {
-                    this._timer = window.setTimeout(() => this._attach(attempt + 1), 100);
-                }
-                return;
-            }
-
-            // the registry strips the class a host was adopted by, so neither view is found
-            // by its registration class: the editor keeps the add-on in its frame, the reading
-            // view replaces the frame and marks its host "wx-content"
-            const frame = this._element.closest(".wx-addon-frame");
-
-            this._editing = !!frame;
-            this._root = frame
-                ? frame.parentElement?.closest("[contenteditable=\"true\"]") || frame.parentElement
-                : this._element.closest(".wx-content") || this._element.closest(".wx-content-addon")?.parentElement;
-
-            if (this._editing && this._root) {
-                this._root.addEventListener("input", this._onInput);
-            }
-
-            this.render();
-        }
-
-        render() {
-            const root = this._root;
-
-            if (!root) {
-                return;
-            }
-
-            const headings = Array.from(root.querySelectorAll("h1, h2, h3, h4"))
-                .filter((heading) => !heading.closest(".ks-addon-toc, .wx-addon-frame .card-header") && heading.textContent.trim().length > 0);
-
-            if (headings.length === 0) {
-                quiet(this._element, t("toc.none"));
-                return;
-            }
-
-            const top = Math.min(...headings.map((heading) => parseInt(heading.tagName.substring(1), 10)));
-            const used = new Set();
-
-            const entries = headings.map((heading) => {
-                const level = parseInt(heading.tagName.substring(1), 10) - top;
-                const text = heading.textContent.trim();
-
-                if (this._editing) {
-                    return `<li class="ks-addon-toc-level-${level}">${esc(text)}</li>`;
-                }
-
-                if (!heading.id) {
-                    let slug = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "section";
-
-                    while (used.has(slug) || document.getElementById(slug)) {
-                        slug += "-";
-                    }
-
-                    heading.id = slug;
-                }
-
-                used.add(heading.id);
-
-                return `<li class="ks-addon-toc-level-${level}"><a href="#${esc(heading.id)}">${esc(text)}</a></li>`;
-            });
-
-            this._element.innerHTML = `<div class="ks-addon-toc-title">${esc(t("toc.label"))}</div><ol>${entries.join("")}</ol>`;
-        }
-
-        destroy() {
-            window.clearTimeout(this._timer);
-            this._root?.removeEventListener("input", this._onInput);
-        }
-    };
-
-    /**
      * The latest blog posts: the blog overview's feed control, handed its data service by hand.
      * A feed on a page gets its service from a wx-service island the server writes into the host;
      * the editor's sanitizer lets no such element into a widget, so the descriptor the island
@@ -614,6 +501,5 @@
     ui.Controller.registerClass("wx-kleenestar-addon-list", ui.KleeneStarListAddonCtrl);
     ui.Controller.registerClass("wx-kleenestar-addon-count", ui.KleeneStarCountAddonCtrl);
     ui.Controller.registerClass("wx-kleenestar-addon-children", ui.KleeneStarChildrenAddonCtrl);
-    ui.Controller.registerClass("wx-kleenestar-addon-toc", ui.KleeneStarTocAddonCtrl);
     ui.Controller.registerClass("wx-kleenestar-addon-news", ui.KleeneStarNewsAddonCtrl);
 })();

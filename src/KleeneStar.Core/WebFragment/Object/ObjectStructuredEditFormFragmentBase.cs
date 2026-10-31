@@ -69,7 +69,7 @@ namespace KleeneStar.Core.WebFragment.Object
         /// title bar anyway.
         /// </para>
         /// </remarks>
-        public ControlFormItemInputText Summary { get; } = new()
+        public ControlFormItemInputText Summary => new()
         {
             Name = _ => nameof(Model.Entities.Object.Summary),
             Placeholder = _ => "kleenestar.core:object.summary.placeholder",
@@ -77,7 +77,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             // the framework's mark for an input that is the dialog's title: no frame, the
             // title bar's own font, the whole width of it, the affordances on hover and focus
-            Classes = [FormTitleInput.Mark]
+            Classes = ["wx-modal-title-input"]
         };
 
         /// <summary>
@@ -105,6 +105,8 @@ namespace KleeneStar.Core.WebFragment.Object
             // The form's REST service is declared by the endpoint type so the
             // client loads and submits the object through the emitted
             // wx-service island. ItemId addresses the row in the body.
+            TitleInputFactory = _ => Summary;
+
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Objects.Index>();
 
             ItemId = renderContext =>
@@ -135,7 +137,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             // the summary titles the form: it goes onto the header, which the dialog lifts
             // onto its title bar, rather than among the answers of the mask
-            return FormTitleInput.Place(base.Render(renderContext, visualTree, items), Summary, renderContext, visualTree);
+            return base.Render(renderContext, visualTree, items);
         }
 
         /// <summary>
@@ -147,7 +149,7 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <remarks>
         /// <see cref="Summary"/> is deliberately absent: it titles the record rather than
         /// answering one of its questions, and is rendered onto the form's header by
-        /// <see cref="FormTitleInput"/>.
+        /// <see cref="ControlForm.TitleInputFactory"/>.
         /// </remarks>
         /// <param name="object">The object the form is built for.</param>
         /// <returns>The form items.</returns>

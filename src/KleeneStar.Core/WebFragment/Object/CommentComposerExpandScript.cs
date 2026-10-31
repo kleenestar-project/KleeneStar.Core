@@ -12,7 +12,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// <remarks>
     /// The script is emitted inline into the page head rather than linked as a static asset, for
     /// the same reason the inline cell renderer is (see
-    /// <see cref="Issues.IssueTableInlineEditScript"/>): the core plugin's own embedded assets
+    /// the embedded application scripts): the core plugin's own embedded assets
     /// would mount under <c>/{app}/assets/…</c>, a route the application already owns for its
     /// workspace-assets feature, so a link to them answers 404.
     /// <para>

@@ -186,24 +186,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
             Add(Table);
         }
 
-        /// <summary>
-        /// Renders the table, first injecting the cell renderer the columns are drawn and edited
-        /// with - the issue overview's, since the columns are the same.
-        /// </summary>
-        /// <param name="renderContext">The context in which the control is rendered.</param>
-        /// <param name="visualTree">The visual tree.</param>
-        /// <returns>The HTML node.</returns>
-        public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
-        {
-            var script = IssueTableInlineEditScript.Value;
 
-            if (!string.IsNullOrEmpty(script))
-            {
-                visualTree.AddHeaderScript(script);
-            }
-
-            return base.Render(renderContext, visualTree);
-        }
     }
 
     /// <summary>

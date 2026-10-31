@@ -292,7 +292,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IRestApiValidationResult Validate(Workspace existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            var result = base.Validate(existingItem, payload, request);
+            var result = AvatarStorage.Validate(payload, nameof(Workspace.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
             var creating = existingItem is null;
 
             var (key, keySent) = ReadField(payload, nameof(Workspace.Key));
@@ -641,14 +641,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // the avatar dialog posts its picture inline as a data url, which the binder would
             // hand to RestValueConverterImageIcon and collapse to the URI "http:///" - while the
             // request still answers 200. So it is taken out of the payload before the binder sees
-            // it, decoded, and written to the icons directory. See RestApiCrudFormDataAvatarExtensions.
+            // it, decoded, and written to the icons directory. See AvatarStorage.
             var avatarSent = payload.Detach(nameof(Workspace.Icon), out var avatar);
 
             var res = base.Update(existingItem, payload, request);
 
             if (avatarSent)
             {
-                existingItem.Icon = RestApiCrudFormDataAvatarExtensions.Resolve
+                existingItem.Icon = AvatarStorage.Resolve
                 (
                     existingItem.Id,
                     avatar,

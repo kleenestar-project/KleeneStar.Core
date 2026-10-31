@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebEditor;
 
@@ -15,13 +14,12 @@ namespace KleeneStar.Core.WebControl
     /// versioned json document rather than text - so a description written through a dialog
     /// is <c>{"version":1,"doc":…}</c>, while a seeded one is the sentence itself. A card, a
     /// table cell or a tooltip wants the words either way, and printing the document as it is
-    /// stored shows the reader the serialization instead. The document is rendered by the
-    /// framework's own reader (<see cref="EditorState.ToHtml"/>), so what is stripped to text
-    /// here is the same markup a reading view would show, and text that is not a document
+    /// stored shows the reader the serialization instead. The framework extracts text directly from the structured
+    /// document through <see cref="EditorState.ToPlainText"/>. Plain application text
     /// passes through untouched. A document rendered as a spreadsheet stores a workbook in the
     /// same column; <see cref="WorkbookText"/> recognises it first and answers its cells.
     /// </remarks>
-    public static partial class ProseText
+    public static class ProseText
     {
         /// <summary>
         /// Returns the plain text of a description.
@@ -33,7 +31,7 @@ namespace KleeneStar.Core.WebControl
         /// </returns>
         public static string ToPlainText(string value)
         {
-            // a workbook starts with a brace too, and the editor's reader refuses it
+            // workbook previews use the application text limit
             if (WorkbookText.Read(value) is { } workbook)
             {
                 return WorkbookText.ToPlainText(workbook);
@@ -46,10 +44,7 @@ namespace KleeneStar.Core.WebControl
 
             try
             {
-                var markup = EditorState.ToHtml(value);
-                var text = WebUtility.HtmlDecode(Tags().Replace(markup, " "));
-
-                return Whitespace().Replace(text, " ").Trim();
+                return EditorState.ToPlainText(value);
             }
             catch (JsonException)
             {
@@ -170,7 +165,7 @@ namespace KleeneStar.Core.WebControl
 
             try
             {
-                return string.IsNullOrWhiteSpace(EditorState.ValidationText(value));
+                return EditorState.IsEmpty(value);
             }
             catch (JsonException)
             {
@@ -179,10 +174,5 @@ namespace KleeneStar.Core.WebControl
             }
         }
 
-        [GeneratedRegex("<[^>]*>")]
-        private static partial Regex Tags();
-
-        [GeneratedRegex(@"\s+")]
-        private static partial Regex Whitespace();
     }
 }

@@ -24,12 +24,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
     /// and option generation functionality for template records.
     /// </summary>
     /// <remarks>
-    /// The overview presents the composition hierarchy as a row tree, so a template that is part of
-    /// another appears below it instead of naming its parent in a column. The rows are produced by
-    /// the ordinary table endpoint — which is composed rather than inherited here, so its filtering,
-    /// sorting, paging and stored column layout apply unchanged — and reshaped afterwards by
-    /// <see cref="RestApiTableShim"/>, because the framework's row and cell models can express
-    /// neither a tree nor a cell carrying markup.
+    /// The composed row source builds the template hierarchy through framework row models.
+    /// Filtering, sorting, paging and stored column layouts remain owned by the table endpoint.
     /// </remarks>
     [Title("kleenestar.core:template.table.header")]
     [Cache]
@@ -53,14 +49,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
         [Method(RequestMethod.GET)]
         public IResponse Retrieve(IRequest request)
         {
-            // the description is authored in the rich-text editor and therefore stored as markup;
-            // the column shows it rendered, as the object pages do, instead of printing its tags
-            return RestApiTableShim.Apply
-            (
-                _rows.Retrieve(request),
-                RetrieveRowParents(request),
-                ["description"]
-            );
+            return _rows.Retrieve(request);
         }
 
         /// <summary>
@@ -75,24 +64,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
             return _rows.Configure(request);
         }
 
-        /// <summary>
-        /// Maps each template of the addressed workspace to its parent template, which is what the
-        /// row nesting is built from.
-        /// </summary>
-        /// <param name="request">The request carrying the workspace key.</param>
-        /// <returns>The row-to-parent map, keyed and valued by template id.</returns>
-        private static IReadOnlyDictionary<string, string> RetrieveRowParents(IRequest request)
-        {
-            var key = request.GetParameter<WorkspaceKeyParameter>();
-            var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);
-            var id = workspace?.Id ?? Guid.Empty;
 
-            var query = new Query<Model.Entities.Template>()
-                .Where(x => x.Class.WorkspaceId == id && x.ParentId != null);
-
-            return CoreHub.TemplateManager.GetTemplates(query)
-                .ToDictionary(x => x.Id.ToString(), x => x.ParentId.Value.ToString());
-        }
     }
 
     /// <summary>
@@ -180,6 +152,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
         }
 
         /// <summary>
+        /// Counts matching templates before nesting changes the number of root rows.
+        /// </summary>
+        /// <param name="query">The filtered query before paging.</param>
+        /// <param name="context">The current data context.</param>
+        /// <param name="request">The request identifying the workspace.</param>
+        /// <returns>The total number of matching templates.</returns>
+        protected override int RetrieveTotal(IQuery<Model.Entities.Template> query, IQueryContext context, IRequest request)
+        {
+            var key = request.GetParameter<WorkspaceKeyParameter>();
+            var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);
+            var id = workspace?.Id ?? Guid.Empty;
+            return CoreHub.TemplateManager.GetTemplates(query.Where(item => item.Class.WorkspaceId == id), context).Count();
+        }
+
+        /// <summary>
         /// Retrieves a collection of table rows that match the specified query and context.
         /// </summary>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Template> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
@@ -201,8 +188,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                     .OrderByAsc(x => x.Name);
             }
 
-            return CoreHub.TemplateManager.GetTemplates(query, context)
-                .Select(x => new RestApiTableRow
+            var templates = CoreHub.TemplateManager.GetTemplates(query, context).ToList();
+            var rows = templates.Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),
                     Cells =
@@ -226,7 +213,37 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
                     Uri = GetUri(x, request)?.ToString(),
                     Image = x.Icon?.Uri?.ToString()
-                });
+                }).ToDictionary(row => row.Id.ToString());
+
+            var roots = new List<RestApiTableRow>();
+            foreach (var template in templates)
+            {
+                var row = rows[template.Id.ToString()];
+                var parent = template.ParentId?.ToString();
+                var visited = new HashSet<string> { row.Id.ToString() };
+                var ancestor = template;
+                while (ancestor.ParentId is Guid ancestorId && visited.Add(ancestorId.ToString()))
+                {
+                    ancestor = templates.FirstOrDefault(item => item.Id == ancestorId);
+                    if (ancestor is null)
+                    {
+                        break;
+                    }
+                }
+                if (parent is not null && rows.TryGetValue(parent, out var parentRow) && ancestor is null)
+                {
+                    parentRow.Children = (parentRow.Children ?? []).Append(row).ToList();
+                }
+                else if (parent is not null && rows.TryGetValue(parent, out parentRow) && ancestor?.ParentId is null)
+                {
+                    parentRow.Children = (parentRow.Children ?? []).Append(row).ToList();
+                }
+                else
+                {
+                    roots.Add(row);
+                }
+            }
+            return roots;
         }
 
         /// <summary>

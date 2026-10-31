@@ -102,7 +102,7 @@ namespace KleeneStar.Core.Test.WebFragment
             var fragment = new ObjectEditFormFragment(null!);
 
             Assert.DoesNotContain(fragment.Summary, Build(fragment, @object));
-            Assert.Contains(FormTitleInput.Mark, fragment.Summary.Classes);
+            Assert.Contains("wx-modal-title-input", fragment.Summary.Classes);
             Assert.Null(fragment.Summary.Label);
         }
 
