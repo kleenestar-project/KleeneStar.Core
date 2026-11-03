@@ -522,6 +522,12 @@ Every node carries the three things a reader needs to judge a consequence withou
 
 Two surfaces read it: the **progress card** in the property column of an object that aggregates (a bar, the percentage, and *3 of 5 finished*), which renders on no other object, and the **plan**, where a parent bar reports its subtree instead of its own state.
 
+**On the plan the sub-tasks hang under their order** (2026-11-03, `RestApiObjectKindGantt.ResolveParents`). A bar's parent is its `ParentId` when that object is on the plan; otherwise the source of an active aggregating relation targeting it, when that order is on the plan; otherwise its class group. An object aggregated by several orders hangs under the oldest relation's source, and an aggregation that would close a cycle with the hierarchy already decided is skipped (the object stays in its class group rather than being lifted out of every group by the client's own cycle cut). A hidden or filtered-out order nests nothing. Dependencies (`BlocksCompletion`) stay links, not nesting.
+
+**What the Gantt client then does with the order is the framework's, not this rule's.** A bar with children becomes a *summary*: `ganttModel.rollup` replaces its span with the span of its children, replaces its progress with their **duration-weighted** average, and the bar can no longer be dragged or resized. So a nested order shows the children *on the plan*, weighted by duration - not the unweighted figure of `GetProgress` with hidden children counted anonymously - and its own date fields are not editable there. The same has always applied to `ParentId` nesting.
+
+**Planned with WebExpress `2.0.1-alpha`:** `RestApiGanttTask.RollupProgress` lets a container keep its delivered progress (dates still roll up). Once KleeneStar references that version, `RetrieveTasks` sets `RollupProgress = false` on the task of every object whose `GetProgress` is `Aggregated`, so the order's bar shows the same figure as its progress card; a plain `ParentId` container keeps the client's rollup.
+
 ```
 ╔ Property column ═════════════════════╗
 ║ ▤ STATUS                             ║

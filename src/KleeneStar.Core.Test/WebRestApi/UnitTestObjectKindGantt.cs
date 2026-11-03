@@ -41,6 +41,8 @@ namespace KleeneStar.Core.Test.WebRestApi
 
             public IEnumerable<RestApiGanttLink> Links(IRequest request) => RetrieveLinks(request);
 
+            public IEnumerable<RestApiGanttTask> Tasks(IRequest request) => RetrieveTasks(request);
+
             public RestApiGanttCalendar Calendar(IRequest request) => RetrieveCalendar(request);
 
             public RestApiGanttLink Create(RestApiGanttLink link, IRequest request) => CreateLink(link, request);
@@ -100,12 +102,25 @@ namespace KleeneStar.Core.Test.WebRestApi
                 Active = true,
                 Order = 2
             });
+
+            CoreHub.ObjectRelationTypeManager.Store(new ObjectRelationType
+            {
+                Id = Guid.NewGuid(),
+                Key = "parent",
+                Label = "is parent of",
+                InverseLabel = "is child of",
+                System = RelationSystem.Object,
+                Cardinality = RelationCardinality.OneToMany,
+                Effect = RelationEffect.AggregatesProgress,
+                Active = true,
+                Order = 3
+            });
         }
 
         /// <summary>
         /// Stores a relation between two seeded objects.
         /// </summary>
-        private static ObjectRelation Relate(string typeKey, Guid source, Guid target, RelationStatus status = RelationStatus.Active)
+        private static ObjectRelation Relate(string typeKey, Guid source, Guid target, RelationStatus status = RelationStatus.Active, DateTime? created = null)
         {
             var relation = new ObjectRelation
             {
@@ -114,7 +129,8 @@ namespace KleeneStar.Core.Test.WebRestApi
                 TypeKey = typeKey,
                 Status = status,
                 SourceObjectId = source,
-                TargetObjectId = target
+                TargetObjectId = target,
+                Created = created ?? DateTime.UtcNow
             };
 
             CoreHub.ObjectRelationManager.Add(relation);
@@ -143,6 +159,109 @@ namespace KleeneStar.Core.Test.WebRestApi
             Assert.Equal(FirstId.ToString(), link.From);
             Assert.Equal(SecondId.ToString(), link.To);
             Assert.Equal("FS", link.Type);
+        }
+
+        /// <summary>
+        /// Verifies that a sub-task hangs under the order aggregating it, even when it is of
+        /// another class, while a relation that does not aggregate, or is obsolete, groups nothing.
+        /// </summary>
+        [Fact]
+        public void Tasks_HangUnderTheAggregatingOrder()
+        {
+            Seed(nameof(Tasks_HangUnderTheAggregatingOrder));
+
+            Relate("parent", FirstId, BugId);
+            Relate("blocks", FirstId, SecondId);
+            Relate("parent", FirstId, ThirdId, RelationStatus.Obsolete);
+
+            var parents = ParentsOf(new Plan().Tasks(CreateRequest()));
+
+            Assert.Equal(FirstId.ToString(), parents[BugId.ToString()]);
+            Assert.Equal($"class:{TaskClassId}", parents[SecondId.ToString()]);
+            Assert.Equal($"class:{TaskClassId}", parents[ThirdId.ToString()]);
+            Assert.Equal($"class:{TaskClassId}", parents[FirstId.ToString()]);
+        }
+
+        /// <summary>
+        /// Verifies that the model's own hierarchy wins over an aggregation, and that an object
+        /// aggregated twice hangs under the order of the older relation.
+        /// </summary>
+        [Fact]
+        public void Tasks_PreferTheParentThenTheOldestAggregation()
+        {
+            var name = nameof(Tasks_PreferTheParentThenTheOldestAggregation);
+            Seed(name);
+
+            using (var db = CoreHubFixture.CreateDbContext(name))
+            {
+                db.Objects.Single(x => x.Id == SecondId).ParentId = ThirdId;
+                db.SaveChanges();
+            }
+
+            Relate("parent", FirstId, SecondId);
+            Relate("parent", ThirdId, BugId, created: DateTime.UtcNow);
+            Relate("parent", FirstId, BugId, created: DateTime.UtcNow.AddDays(-1));
+
+            var parents = ParentsOf(new Plan().Tasks(CreateRequest()));
+
+            Assert.Equal(ThirdId.ToString(), parents[SecondId.ToString()]);
+            Assert.Equal(FirstId.ToString(), parents[BugId.ToString()]);
+        }
+
+        /// <summary>
+        /// Verifies that an aggregation closing a cycle is not drawn as nesting: the object stays
+        /// in its class group instead of being lifted out of every group by the client.
+        /// </summary>
+        [Fact]
+        public void Tasks_SkipAnAggregationThatClosesACycle()
+        {
+            Seed(nameof(Tasks_SkipAnAggregationThatClosesACycle));
+
+            Relate("parent", FirstId, SecondId, created: DateTime.UtcNow.AddMinutes(-2));
+            Relate("parent", SecondId, ThirdId, created: DateTime.UtcNow.AddMinutes(-1));
+            Relate("parent", ThirdId, FirstId, created: DateTime.UtcNow);
+
+            var parents = ParentsOf(new Plan().Tasks(CreateRequest()));
+
+            Assert.Equal(FirstId.ToString(), parents[SecondId.ToString()]);
+            Assert.Equal(SecondId.ToString(), parents[ThirdId.ToString()]);
+            Assert.Equal($"class:{TaskClassId}", parents[FirstId.ToString()]);
+        }
+
+        /// <summary>
+        /// Returns the parent bar of every object bar of a plan, keyed by the bar id.
+        /// </summary>
+        private static Dictionary<string, string> ParentsOf(IEnumerable<RestApiGanttTask> tasks)
+        {
+            return tasks
+                .Where(x => !x.Id.StartsWith("class:", StringComparison.Ordinal))
+                .ToDictionary(x => x.Id, x => x.ParentId);
+        }
+
+        /// <summary>
+        /// Verifies that every concrete plan endpoint of the core accepts the sub-paths the
+        /// control writes to (<c>/tasks/{id}</c>, <c>/links[/{id}]</c>). The insight plan lacked
+        /// the attribute: it loaded its links, and every drawn, retyped or deleted one answered 404.
+        /// </summary>
+        [Fact]
+        public void Endpoints_IncludeTheSubPathsTheControlWritesTo()
+        {
+            var endpoints = typeof(RestApiObjectKindGantt).Assembly
+                .GetTypes()
+                .Where(x => !x.IsAbstract && typeof(RestApiObjectKindGantt).IsAssignableFrom(x))
+                .ToList();
+
+            Assert.NotEmpty(endpoints);
+
+            foreach (var endpoint in endpoints)
+            {
+                var attribute = endpoint
+                    .GetCustomAttributes(typeof(WebExpress.WebCore.WebAttribute.IncludeSubPathsAttribute), false)
+                    .OfType<WebExpress.WebCore.WebAttribute.IncludeSubPathsAttribute>()
+                    .SingleOrDefault();
+
+                Assert.True(attribute?.IncludeSubPaths == true, $"{endpoint.FullName} does not include its sub-paths.");
+            }
         }
 
         /// <summary>

@@ -12,6 +12,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// their classes, grouped by class. Dragging a bar writes the dates back, as on a
     /// workspace's plan.
     /// </summary>
+    /// <remarks>
+    /// <see cref="IncludeSubPathsAttribute"/> is REQUIRED, as on the workspace plan: the control
+    /// persists a moved bar against <c>{base}/tasks/{id}</c> and a dependency against
+    /// <c>{base}/links[/{id}]</c>. Without it every drag, drawn, retyped or deleted link answered
+    /// 404 and reverted on the next load, while the plan itself loaded fine.
+    /// </remarks>
+    [IncludeSubPaths(true)]
     [Cache]
     public sealed class Gantt : RestApiObjectKindGantt
     {

@@ -27,8 +27,10 @@ namespace KleeneStar.Core.WebRestApi
     /// </summary>
     /// <remarks>
     /// Objects are grouped the way the model already groups them: an object whose parent is
-    /// itself on the plan hangs under that parent, and everything else hangs under a synthetic
-    /// container per class — the same grouping the Kanban board draws its swimlanes from.
+    /// itself on the plan hangs under that parent, one without such a parent hangs under the
+    /// order that aggregates it (<see cref="RelationEffect.AggregatesProgress"/>) when that order
+    /// is on the plan, and everything else hangs under a synthetic container per class — the
+    /// same grouping the Kanban board draws its swimlanes from.
     /// <para>
     /// Moving or resizing a bar writes the new dates back into the class' date fields. An edge
     /// the class models no field for is refused rather than half-applied (see
@@ -130,7 +132,7 @@ namespace KleeneStar.Core.WebRestApi
                 yield break;
             }
 
-            var onPlan = objects.Select(x => x.Id).ToHashSet();
+            var parents = ResolveParents(objects);
 
             var categories = ObjectBoardProjection.GetOrderedCategories();
             var categoriesById = categories.ToDictionary(x => x.Id, x => x);
@@ -186,9 +188,9 @@ namespace KleeneStar.Core.WebRestApi
                     Progress = CoreHub.ObjectProgressManager.GetProgress(entity.Id).Percent,
                     Resources = assignee is null ? null : [assignee.Name],
 
-                    // the model's own hierarchy wins where both ends are on the plan; the class
-                    // container is what is left for a root object
-                    ParentId = entity.ParentId is Guid parentId && onPlan.Contains(parentId)
+                    // the model's own hierarchy, then the aggregating order (see ResolveParents);
+                    // the class container is what is left for a root object
+                    ParentId = parents.TryGetValue(entity.Id, out var parentId)
                         ? parentId.ToString()
                         : ContainerId(entity.ClassId)
                 };
@@ -567,6 +569,95 @@ namespace KleeneStar.Core.WebRestApi
             source = from;
 
             return stored;
+        }
+
+        /// <summary>
+        /// Decides which bar each object hangs under. The model's own hierarchy comes first: a
+        /// <c>ParentId</c> on the plan wins. An object without one hangs under the order that
+        /// aggregates it - the source of an active <see cref="RelationEffect.AggregatesProgress"/>
+        /// relation targeting it - when that order is on the plan too, which is how a sub-task
+        /// filed in another class (or, on an insight, another workspace) appears beneath the
+        /// order it was decomposed from instead of beneath its class.
+        /// </summary>
+        /// <remarks>
+        /// An object aggregated by several orders hangs under the oldest relation's source, so
+        /// the plan does not reshuffle between loads. An aggregation that would close a cycle with
+        /// the hierarchy already decided is skipped - the object then stays in its class group -
+        /// because the client would otherwise cut the cycle itself and lift the object to the top
+        /// level, outside any group. Objects not on the plan play no part: a hidden order leaves its
+        /// sub-tasks in their class groups.
+        /// </remarks>
+        /// <param name="objects">The objects on the plan.</param>
+        /// <returns>The parent bar per object id; an object missing from it is a root.</returns>
+        private static Dictionary<Guid, Guid> ResolveParents(List<Model.Entities.Object> objects)
+        {
+            var onPlan = objects.Select(x => x.Id).ToHashSet();
+            var parents = new Dictionary<Guid, Guid>();
+
+            foreach (var entity in objects)
+            {
+                if (entity.ParentId is Guid parentId && parentId != entity.Id && onPlan.Contains(parentId))
+                {
+                    parents[entity.Id] = parentId;
+                }
+            }
+
+            var aggregations = CoreHub.ObjectRelationManager
+                .GetRelationsAmong(onPlan)
+                .Where(IsAggregation)
+                .Where(x => x.SourceObjectId != x.TargetObjectId)
+                .OrderBy(x => x.Created)
+                .ThenBy(x => x.Id);
+
+            foreach (var relation in aggregations)
+            {
+                var child = relation.TargetObjectId.Value;
+                var order = relation.SourceObjectId;
+
+                if (parents.ContainsKey(child) || IsAncestorOrSelf(child, order, parents))
+                {
+                    continue;
+                }
+
+                parents[child] = order;
+            }
+
+            return parents;
+        }
+
+        /// <summary>
+        /// Determines whether an object is the given bar or one of the bars above it.
+        /// </summary>
+        /// <param name="candidate">The object looked for.</param>
+        /// <param name="start">The bar the walk up starts at.</param>
+        /// <param name="parents">The hierarchy decided so far.</param>
+        /// <returns><see langword="true"/> when hanging <paramref name="candidate"/> under <paramref name="start"/> would close a cycle.</returns>
+        private static bool IsAncestorOrSelf(Guid candidate, Guid start, Dictionary<Guid, Guid> parents)
+        {
+            var visited = new HashSet<Guid>();
+
+            for (Guid? current = start; current is Guid id; current = parents.TryGetValue(id, out var next) ? next : null)
+            {
+                if (id == candidate || !visited.Add(id))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether a relation makes its source report the progress of its target: an
+        /// object-to-object relation that is not obsolete and whose type aggregates progress.
+        /// </summary>
+        /// <param name="relation">The relation.</param>
+        /// <returns><see langword="true"/> for an aggregation.</returns>
+        private static bool IsAggregation(ObjectRelation relation)
+        {
+            return relation?.TargetObjectId is not null
+                && relation.Status != RelationStatus.Obsolete
+                && RelationRegistry.GetType(relation.TypeKey)?.Effect == RelationEffect.AggregatesProgress;
         }
 
         /// <summary>
