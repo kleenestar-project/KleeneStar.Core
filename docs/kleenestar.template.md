@@ -86,7 +86,7 @@ When a user clicks "Add Object", they are not immediately presented with a blank
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Create new object                                                 │║
@@ -129,7 +129,7 @@ Workspace administrators manage templates via a dedicated list view, similar to 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Settings / Templates                                              │║
@@ -155,7 +155,7 @@ Editing a template involves setting its metadata (Title, Category, Icon) and def
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔TemplateEditModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Edit Template                                                        │║     │║
@@ -195,4 +195,5 @@ By assigning `template_view_policy` to specific groups in a template's profile, 
 | `/api/1/workspaces/{workspaceKey}/templates/categories` | GET | List distinct categories used in templates |
 
 ## Conclusion
+
 The Template Management system bridge the gap between abstract structural definitions (Classes) and end-user data entry by providing curated, pre-filled starting points. This concept promotes data consistency and greatly improves the usability of the KleeneStar platform for daily operational tasks.

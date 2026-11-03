@@ -195,7 +195,7 @@ This page is the central administrative view for all SLA policies of a selected 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / SLA                                                    │║
@@ -210,7 +210,7 @@ This page is the central administrative view for all SLA policies of a selected 
 ║│                      │░│ Incident · P1 ·…  |Critical| 24 / 7        |Active |  3   │║
 ║│                      │░│ Incident · P2 ·…  |High    | Standard ·…   |Active |  3   │║
 ║│                      │░│ Incident · P3 ·…  |Low     | Standard ·…   |Active |  2   │║
-║│                      │░│ Incident · VIP ·…|Critical| 24 / 7        |Active |  3   │║
+║│                      │░│ Incident · VIP·…  |Critical| 24 / 7        |Active |  3   │║
 ║│                      │░│ Batch job · …     |Medium  | Night shift   |Draft  |  2   │║
 ║│                      │░│ Legacy · …        |Low     | Standard ·…   |Inact. |  2   │║
 ║│                      │░│                                                           │║
@@ -231,7 +231,7 @@ The "Add SLA policy" and "Edit SLA policy" modals share a form layout. The basic
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔SlaAddEditModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add SLA policy / Edit SLA policy                                     │║     │║

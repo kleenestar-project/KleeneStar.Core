@@ -259,7 +259,7 @@ The class sidebar carries a "Relations" entry beside Fields, Forms, Statuses, Wo
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Finance / classes / Budget / relations                                           │║
@@ -277,7 +277,7 @@ The class sidebar carries a "Relations" entry beside Fields, Forms, Statuses, Wo
 ║│ ▸ Priorities       4 │░│                                                           │║
 ║│ ▸ SLAs             2 │░│                                                           │║
 ║│ ▸ Calendars        1 │░│                                                           │║
-║│ ▸ Relations        8 │◄── the entry this concept adds                              │║
+║│ ▸ Relations        8 │░│                                                           │║
 ║│                      │░│                                                           │║
 ║├──────────────────────┤░│                                                           │║
 ║│ [+] | [Setting]   << │░│                                                           │║

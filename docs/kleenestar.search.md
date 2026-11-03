@@ -140,14 +140,14 @@ The search page renders the WQL search bar in the view header, the cross-workspa
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar   Workspace ▼   Object ▼   Dashboard ▼          [+ AddObject]         │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Search                                                                           │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Saved searches────────┐ ┌Search across all workspaces───────────────────────────────┐║
 ║│                      │░│                                                           │║
-║│  + New search        │░│ [ Summary ~ "incident"                          🔍 ]      │║
+║│  + New search        │░│ [ Summary ~ "incident"                                  ] │║
 ║│                      │░│                                                           │║
 ║│  SAVED SEARCHES      │░│ Key      | Summary                  | Workspace  | …      │║
 ║│  ★ My open incidents│░│----------|-------------------------|------------|---------│║
@@ -187,7 +187,7 @@ Creating or editing a saved search is done in a focused modal opened from the se
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar   Workspace ▼   Object ▼   Dashboard ▼          [+ AddObject]         │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔SavedSearchAddEditModal═════════════════════════════════════════════════╗─────┘║
 ║┌Saved║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│  + N║│ New saved search / Edit saved search                                 │║rch] │║
