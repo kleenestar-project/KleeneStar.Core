@@ -47,7 +47,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
             {
                 "edit" => ContentAuthorization.MayUseInsight(id, request, typeof(WebPermissions.InsightUpdatePermission)),
                 "delete" => ContentAuthorization.MayUseInsight(id, request, typeof(WebPermissions.InsightDeletePermission)),
-                "clone" or "new" => ContentAuthorization.MayUseInsight(id, request, typeof(WebPermissions.InsightClonePermission)),
+                "clone" => ContentAuthorization.MayUseInsight(id, request, typeof(WebPermissions.InsightClonePermission))
+                    && ContentAuthorization.MayCreateInsight(request),
+                "new" => ContentAuthorization.MayCreateInsight(request),
                 _ => true
             };
 
@@ -56,14 +58,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         }
 
         /// <summary>
-        /// Creates an insight for a signed-in caller, or clones one they may clone.
+        /// Creates an insight for a caller who may create one, or clones one they may clone -
+        /// a clone is a new insight too, so it needs both.
         /// </summary>
         /// <param name="request">The request.</param>
         /// <returns>The response.</returns>
         [Method(RequestMethod.POST)]
         public override IResponse Create(IRequest request)
         {
-            return ContentAuthorization.MayUseInsight(ContentAuthorization.ReadId(request), request, typeof(WebPermissions.InsightClonePermission))
+            return ContentAuthorization.MayCreateInsight(request)
+                && ContentAuthorization.MayUseInsight(ContentAuthorization.ReadId(request), request, typeof(WebPermissions.InsightClonePermission))
                 ? base.Create(request)
                 : new ResponseForbidden();
         }
@@ -251,6 +255,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         {
             var result = base.Validate(existingItem, payload, request);
             var (query, sent) = payload.TryRead(nameof(Model.Entities.Insight.Query));
+            var (state, stateSent) = payload.TryRead(nameof(Model.Entities.Insight.State));
+
+            // taking an insight out of use is archiving it, putting it back restoring it - each
+            // its own permission beside the update; refused on the field the dialog shows
+            if (existingItem is not null && stateSent && ParseState(state) is { } target
+                && !ContentAuthorization.MayChangeInsightState(existingItem.Id, existingItem.State, target, request))
+            {
+                result.Add
+                (
+                    Translate(request, target.IsActive()
+                        ? "kleenestar.core:insight.state.validation.restore"
+                        : "kleenestar.core:insight.state.validation.archive"),
+                    nameof(Model.Entities.Insight.State)
+                );
+            }
 
             // the query is what every tab of the insight shows; one that does not compile would
             // leave every tab empty, so it is refused when it is written, with the parser's reason
@@ -264,6 +283,39 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Reads a submitted state: the id the state selection posts
+        /// (<see cref="InsightStateExtensions.Id(InsightState)"/>), the name or the number.
+        /// </summary>
+        /// <param name="value">The submitted value.</param>
+        /// <returns>The state, or <see langword="null"/> when the value names none.</returns>
+        internal static InsightState? ParseState(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            value = value.Trim();
+
+            if (Guid.TryParse(value, out var id))
+            {
+                foreach (var candidate in Enum.GetValues<InsightState>())
+                {
+                    if (candidate.Id() == id)
+                    {
+                        return candidate;
+                    }
+                }
+
+                return null;
+            }
+
+            return Enum.TryParse<InsightState>(value, true, out var parsed) && Enum.IsDefined(parsed)
+                ? parsed
+                : null;
         }
 
         /// <summary>

@@ -39,15 +39,36 @@ namespace KleeneStar.Core.WebInsight
         public const string QuickfilterView = "insight";
 
         /// <summary>
-        /// Resolves the insight the route names.
+        /// Resolves the insight the route names, if it is in use.
         /// </summary>
+        /// <remarks>
+        /// Only an active insight is in use. One set to <see cref="Model.Entities.InsightState.Deleted"/>
+        /// lies in the overview until it is restored or deleted for good - its tabs, boards and
+        /// reports answer as if it did not exist. The dialogs of the overview (edit, clone,
+        /// delete, permissions) do not ask here; they reach it through the insight CRUD endpoint.
+        /// </remarks>
         /// <param name="request">The request.</param>
-        /// <returns>The insight, or <see langword="null"/> when the route names none.</returns>
+        /// <returns>
+        /// The insight, or <see langword="null"/> when the route names none or the one it names is
+        /// not active.
+        /// </returns>
         public static Model.Entities.Insight Resolve(IRequest request)
         {
-            return Guid.TryParse(request?.GetParameter<InsightIdParameter>()?.Value, out var id) && id != Guid.Empty
+            var insight = Guid.TryParse(request?.GetParameter<InsightIdParameter>()?.Value, out var id) && id != Guid.Empty
                 ? CoreHub.InsightManager.GetInsight(id)
                 : null;
+
+            return IsInUse(insight) ? insight : null;
+        }
+
+        /// <summary>
+        /// Determines whether an insight is in use - present and active.
+        /// </summary>
+        /// <param name="insight">The insight. May be null, which answers false.</param>
+        /// <returns><see langword="true"/> when the insight can be opened.</returns>
+        public static bool IsInUse(Model.Entities.Insight insight)
+        {
+            return insight is not null && Model.Entities.InsightStateExtensions.IsActive(insight.State);
         }
 
         /// <summary>
@@ -58,7 +79,7 @@ namespace KleeneStar.Core.WebInsight
         /// <returns><see langword="true"/> when the caller may read it.</returns>
         public static bool MayRead(Model.Entities.Insight insight, IRequest request)
         {
-            return insight is not null
+            return IsInUse(insight)
                 && ContentAuthorization.MayUseInsight(insight.Id, request, typeof(WebPermissions.InsightReadContentPermission));
         }
 
@@ -71,7 +92,7 @@ namespace KleeneStar.Core.WebInsight
         /// <returns><see langword="true"/> when the caller may arrange it.</returns>
         public static bool MayArrange(Model.Entities.Insight insight, IRequest request)
         {
-            return insight is not null
+            return IsInUse(insight)
                 && ContentAuthorization.MayUseInsight(insight.Id, request, typeof(WebPermissions.InsightWriteContentPermission));
         }
 

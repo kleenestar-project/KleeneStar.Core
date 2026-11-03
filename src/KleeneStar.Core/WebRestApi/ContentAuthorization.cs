@@ -123,6 +123,73 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
+        /// The scope id of the installation-wide insight resource: the grants that say who may
+        /// create insights, administered in the permission dialog of the insight overview.
+        /// </summary>
+        /// <remarks>
+        /// A new insight is on no resource yet, so "who may create one" needs a resource of its
+        /// own. It lives in the insight scope under an id no insight can carry (not a guid), so
+        /// the readers of per-insight grants - <c>GetRefusedIds</c> and <c>GetGrantedIds</c>,
+        /// which parse the id as a guid - pass it by.
+        /// </remarks>
+        public const string InsightCreationScopeId = "creation";
+
+        /// <summary>
+        /// The installation-wide insight resource (<see cref="InsightCreationScopeId"/>).
+        /// </summary>
+        public static PermissionResource InsightCreationResource => new(PermissionScope.Insight, InsightCreationScopeId);
+
+        /// <summary>
+        /// Determines whether the caller may create an insight: signed in, and granted
+        /// <see cref="InsightCreatePermission"/> on the installation-wide insight resource -
+        /// open to every signed-in caller while nobody administered it, like any resource.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the caller may create an insight.</returns>
+        public static bool MayCreateInsight(IRequest request)
+        {
+            return RouteAuthorization.IsSignedIn(request)
+                && PageAuthorization.IsGranted(request, typeof(InsightCreatePermission), InsightCreationResource);
+        }
+
+        /// <summary>
+        /// Determines whether the caller may administer who creates insights. The resource
+        /// belongs to the installation, not to anybody's insight, so this fails closed on the
+        /// administrators group (<see cref="AccountAuthorization.IsAdministrator(IRequest)"/>).
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the caller may change the creation grants.</returns>
+        public static bool MayAdministerInsightCreation(IRequest request)
+        {
+            return RouteAuthorization.IsSignedIn(request) && AccountAuthorization.IsAdministrator(request);
+        }
+
+        /// <summary>
+        /// Determines whether the caller may move an insight from one state to another: taking
+        /// an active insight out of use needs <see cref="InsightArchivePermission"/>, putting
+        /// one back into use <see cref="InsightRestorePermission"/>. Staying in the same state
+        /// asks nothing beyond the update itself.
+        /// </summary>
+        /// <param name="insightId">The insight.</param>
+        /// <param name="from">The state it has.</param>
+        /// <param name="to">The state it is to have.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the change of state may proceed.</returns>
+        public static bool MayChangeInsightState(Guid insightId, InsightState from, InsightState to, IRequest request)
+        {
+            if (from == to)
+            {
+                return true;
+            }
+
+            var permission = to.IsActive()
+                ? typeof(InsightRestorePermission)
+                : typeof(InsightArchivePermission);
+
+            return MayUseInsight(insightId, request, permission);
+        }
+
+        /// <summary>
         /// Reads the <c>id</c> query parameter of a CRUD request.
         /// </summary>
         /// <param name="request">The request.</param>

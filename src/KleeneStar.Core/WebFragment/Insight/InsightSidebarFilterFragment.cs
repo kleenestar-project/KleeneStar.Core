@@ -1,4 +1,11 @@
+using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebInsight;
+using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Model.Entities;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
@@ -11,14 +18,16 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Insight
 {
     /// <summary>
-    /// Displays the list of all available insights in the sidebar of the insight view
-    /// page, allowing the user to switch between insights.
+    /// Lists the insights in the sidebar of the insight page, so the reader can switch
+    /// between them without going back to the overview.
     /// </summary>
     /// <remarks>
-    /// The list used to sit on the home page, back when the home page was an insight. The
-    /// home page is now the landing page (<see cref="WWW.Index"/>), which is the shared
-    /// starting point rather than one person's board, so the switcher moved to where the
-    /// boards are read.
+    /// The list is the one the header menu offers: the active insights the caller may read
+    /// (<see cref="ContentVisibility.Restrict(IQuery{Model.Entities.Insight})"/>), by name. It
+    /// used to list every insight of the installation - names the caller was refused included -
+    /// as filter entries that did nothing on this page. Each entry is now a link to its insight
+    /// page, the open one marked. The links are unbound: a bound link would have its
+    /// <c>{insightid}</c> replaced by the one of the page being shown.
     /// </remarks>
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]
@@ -51,23 +60,37 @@ namespace KleeneStar.Core.WebFragment.Insight
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
+            var request = renderContext?.Request;
+            var current = InsightScope.Resolve(request)?.Id;
             var list = new List<IHtmlNode>();
 
-            foreach (var insight in CoreHub.InsightManager.GetInsights(new Query<Model.Entities.Insight>()))
+            foreach (var insight in GetListed())
             {
-                list.Add(new ControlSidebarItemLink($"insight-{insight.Id}")
+                var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Insight._insightid_.Index>()?
+                    .BindParameters(new InsightIdParameter(insight.Id));
+
+                list.Add(new UnboundSidebarItemLink($"insight-{insight.Id}")
                 {
                     Text = _ => insight.Name,
-                    PrimaryAction = _ => new ActionFilter()
-                    {
-                        Exclusive = true,
-                        Group = "insight"
-                    }
+                    Uri = _ => uri,
+                    Active = _ => insight.Id == current ? TypeActive.Active : TypeActive.None
                 }
                     .Render(renderContext, visualTree));
             }
 
             return new HtmlList(list);
+        }
+
+        /// <summary>
+        /// Returns the insights the sidebar lists for the caller: active, readable, by name.
+        /// </summary>
+        /// <returns>The insights to list.</returns>
+        internal static IReadOnlyList<Model.Entities.Insight> GetListed()
+        {
+            return [.. CoreHub.InsightManager
+                .GetInsights(ContentVisibility.Restrict(new Query<Model.Entities.Insight>()))
+                .Where(x => x.State.IsActive())
+                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)];
         }
     }
 }

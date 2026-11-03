@@ -90,7 +90,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
             {
                 Id = "state",
                 Label = "State",
-                Visible = false
+                // an insight set to deleted is listed here only - the header menu and the
+                // insight page leave it out - so the overview says which ones are in use
+                Visible = true
             };
         }
 
@@ -217,7 +219,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
                 ["name"] = row.Name,
                 ["query"] = row.Query,
                 ["description"] = ProseText.ToPlainText(row.Description),
-                ["state"] = row.State.ToString()
+                ["state"] = I18N.Translate(request, row.State.Text()) ?? row.State.ToString()
             };
 
             return [.. order.Select(id => new RestApiTableCell() { Content = cells.GetValueOrDefault(id) })];

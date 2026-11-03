@@ -202,6 +202,18 @@ namespace KleeneStar.Core.WebPermission
         /// <returns><see langword="true"/> when the page may render.</returns>
         private static bool MayOpenInsightPage(string pageId, IRequest request)
         {
+            // the overview's own dialogs name no insight: creating one asks the installation-wide
+            // creation grant, administering that grant is the installation administrators' job
+            if (string.Equals(pageId, Prefix + "insights.add", StringComparison.OrdinalIgnoreCase))
+            {
+                return WebRestApi.ContentAuthorization.MayCreateInsight(request);
+            }
+
+            if (string.Equals(pageId, Prefix + "insights.permission", StringComparison.OrdinalIgnoreCase))
+            {
+                return WebRestApi.ContentAuthorization.MayAdministerInsightCreation(request);
+            }
+
             var id = Parse(request.GetParameter<InsightIdParameter>()?.Value);
             var permission = pageId[(pageId.LastIndexOf('.') + 1)..].ToLowerInvariant() switch
             {

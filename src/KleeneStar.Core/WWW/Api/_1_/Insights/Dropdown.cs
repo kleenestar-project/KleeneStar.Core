@@ -63,7 +63,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights
         /// </returns>
         protected override IEnumerable<RestApiDropdownItem> RetrieveItems(IQuery<Model.Entities.Insight> query, IQueryContext context, IRequest request)
         {
+            // the menu leads into insights, so it offers only those that can be opened; one set
+            // to deleted is found in the overview
             return CoreHub.InsightManager?.GetInsights(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
+                .Where(x => x.State == Model.Entities.InsightState.Active)
                 .Select(x => new RestApiDropdownItem()
                 {
                     Id = x.Id,

@@ -49,7 +49,10 @@ namespace KleeneStar.Core.WebFragment.Insight
         /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            if (!FragmentContext.Conditions.Check(renderContext?.Request))
+            // offered only to a caller who may create an insight - the rule of the dialog and
+            // of the endpoint behind it
+            if (!FragmentContext.Conditions.Check(renderContext?.Request)
+                || !global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayCreateInsight(renderContext?.Request))
             {
                 return null;
             }

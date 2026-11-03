@@ -1,9 +1,11 @@
 ﻿using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebInsight;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebUri;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebCore.WebAttribute;
+using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebIcon;
@@ -36,6 +38,13 @@ namespace KleeneStar.Core.WWW.Insight._insightid_
         {
             var insightParameter = renderContext.Request.GetParameter<InsightIdParameter>();
             var insight = CoreHub.InsightManager.GetInsight(insightParameter);
+
+            // only an active insight is opened; one set to deleted (or none at all) has nothing
+            // to show here and is found in the overview, where it is restored or removed
+            if (!InsightScope.IsInUse(insight))
+            {
+                throw new RedirectException(CoreHub.GetUri<global::KleeneStar.Core.WWW.Insights.Index>());
+            }
 
             var uri = renderContext.PageContext.ApplicationContext.Route
                 .Concat(new UriPathSegmentConstant("insights")

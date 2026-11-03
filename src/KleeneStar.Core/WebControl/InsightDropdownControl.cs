@@ -16,8 +16,14 @@ namespace KleeneStar.Core.WebControl
         /// <summary>
         /// Gets the control link for adding a new insight.
         /// </summary>
+        /// <remarks>
+        /// Offered only to a caller who may create an insight
+        /// (<see cref="WebRestApi.ContentAuthorization.MayCreateInsight"/>), the rule the dialog
+        /// and the endpoint behind it apply.
+        /// </remarks>
         public ControlDropdownItemLink AddInsight { get; } = new()
         {
+            Visible = ctx => WebRestApi.ContentAuthorization.MayCreateInsight(ctx?.Request),
             Text = _ => "kleenestar.core:insight.add.label",
             Icon = _ => new IconPlus(),
             PrimaryAction = _ => new ActionModal("modal-form", CoreHub.GetUri<global::KleeneStar.Core.WWW.Insights.Add>(), TypeModalSize.ExtraLarge),
