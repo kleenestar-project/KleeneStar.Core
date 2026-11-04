@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -71,9 +70,9 @@ namespace KleeneStar.Core.WebRestApi
 
             try
             {
-                var stored = json.TrimStart().StartsWith("[")
+                var stored = json.TrimStart().StartsWith('[')
                     ? JsonSerializer.Deserialize<List<RestApiTableColumnUpdate>>(json, _jsonOptions)
-                    : RestApiTableLayout.Parse(json).Columns.ToList();
+                    : [.. RestApiTableLayout.Parse(json).Columns];
 
                 return stored?.Where(c => !string.IsNullOrWhiteSpace(c?.Id)).ToList();
             }
