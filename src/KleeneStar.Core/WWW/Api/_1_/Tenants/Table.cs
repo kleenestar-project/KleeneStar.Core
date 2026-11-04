@@ -80,9 +80,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
                 Visible = true
             };
 
+            // its own id: a second "description" made every layout of the table fail
+            // (RestApiTableLayout keys the columns by id)
             yield return new RestApiTableColumn()
             {
-                Id = "description",
+                Id = "workspaces",
                 Label = I18N.Translate(request, "kleenestar.core:setting.tenant.column.assigned.workspace"),
                 Visible = true
             };
@@ -120,24 +122,27 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         /// </returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Tenant> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
+            // the cells follow the columns in the order they are shown - a stored layout reorders
+            // them, and the client pairs cells with columns by position
+            var order = columns?.Select(c => c.Id).ToList() ?? [];
+
             return CoreHub.TenantManager.GetTenants(query, context)
                 .Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),
                     Cells =
                     [
-                        new RestApiTableCell() {
-                             Content = x.Name
-                        },
-                        new() {
-                            Content = ProseText.ToPlainText(x.Description)
-                        },
-                        new() {
-                            Content = string.Join(", ", x.Workspaces.Select(x => x.Name))
-                        },
-                        new() {
-                            Content = x.State.ToString()
-                        }
+                        .. order.Select(id => new RestApiTableCell
+                        {
+                            Content = id switch
+                            {
+                                "name" => x.Name,
+                                "description" => ProseText.ToPlainText(x.Description),
+                                "workspaces" => string.Join(", ", x.Workspaces.Select(w => w.Name)),
+                                "state" => x.State.ToString(),
+                                _ => null
+                            }
+                        })
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
                     Uri = GetUri(x, request)?.ToString()
