@@ -1,3 +1,6 @@
+var kleenestar = kleenestar || {}
+kleenestar.core = kleenestar.core || {}
+
 /**
  * KleeneStar object-move-tree controller.
  *
@@ -13,7 +16,7 @@
  * rejected move (e.g. a hierarchy-rule violation returning 400) the page is reloaded so the
  * optimistic client-side move is reverted to the persisted state.
  */
-webexpress.webui.KleeneStarObjectMoveTreeCtrl = class extends webexpress.webui.Ctrl {
+kleenestar.core.ObjectMoveTreeCtrl = class extends webexpress.webui.Ctrl {
     /**
      * Initializes the controller: caches the REST endpoint and subscribes to move events.
      * @param {HTMLElement} element - The wrapper element hosting the movable tree.
@@ -103,4 +106,4 @@ webexpress.webui.KleeneStarObjectMoveTreeCtrl = class extends webexpress.webui.C
 };
 
 // register the class in the controller
-webexpress.webui.Controller.registerClass("wx-kleenestar-object-movetree", webexpress.webui.KleeneStarObjectMoveTreeCtrl);
+webexpress.webui.Controller.registerClass("wx-kleenestar-object-movetree", kleenestar.core.ObjectMoveTreeCtrl);

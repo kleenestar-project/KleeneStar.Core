@@ -9,7 +9,7 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment
 {
     /// <summary>
-    /// Tells the editor's KleeneStar add-ons (<c>Assets/js/editoraddons.js</c>) where to read
+    /// Tells the editor's KleeneStar add-ons (<c>Assets/js/editor/addons/*.js</c>) where to read
     /// what they show: the address of <c>/api/1/editor/objects</c> in
     /// <c>&lt;meta name="kleenestar.editor.objects"&gt;</c> and that of the news feed
     /// <c>/api/1/blogs/feed</c> in <c>&lt;meta name="kleenestar.editor.news"&gt;</c>.

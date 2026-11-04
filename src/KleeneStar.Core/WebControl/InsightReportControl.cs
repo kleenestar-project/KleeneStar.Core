@@ -60,7 +60,7 @@ namespace KleeneStar.Core.WebControl
 
             var html = new StringBuilder();
 
-            html.Append($"<div class=\"ks-insight-reports\" data-uri=\"{A(Uri?.Invoke(renderContext))}\" data-storage=\"{A(StorageKey?.Invoke(renderContext))}\">");
+            html.Append($"<div class=\"ks-insight-reports wx-kleenestar-insightreports\" data-uri=\"{A(Uri?.Invoke(renderContext))}\" data-storage=\"{A(StorageKey?.Invoke(renderContext))}\">");
             html.Append("<div class=\"ks-insight-reports-toolbar\">");
 
             html.Append($"<label class=\"ks-insight-reports-field\"><span>{T("kleenestar.core:insight.report.picker.report")}</span><select class=\"ks-insight-reports-report\">");

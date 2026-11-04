@@ -1,5 +1,8 @@
+var kleenestar = kleenestar || {}
+kleenestar.core = kleenestar.core || {}
+
 /**
- * KleeneStar: brings an object detail page up to date after a dialog has changed the object.
+ * Brings an object detail page up to date after a dialog has changed the object.
  *
  * The detail page of an issue, an asset, a document or a blog post is rendered by the server
  * once, and the dialogs that write the record - the structured edit mask, the prose editor,
@@ -17,38 +20,53 @@
  * the page would only reload into a "not found"; and a form that is not in a dialog is not
  * followed either, because a page-level form reports its own outcome in place.
  */
-(function () {
+kleenestar.core.ObjectRefresh = new class {
     /**
      * The meta tag the detail page names its object in.
      */
-    const META_NAME = "kleenestar.object";
+    META_NAME = "kleenestar.object";
+
+    /**
+     * Constructor
+     */
+    constructor() {
+        document.addEventListener(webexpress.webui.Event.UPLOAD_SUCCESS_EVENT, (event) => {
+            if (!this.changesThisObject(event)) {
+                return;
+            }
+
+            // the reload is deferred a tick so the form's own listeners - the dialog closing,
+            // the toast, the editor ending its draft - run against the page they were written for
+            window.setTimeout(() => window.location.reload(), 0);
+        });
+    }
 
     /**
      * Reads the id of the object the page shows.
      * @returns {string|null} The id, or null on a page that names none.
      */
-    const objectId = () => {
-        const meta = document.querySelector(`meta[name="${META_NAME}"]`);
+    objectId() {
+        const meta = document.querySelector(`meta[name="${this.META_NAME}"]`);
         const content = meta ? (meta.getAttribute("content") || "").trim().toLowerCase() : "";
 
         return content.length > 0 ? content : null;
-    };
+    }
 
     /**
      * Decides whether a successful submit changed the object the page shows.
-     * @param {CustomEvent} event The upload success event of a form.
+     * @param {CustomEvent} event - The upload success event of a form.
      * @returns {boolean} True when the page has to be reloaded.
      */
-    const changesThisObject = (event) => {
+    changesThisObject(event) {
         const form = event?.detail?.form;
-        const id = objectId();
+        const id = this.objectId();
 
         if (!form || !id || !form.closest) {
             return false;
         }
 
-        // a clone created a new object, which objectcreated.js opens; reloading the original
-        // here would race that navigation
+        // a clone created a new object, which kleenestar.core.ObjectCreated opens; reloading the
+        // original here would race that navigation
         if (event?.detail?.response?.data?.created === true) {
             return false;
         }
@@ -67,27 +85,8 @@
             return false;
         }
 
-        const controller = window.webexpress?.webui?.Controller;
-        const instance = controller && typeof controller.getInstanceByElement === "function"
-            ? controller.getInstanceByElement(form)
-            : null;
+        const instance = webexpress.webui.Controller.getInstanceByElement(form);
 
         return !(instance && instance.mode === "delete");
-    };
-
-    const eventName = window.webexpress?.webui?.Event?.UPLOAD_SUCCESS_EVENT;
-
-    if (!eventName) {
-        return;
     }
-
-    document.addEventListener(eventName, (event) => {
-        if (!changesThisObject(event)) {
-            return;
-        }
-
-        // the reload is deferred a tick so the form's own listeners - the dialog closing,
-        // the toast, the editor ending its draft - run against the page they were written for
-        window.setTimeout(() => window.location.reload(), 0);
-    });
-})();
+};

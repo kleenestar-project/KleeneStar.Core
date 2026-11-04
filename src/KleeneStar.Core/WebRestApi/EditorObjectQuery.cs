@@ -10,7 +10,7 @@ using WebExpress.WebIndex.Queries;
 namespace KleeneStar.Core.WebRestApi
 {
     /// <summary>
-    /// What an object add-on of the editor asks for (<c>Assets/js/editoraddons.js</c>): a filter
+    /// What an object add-on of the editor asks for (<c>Assets/js/editor/addons/*.js</c>): a filter
     /// over the objects of the installation, read the way the reader is allowed to read them.
     /// </summary>
     /// <param name="Workspace">The key of the workspace, or blank for every workspace.</param>

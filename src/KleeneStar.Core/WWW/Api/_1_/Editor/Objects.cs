@@ -14,7 +14,7 @@ using WebExpress.WebCore.WebRestApi;
 namespace KleeneStar.Core.WWW.Api._1_.Editor
 {
     /// <summary>
-    /// The objects the editor's KleeneStar add-ons show (<c>Assets/js/editoraddons.js</c>):
+    /// The objects the editor's KleeneStar add-ons show (<c>Assets/js/editor/addons/*.js</c>):
     /// one object by key (object reference), the documents below a document (child pages), or
     /// the objects a filter selects (object list and figure).
     /// </summary>
