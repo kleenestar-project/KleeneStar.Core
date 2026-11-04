@@ -35,11 +35,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Hierarchy._objectkey_
     /// <para>
     /// <c>PUT {base}</c> sets or clears the parent. The request body is a JSON
     /// document of the form <c>{ "parent": "SD-17" }</c> (object key or id) or
-    /// <c>{ "parent": null }</c> to detach. Validation is delegated to
-    /// <see cref="WebManager.IObjectManager.SetParent"/>: an unknown object yields
-    /// <c>404</c>, a rule violation (self-parent, cycle, cross-workspace link, or a
-    /// child class the parent's class does not allow) yields <c>400</c> with an
-    /// <c>error</c> message. On success the updated hierarchy is returned.
+    /// <c>{ "parent": null }</c> to detach, optionally with the <c>expectedParent</c> the
+    /// client saw. Authorization and validation are
+    /// <see cref="WebRestApi.ObjectMove.Execute"/>: an unknown object yields <c>404</c>, a
+    /// caller who may not change the object, its new or its old parent <c>403</c>, a rule
+    /// violation (self-parent, cycle, cross-workspace link, depth, or a child class the
+    /// parent's class does not allow) <c>400</c> with an <c>error</c> message, and a conflict
+    /// (moved meanwhile, workspace busy) <c>409</c>. On success the updated hierarchy is
+    /// returned.
     /// </para>
     /// </remarks>
     [Title("kleenestar.core:object.hierarchy.api.title")]
@@ -121,32 +124,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Hierarchy._objectkey_
                 return Error("The request body must be a JSON document of the form { \"parent\": \"KEY\" } or { \"parent\": null }.");
             }
 
-            Guid? parentId = null;
+            ObjectEntity parent = null;
 
             if (!string.IsNullOrWhiteSpace(payload.Parent))
             {
-                var parent = Guid.TryParse(payload.Parent, out var parsed)
-                    ? CoreHub.ObjectManager.GetObject(parsed)
-                    : CoreHub.ObjectManager.GetObjectByKey(payload.Parent);
+                parent = global::KleeneStar.Core.WebRestApi.ObjectMove.Resolve(payload.Parent);
 
                 if (parent is null)
                 {
                     return Error($"The parent object '{payload.Parent}' does not exist.");
                 }
-
-                parentId = parent.Id;
             }
 
-            try
-            {
-                var updated = CoreHub.ObjectManager.SetParent(entity.Id, parentId);
+            var refusal = global::KleeneStar.Core.WebRestApi.ObjectMove.Execute(entity, parent, payload.ExpectedParent, request, out var updated);
 
-                return updated is null ? new ResponseNotFound() : Json(BuildHierarchy(updated));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Error(ex.Message);
-            }
+            return refusal ?? Json(BuildHierarchy(updated));
         }
 
         /// <summary>
@@ -355,6 +347,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Hierarchy._objectkey_
             /// to detach the object from its parent.
             /// </summary>
             public string Parent { get; set; }
+
+            /// <summary>
+            /// Gets or sets the parent the client saw: a key or id, <c>null</c> for the root, or
+            /// absent (<see cref="JsonValueKind.Undefined"/>) when the client states none.
+            /// </summary>
+            public JsonElement ExpectedParent { get; set; }
         }
     }
 }

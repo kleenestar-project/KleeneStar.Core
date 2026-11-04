@@ -1,4 +1,5 @@
 using KleeneStar.Core.Test;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Model.Entities;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
 
@@ -225,6 +226,283 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.NotNull(updated);
             Assert.Equal(MidId, updated.ParentId);
             Assert.Equal(0, raised);
+        }
+
+        /// <summary>
+        /// The cycle check walks the ancestry of the target, so a parent several levels below
+        /// the moved object is caught as well as a direct child.
+        /// </summary>
+        [Fact]
+        public void SetParent_RejectsCycleThroughGrandchild()
+        {
+            Seed(nameof(SetParent_RejectsCycleThroughGrandchild));
+
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(RootId, MidId));
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(MidId, LeafId));
+
+            // nothing was written
+            Assert.Null(CoreHub.ObjectManager.GetObject(RootId)!.ParentId);
+            Assert.Equal(RootId, CoreHub.ObjectManager.GetObject(MidId)!.ParentId);
+        }
+
+        /// <summary>
+        /// A move is refused when it would place the moved object - or the deepest object of
+        /// its subtree - below the configured depth limit (root = level one).
+        /// </summary>
+        [Fact]
+        public void SetParent_HonorsMaxDepth()
+        {
+            Seed(nameof(SetParent_HonorsMaxDepth));
+
+            WithMaxDepth(3, () =>
+            {
+                // leaf sits at level 3: nothing may go below it
+                Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(LooseId, LeafId));
+
+                // root carries two levels below it; under loose (level 1) leaf would land at 4
+                Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(RootId, LooseId));
+
+                // mid carries one level; under loose, mid lands at 2 and leaf at 3 - permitted
+                var mid = CoreHub.ObjectManager.SetParent(MidId, LooseId);
+                Assert.Equal(LooseId, mid!.ParentId);
+            });
+        }
+
+        /// <summary>
+        /// A move stating the parent the caller saw is refused as a conflict when the object
+        /// has another one by now, and carried out when the expectation holds.
+        /// </summary>
+        [Fact]
+        public void SetParent_ExpectedParent_RefusesStaleMove()
+        {
+            Seed(nameof(SetParent_ExpectedParent_RefusesStaleMove));
+
+            // the caller believes leaf sits below root; it sits below mid
+            var conflict = Assert.Throws<HierarchyConflictException>(() => CoreHub.ObjectManager.SetParent(LeafId, null, RootId));
+            Assert.Contains("moved", conflict.Message);
+            Assert.Equal(MidId, CoreHub.ObjectManager.GetObject(LeafId)!.ParentId);
+
+            // the caller believes loose sits at the root, which is right
+            var loose = CoreHub.ObjectManager.SetParent(LooseId, MidId, null);
+            Assert.Equal(MidId, loose!.ParentId);
+
+            var leaf = CoreHub.ObjectManager.SetParent(LeafId, null, MidId);
+            Assert.Null(leaf!.ParentId);
+        }
+
+        /// <summary>
+        /// A move raises <see cref="KleeneStar.Core.WebManager.IObjectManager.ObjectMoved"/>
+        /// with both ends; a move that changes nothing raises nothing.
+        /// </summary>
+        [Fact]
+        public void SetParent_RaisesObjectMoved()
+        {
+            Seed(nameof(SetParent_RaisesObjectMoved));
+
+            var moves = new List<ObjectMovedEventArgs>();
+            void Record(object _, ObjectMovedEventArgs e) => moves.Add(e);
+
+            CoreHub.ObjectManager.ObjectMoved += Record;
+
+            try
+            {
+                CoreHub.ObjectManager.SetParent(LeafId, MidId);
+                Assert.Empty(moves);
+
+                CoreHub.ObjectManager.SetParent(LeafId, LooseId);
+                CoreHub.ObjectManager.SetParent(LeafId, null);
+
+                Assert.Equal(2, moves.Count);
+                Assert.Equal((MidId, LooseId), (moves[0].PreviousParentId!.Value, moves[0].ParentId!.Value));
+                Assert.Equal(LeafId, moves[0].Object.Id);
+                Assert.Equal(LooseId, moves[1].PreviousParentId);
+                Assert.Null(moves[1].ParentId);
+            }
+            finally
+            {
+                CoreHub.ObjectManager.ObjectMoved -= Record;
+            }
+        }
+
+        /// <summary>
+        /// A move is recorded in the object's history as the system property <c>parent</c>.
+        /// </summary>
+        [Fact]
+        public void SetParent_RecordsTheMoveInTheHistory()
+        {
+            Seed(nameof(SetParent_RecordsTheMoveInTheHistory));
+
+            CoreHub.ObjectManager.SetParent(LooseId, RootId);
+
+            var change = CoreHub.CommitManager.GetHistory(LooseId)
+                .SelectMany(c => c.Changes)
+                .FirstOrDefault(c => c.Name == KleeneStar.Core.WebManager.ObjectProperty.Parent);
+
+            Assert.NotNull(change);
+            Assert.Equal(RootId.ToString(), change.NewValue);
+        }
+
+        /// <summary>
+        /// A move is attributed to the identity acting on the call chain, not to whoever edited
+        /// the object last; a move by nobody (the system) is attributed to nobody.
+        /// </summary>
+        [Fact]
+        public void SetParent_IsAttributedToTheActingIdentity()
+        {
+            Seed(nameof(SetParent_IsAttributedToTheActingIdentity));
+
+            var actor = Guid.NewGuid();
+
+            using (CoreHub.SessionManager.BeginIdentity(actor))
+            {
+                CoreHub.ObjectManager.SetParent(LooseId, RootId);
+            }
+
+            var byActor = CoreHub.CommitManager.GetHistory(LooseId).First();
+
+            Assert.Equal(actor, byActor.CreatedById);
+            Assert.Equal(actor, CoreHub.ObjectManager.GetObject(LooseId)!.UpdaterId);
+
+            using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
+            {
+                CoreHub.ObjectManager.SetParent(LooseId, null);
+            }
+
+            var byNobody = CoreHub.CommitManager.GetHistory(LooseId).First();
+
+            Assert.NotEqual(byActor.Id, byNobody.Id);
+            Assert.True(byNobody.CreatedById is null || byNobody.CreatedById == Guid.Empty);
+            Assert.Null(CoreHub.ObjectManager.GetObject(LooseId)!.UpdaterId);
+        }
+
+        /// <summary>
+        /// Two opposite moves started at the same time - A below B and B below A - cannot both
+        /// pass: the hierarchy lock serializes them, so the second sees the first and is
+        /// refused as a cycle. Exactly one lands, and the tree stays acyclic.
+        /// </summary>
+        [Fact]
+        public async Task SetParent_ConcurrentOppositeMoves_NeverPersistACycle()
+        {
+            Seed(nameof(SetParent_ConcurrentOppositeMoves_NeverPersistACycle));
+
+            using var barrier = new Barrier(2);
+
+            bool Attempt(Guid node, Guid parent)
+            {
+                barrier.SignalAndWait();
+
+                try
+                {
+                    CoreHub.ObjectManager.SetParent(node, parent);
+
+                    return true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            }
+
+            var cancellation = TestContext.Current.CancellationToken;
+            var first = Task.Run(() => Attempt(LooseId, BugId), cancellation);
+            var second = Task.Run(() => Attempt(BugId, LooseId), cancellation);
+
+            var landed = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30), cancellation);
+
+            Assert.True(landed[0] ^ landed[1], "exactly one of the opposite moves must succeed");
+
+            var loose = CoreHub.ObjectManager.GetObject(LooseId)!;
+            var bug = CoreHub.ObjectManager.GetObject(BugId)!;
+
+            Assert.False(loose.ParentId == BugId && bug.ParentId == LooseId);
+        }
+
+        /// <summary>
+        /// Removing an object that still has children is refused before anything is written:
+        /// no terminal commit claims a deletion, and the object stays.
+        /// </summary>
+        [Fact]
+        public void Remove_WithChildren_IsRefusedBeforeTheCommit()
+        {
+            Seed(nameof(Remove_WithChildren_IsRefusedBeforeTheCommit));
+
+            var refused = Assert.Throws<HierarchyConflictException>(() => CoreHub.ObjectManager.Remove(MidId));
+
+            Assert.Equal(1, refused.Count);
+            Assert.NotNull(CoreHub.ObjectManager.GetObject(MidId));
+            Assert.DoesNotContain(CoreHub.CommitManager.GetHistory(MidId), c => c.Type == CommitType.Deleted);
+
+            // once the child is gone, the parent can go
+            CoreHub.ObjectManager.Remove(LeafId);
+            CoreHub.ObjectManager.Remove(MidId);
+
+            Assert.Null(CoreHub.ObjectManager.GetObject(MidId));
+        }
+
+        /// <summary>
+        /// The terminal commit of a removal names the identity acting now, not whoever edited
+        /// the object last; a removal by nobody carries no author.
+        /// </summary>
+        [Fact]
+        public void Remove_IsAttributedToTheActingIdentity()
+        {
+            Seed(nameof(Remove_IsAttributedToTheActingIdentity));
+
+            var lastEditor = Guid.NewGuid();
+            var actor = Guid.NewGuid();
+
+            using (var db = CoreHubFixture.CreateDbContext(nameof(Remove_IsAttributedToTheActingIdentity)))
+            {
+                foreach (var id in new[] { BugId, LooseId })
+                {
+                    db.Objects.Single(x => x.Id == id).UpdaterId = lastEditor;
+                }
+
+                db.SaveChanges();
+            }
+
+            using (CoreHub.SessionManager.BeginIdentity(actor))
+            {
+                CoreHub.ObjectManager.Remove(BugId);
+            }
+
+            var byActor = CoreHub.CommitManager.GetHistory(BugId).First();
+
+            Assert.Equal(CommitType.Deleted, byActor.Type);
+            Assert.Equal(actor, byActor.CreatedById);
+
+            using (CoreHub.SessionManager.BeginIdentity(Guid.Empty))
+            {
+                CoreHub.ObjectManager.Remove(LooseId);
+            }
+
+            var byNobody = CoreHub.CommitManager.GetHistory(LooseId).First();
+
+            Assert.Equal(CommitType.Deleted, byNobody.Type);
+            Assert.NotEqual(lastEditor, byNobody.CreatedById);
+            Assert.True(byNobody.CreatedById is null || byNobody.CreatedById == Guid.Empty);
+        }
+
+        /// <summary>
+        /// Runs an action with a different depth limit and restores the previous settings.
+        /// </summary>
+        /// <param name="maxDepth">The limit to apply.</param>
+        /// <param name="action">The action.</param>
+        internal static void WithMaxDepth(int maxDepth, Action action)
+        {
+            var property = typeof(CoreHub).GetProperty(nameof(CoreHub.HierarchySettings))!;
+            var previous = CoreHub.HierarchySettings;
+
+            property.SetValue(null, new HierarchySettings { MaxDepth = maxDepth });
+
+            try
+            {
+                action();
+            }
+            finally
+            {
+                property.SetValue(null, previous);
+            }
         }
     }
 }

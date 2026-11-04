@@ -42,6 +42,55 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
+        /// Determines whether the caller may move an object below another one (or to the root
+        /// of its workspace).
+        /// </summary>
+        /// <remarks>
+        /// A move changes three records: the object, which gets another parent; the new parent,
+        /// whose content grows; and the old parent, whose content shrinks. The caller needs
+        /// <see cref="ObjectUpdatePermission"/> on all three - asking only about the object let
+        /// anybody who may edit a record file it below any object of the workspace they could
+        /// see. The root of a workspace is no record and needs nothing.
+        /// <para>
+        /// The old parent is read without narrowing: an object may sit below a parent the caller
+        /// cannot see (security levels judge every object on its own), and whether it may be
+        /// taken out of there is still a question about that parent's permissions. Nothing of
+        /// the parent reaches the caller beyond the refusal.
+        /// </para>
+        /// </remarks>
+        /// <param name="object">The object to move, may be absent.</param>
+        /// <param name="parent">The new parent, or <see langword="null"/> for the root.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the move may proceed.</returns>
+        public static bool MayMove(ObjectEntity @object, ObjectEntity parent, IRequest request)
+        {
+            if (@object is null)
+            {
+                return true;
+            }
+
+            if (!MayWrite(@object, request) || !MayWrite(parent, request))
+            {
+                return false;
+            }
+
+            if (@object.ParentId is not Guid previousId || previousId == parent?.Id)
+            {
+                return true;
+            }
+
+            ObjectEntity previous;
+
+            // the system asks which parent the object has, not what the caller is cleared for
+            using (CoreHub.SecurityLevelManager?.BeginUnrestricted())
+            {
+                previous = CoreHub.ObjectManager.GetObject(previousId);
+            }
+
+            return MayWrite(previous, request);
+        }
+
+        /// <summary>
         /// Determines whether the caller may change the content of the workspace the route
         /// names - a sprint, a board's lanes and filter, a plan dragged on a timeline.
         /// </summary>

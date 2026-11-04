@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WebQuickfilter
 
             try
             {
-                var statement = new WqlParser<TIndexItem>().Parse(wql);
+                var statement = new WqlParser<TIndexItem>().Parse(Expand<TIndexItem>(wql));
 
                 if (statement is null || statement.HasErrors || statement.Filter is null)
                 {
@@ -79,7 +79,7 @@ namespace KleeneStar.Core.WebQuickfilter
 
             try
             {
-                var statement = new WqlParser<TIndexItem>().Parse(wql);
+                var statement = new WqlParser<TIndexItem>().Parse(Expand<TIndexItem>(wql));
 
                 if (statement is null)
                 {
@@ -163,6 +163,19 @@ namespace KleeneStar.Core.WebQuickfilter
                     return false;
                 }
             });
+        }
+
+        /// <summary>
+        /// Expands the object predicates KleeneStar adds to WQL (<c>within("KEY")</c>, see
+        /// <see cref="WqlWithin"/>) before the framework's parser sees the expression.
+        /// </summary>
+        /// <typeparam name="TIndexItem">The queried type; only objects know the predicate.</typeparam>
+        /// <param name="wql">The expression.</param>
+        /// <returns>The expression the parser understands.</returns>
+        public static string Expand<TIndexItem>(string wql)
+            where TIndexItem : IIndexItem
+        {
+            return typeof(TIndexItem) == typeof(Model.Entities.Object) ? WqlWithin.Expand(wql) : wql;
         }
     }
 }

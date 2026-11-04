@@ -53,6 +53,7 @@ namespace KleeneStar.Core.Test
             ("_objectViewManager",typeof(ObjectViewManager)),
             ("_objectRelationManager",typeof(ObjectRelationManager)),
             ("_objectImpactManager",  typeof(ObjectImpactManager)),
+            ("_objectOperationManager", typeof(ObjectOperationManager)),
             ("_objectProgressManager",typeof(ObjectProgressManager)),
             ("_blueprintManager",   typeof(BlueprintManager)),
             ("_automationManager",  typeof(AutomationManager)),
@@ -87,6 +88,10 @@ namespace KleeneStar.Core.Test
         /// </param>
         public static void Initialize(string connectionString)
         {
+            // the path index is a process-wide switch; a new database starts with it off, so a
+            // test that rebuilt it for its own store cannot leak a 'ready' index into the next
+            KleeneStar.Core.WebManager.ObjectPathIndex.Disable();
+
             ModelHub.DatabaseSettings = new DatabaseSettings
             {
                 Assembly = "KleeneStar.Core.Test",

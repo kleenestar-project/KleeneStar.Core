@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using System;
 using System.Threading;
 
@@ -71,6 +71,17 @@ namespace KleeneStar.Core.WebAutomation
                 // tick ends rather than one batch per interval
                 while (CoreHub.AutomationManager.ProcessDue() >= 20)
                 {
+                }
+
+                // the recursive operation runs too large for a request (archive, delete, clone of
+                // a big subtree) advance a bounded slice per tick and report their progress
+                try
+                {
+                    CoreHub.ObjectOperationManager.ProcessDue(500);
+                }
+                catch (Exception ex)
+                {
+                    CoreHub.HttpServerContext?.Log?.Exception(ex);
                 }
 
                 if (now >= _nextHousekeeping)

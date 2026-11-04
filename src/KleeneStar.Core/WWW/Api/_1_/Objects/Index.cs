@@ -95,9 +95,47 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         [Method(RequestMethod.DELETE)]
         public override IResponse Delete(IRequest request)
         {
-            return ContentAuthorization.MayWrite(Resolve(ContentAuthorization.ReadId(request)), request)
-                ? base.Delete(request)
-                : new ResponseForbidden();
+            var target = Resolve(ContentAuthorization.ReadId(request));
+
+            if (!ContentAuthorization.MayWrite(target, request))
+            {
+                return new ResponseForbidden();
+            }
+
+            // ?mode=recursive (the whole subtree, children first) or ?mode=dissolve (the contents
+            // one level up, then the object) run as a recursive operation, judged and answered like
+            // POST /api/1/operations/{ws}; without a mode an object with children is
+            // refused, as it always was
+            var mode = request.GetParameter("mode")?.Value?.Trim().ToLowerInvariant();
+
+            if (mode is "recursive" or "dissolve" && target is not null)
+            {
+                var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+                if (identityId == Guid.Empty)
+                {
+                    return new ResponseForbidden();
+                }
+
+                var started = CoreHub.ObjectOperationManager.Start
+                (
+                    mode == "recursive" ? ObjectOperationKinds.Delete : ObjectOperationKinds.Dissolve,
+                    target.Id,
+                    null,
+                    request.GetParameter("key")?.Value,
+                    identityId,
+                    x => ContentAuthorization.MayWrite(x, request)
+                );
+
+                return global::KleeneStar.Core.WWW.Api._1_.Operations._workspacekey_.Index.Answer(started, request);
+            }
+
+            if (mode is not (null or "" or "refuse"))
+            {
+                return new ResponseBadRequest();
+            }
+
+            return base.Delete(request);
         }
 
         /// <summary>
@@ -701,6 +739,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // a new parent is a move, and a move has rules a field binding knows nothing of -
+            // the cycle check, the depth limit, the hierarchy lock, the write right on both
+            // parents. The field is taken out of the payload and carried out as a move below,
+            // inside the same commit as the rest of the save
+            var parentSent = payload.Detach(nameof(Model.Entities.Object.ParentId), out var parentValue);
+            var previousParentId = existingItem.ParentId;
+            Guid? requestedParentId = Guid.TryParse(parentValue, out var parsedParent) && parsedParent != Guid.Empty
+                ? parsedParent
+                : null;
+
             var res = base.Update(existingItem, payload, request);
 
             // stamp the identity that performed this update (best-effort; keep the prior
@@ -718,9 +766,51 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 CoreHub.ObjectManager.Update(existingItem);
 
                 UpsertFieldValues(existingItem, payload);
+
+                if (parentSent && requestedParentId != previousParentId)
+                {
+                    MoveTo(existingItem, requestedParentId, request);
+                }
             }
 
             return res;
+        }
+
+        /// <summary>
+        /// Carries out the move an update asked for, through the same gate and the same rules
+        /// as the move endpoints (<see cref="ObjectMove"/>).
+        /// </summary>
+        /// <param name="object">The object, already updated.</param>
+        /// <param name="parentId">The new parent, or <c>null</c> for the root.</param>
+        /// <param name="request">The request.</param>
+        /// <exception cref="RestApiRefusal">The move is not possible; the reason is the message.</exception>
+        private static void MoveTo(Model.Entities.Object @object, Guid? parentId, IRequest request)
+        {
+            Model.Entities.Object parent = null;
+
+            if (parentId is Guid id)
+            {
+                parent = CoreHub.ObjectManager.GetObject(id)
+                    ?? throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.move.refused.parent"));
+            }
+
+            if (!ContentAuthorization.MayMove(@object, parent, request))
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.move.refused.permission"));
+            }
+
+            try
+            {
+                CoreHub.ObjectManager.SetParent(@object.Id, parentId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // the hierarchy rules (cycle, depth, other workspace, allowed children) and a
+                // conflict state their reason in English; it is still the reason
+                throw new RestApiRefusal(ex.Message, ex);
+            }
+
+            @object.ParentId = parentId;
         }
 
         /// <summary>
@@ -1277,9 +1367,29 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <returns>
         /// A result object containing information about the delete operation.
         /// </returns>
+        /// <exception cref="RestApiRefusal">
+        /// The object still contains objects. The framework answers the refusal with its
+        /// translated reason, which the delete dialog shows.
+        /// </exception>
         protected override IRestApiCrudResultDelete Delete(Model.Entities.Object existingItem, IRequest request)
         {
-            CoreHub.ObjectManager.Remove(existingItem.Id);
+            try
+            {
+                CoreHub.ObjectManager.Remove(existingItem.Id);
+            }
+            catch (HierarchyConflictException ex)
+            {
+                throw new RestApiRefusal
+                (
+                    string.Format
+                    (
+                        request?.Culture ?? CultureInfo.InvariantCulture,
+                        I18N.Translate(request, "kleenestar.core:object.delete.refused.children"),
+                        ex.Count
+                    ),
+                    ex
+                );
+            }
 
             return base.Delete(existingItem, request);
         }

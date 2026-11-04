@@ -2249,3 +2249,37 @@ catalog.delete.title=Katalog löschen
 catalog.delete.description=Der Katalog und seine Versionen werden entfernt; die gebundenen Felder behalten ihre Optionen.
 automation.action.archive=archive [Tage erledigt und unverändert]
 maintenance.api.backups.title=Datenbank-Sicherungen
+
+# die Objekthierarchie (kleenestar.hierarchy.md): Verschieben, Löschen mit Kindern
+object.delete.refused.children=Das Objekt enthält noch {0} Objekt(e). Verschieben oder löschen Sie diese zuerst.
+object.move.refused.parent=Das neue übergeordnete Objekt existiert nicht.
+object.move.refused.permission=Sie dürfen das Objekt nicht dorthin verschieben.
+
+# rekursive Operationen auf einem Objekt und seinem Teilbaum
+operation.api.title=Rekursive Operationen auf Objekten
+operation.refused.kind=Diese Operation ist unbekannt.
+operation.refused.missing=Das Objekt gibt es nicht.
+operation.refused.limit=Der Teilbaum enthält {0} Objekte; eine Operation darf höchstens {1} umfassen.
+operation.refused.hidden=Der Teilbaum enthält {0} Objekt(e), die Sie nicht sehen dürfen; es wurde nichts geändert.
+operation.refused.permission=Sie dürfen {0} Objekt(e) des Teilbaums nicht ändern; es wurde nichts geändert.
+operation.refused.archived=Hier ist bereits alles archiviert.
+operation.refused.parentarchived=Das Objekt darüber, „{0}“, ist archiviert; stellen Sie es zuerst wieder her.
+operation.refused.active=Hier gibt es nichts Archiviertes wiederherzustellen.
+
+# Zusammenfassung eines Laufs, den der Hintergrunddienst beendet hat
+operation.notification.completed=Operation abgeschlossen
+operation.notification.failed=Operation abgebrochen
+operation.notification.archive=Mit Inhalt archiviert.
+operation.notification.restore=Das mit ihm Archivierte ist wiederhergestellt.
+operation.notification.delete=Mit Inhalt gelöscht.
+operation.notification.dissolve=Aufgelöst; der Inhalt ist eine Ebene höher gewandert.
+operation.notification.clone=Geklont.
+operation.notification.transfer=In einen anderen Arbeitsbereich verschoben.
+
+# ein Objekt in einen anderen Arbeitsbereich verschieben
+object.transfer.label=In anderen Arbeitsbereich verschieben …
+transfer.refused.workspace=Wählen Sie einen anderen Arbeitsbereich als den eigenen des Objekts.
+transfer.refused.classes=Für folgende Klassen ist keine Klasse des Ziel-Arbeitsbereichs gewählt: {0}.
+transfer.refused.create=Sie dürfen im Ziel-Arbeitsbereich keine Objekte der Klasse „{0}“ anlegen.
+transfer.refused.level=Die Sicherheitsstufe „{0}“ hat in der Zielklasse keine Entsprechung; stufen Sie herab oder wählen Sie eine andere Klasse.
+transfer.refused.depth=Die Objekte lägen im Ziel tiefer als {0} Ebenen.

@@ -1388,3 +1388,154 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
         min-height: 16rem;
     }
 }
+
+/* ============================================================== transfer */
+/* the dialog moving an object into another workspace (Assets/js/transfer.js): its own small
+   dialog, the mapping sections and the toasts that follow the run */
+.ks-transfer-dialog {
+    border: 0;
+    border-radius: 8px;
+    padding: 1.25rem;
+    width: min(32rem, calc(100vw - 2rem));
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.ks-transfer-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.ks-transfer-dialog h2 {
+    font-size: 1.1rem;
+    margin: 0 0 0.75rem 0;
+}
+
+.ks-transfer-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0 0 0.75rem 0;
+}
+
+.ks-transfer-input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+}
+
+.ks-transfer-dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.ks-transfer-dialog-buttons button {
+    border-radius: 6px;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.ks-transfer-dialog-buttons button.primary {
+    background: var(--wx-primary, #0d6efd);
+    border-color: var(--wx-primary, #0d6efd);
+    color: #fff;
+}
+
+.ks-transfer-toasts {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    z-index: 2100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: min(40rem, calc(100vw - 2rem));
+}
+
+.ks-transfer-toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 6px;
+    background: #1f2937;
+    color: #f9fafb;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    font-size: 0.9rem;
+}
+
+.ks-transfer-toast.error {
+    background: #7f1d1d;
+}
+
+.ks-transfer-toast button {
+    background: transparent;
+    border: 0;
+    color: #93c5fd;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ks-transfer-toast button.close {
+    color: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.ks-transfer-choice {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0.35rem 0;
+    cursor: pointer;
+}
+
+.ks-transfer-warning {
+    padding: 0.4rem 0.6rem;
+    border-left: 3px solid #dc3545;
+    background: color-mix(in srgb, #dc3545 10%, transparent);
+}
+
+.ks-transfer-toast.progress {
+    background: #1e3a8a;
+}
+
+.ks-transfer-dialog:has(.ks-transfer) {
+    width: min(42rem, calc(100vw - 2rem));
+}
+
+.ks-transfer-section {
+    margin: 0.75rem 0;
+}
+
+.ks-transfer-section h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.35rem 0;
+}
+
+.ks-transfer-section ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.875rem;
+}
+
+.ks-transfer-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) 2fr;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+}
+
+.ks-transfer-total {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}

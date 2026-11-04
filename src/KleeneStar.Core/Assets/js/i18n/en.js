@@ -75,6 +75,26 @@ webexpress.webui.I18N.register("en", "kleenestar.core", {
     "editor.addon.news.count": "Number of posts",
     "editor.addon.news.more": "Show more posts",
     "editor.addon.news.empty": "No posts yet.",
-    "editor.addon.news.open": "more"
+    "editor.addon.news.open": "more",
+
+    "transfer.title": "Move \"{0}\" to another workspace",
+    "transfer.none": "There is no other workspace you may move into.",
+    "transfer.choose": "(choose a workspace)",
+    "transfer.workspace": "Target workspace",
+    "transfer.classes": "Classes",
+    "transfer.unmapped": "(no counterpart)",
+    "transfer.states": "Workflow states",
+    "transfer.nostate": "no workflow",
+    "transfer.dropped": "Fields the target lacks (their values are dropped, kept in the history)",
+    "transfer.levels": "Security levels without counterpart",
+    "transfer.declassify": "Move them unclassified",
+    "transfer.total": "{0} object(s) get new keys; the old keys keep leading to them.",
+    "transfer.ok": "Move",
+    "transfer.cancel": "Cancel",
+    "transfer.close": "Close",
+    "transfer.failed": "That did not work.",
+    "transfer.running": "{0} of {1} done …",
+    "transfer.aborted": "Stopped after {0} of {1}: {2}",
+    "transfer.done": "{0} object(s) moved."
 
 });

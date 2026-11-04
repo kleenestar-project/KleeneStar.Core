@@ -55,6 +55,9 @@ namespace KleeneStar.Core
             // the built-in sqlite defaults
             ModelHub.DatabaseSettings = DatabaseSettings.From(applicationContext.PluginContext?.Settings);
 
+            // the limits of the object hierarchy (Hierarchy:MaxDepth), from the same section
+            CoreHub.HierarchySettings = WebManager.HierarchySettings.From(applicationContext.PluginContext?.Settings);
+
             // the external sources an administrator configured (Authentication:OpenIdConnect in
             // the same section); a source that cannot be built is logged and skipped, and its
             // accounts cannot sign in until it is fixed
@@ -87,6 +90,8 @@ namespace KleeneStar.Core
             RecordStartup();
 
             RecoverInterruptedCreations();
+
+            VerifyHierarchy();
 
             ConnectBlueprints();
 
@@ -161,6 +166,39 @@ namespace KleeneStar.Core
             }
             catch (Exception ex)
             {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
+        }
+
+        /// <summary>
+        /// Checks the object hierarchy and breaks parent cycles older data may carry
+        /// (<see cref="WebMaintenance.HierarchyVerifier"/>).
+        /// </summary>
+        /// <remarks>
+        /// It runs after the interrupted creations were taken back, so it does not judge objects
+        /// that are about to disappear. A failure here must not keep the application from
+        /// starting; it is logged.
+        /// </remarks>
+        private static void VerifyHierarchy()
+        {
+            try
+            {
+                WebMaintenance.HierarchyVerifier.Run(CoreHub.HttpServerContext?.Log);
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
+
+            // after the verifier broke any cycle: fill and verify the path index (phase 3) and
+            // turn it on; a failure leaves it off and every reader walks the parent relation
+            try
+            {
+                WebManager.ObjectPathIndex.Rebuild(CoreHub.HttpServerContext?.Log);
+            }
+            catch (Exception ex)
+            {
+                WebManager.ObjectPathIndex.Disable();
                 CoreHub.HttpServerContext?.Log?.Exception(ex);
             }
         }

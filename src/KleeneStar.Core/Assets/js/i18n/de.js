@@ -75,6 +75,26 @@ webexpress.webui.I18N.register("de", "kleenestar.core", {
     "editor.addon.news.count": "Anzahl Beiträge",
     "editor.addon.news.more": "Weitere Beiträge anzeigen",
     "editor.addon.news.empty": "Noch keine Beiträge.",
-    "editor.addon.news.open": "mehr"
+    "editor.addon.news.open": "mehr",
+
+    "transfer.title": "„{0}“ in einen anderen Arbeitsbereich verschieben",
+    "transfer.none": "Es gibt keinen anderen Arbeitsbereich, in den Sie verschieben dürfen.",
+    "transfer.choose": "(Arbeitsbereich wählen)",
+    "transfer.workspace": "Ziel-Arbeitsbereich",
+    "transfer.classes": "Klassen",
+    "transfer.unmapped": "(keine Entsprechung)",
+    "transfer.states": "Workflow-Status",
+    "transfer.nostate": "kein Workflow",
+    "transfer.dropped": "Felder, die das Ziel nicht hat (ihre Werte entfallen, bleiben in der Historie)",
+    "transfer.levels": "Sicherheitsstufen ohne Entsprechung",
+    "transfer.declassify": "Ohne Sicherheitsstufe verschieben",
+    "transfer.total": "{0} Objekt(e) bekommen neue Schlüssel; die alten führen weiter zu ihnen.",
+    "transfer.ok": "Verschieben",
+    "transfer.cancel": "Abbrechen",
+    "transfer.close": "Schließen",
+    "transfer.failed": "Das hat nicht geklappt.",
+    "transfer.running": "{0} von {1} erledigt …",
+    "transfer.aborted": "Abgebrochen nach {0} von {1}: {2}",
+    "transfer.done": "{0} Objekt(e) verschoben."
 
 });

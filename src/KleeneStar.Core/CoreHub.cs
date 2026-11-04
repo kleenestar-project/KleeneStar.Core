@@ -59,6 +59,7 @@ namespace KleeneStar.Core
         private static ObjectRelationManager _objectRelationManager;
         private static ObjectRelationTypeManager _objectRelationTypeManager;
         private static ObjectImpactManager _objectImpactManager;
+        private static ObjectOperationManager _objectOperationManager;
         private static ObjectProgressManager _objectProgressManager;
         private static BlueprintManager _blueprintManager;
         private static AutomationManager _automationManager;
@@ -94,6 +95,12 @@ namespace KleeneStar.Core
         /// Gets the current HTTP server context for the application.
         /// </summary>
         public static IHttpServerContext HttpServerContext { get; internal set; }
+
+        /// <summary>
+        /// Gets the settings of the object hierarchy (<c>Plugins:kleenestar.core:Hierarchy</c>).
+        /// Holds the defaults until the application binds the configured ones.
+        /// </summary>
+        public static WebManager.HierarchySettings HierarchySettings { get; internal set; } = new();
 
         /// <summary>
         /// Gets the workspace manager responsible for managing workspaces within the application.
@@ -304,6 +311,12 @@ namespace KleeneStar.Core
         /// the relations of the installation walked transitively rather than one hop at a time.
         /// </summary>
         public static IObjectImpactManager ObjectImpactManager => _objectImpactManager ??= ComponentHub.GetComponentManager<ObjectImpactManager>();
+
+        /// <summary>
+        /// Gets the manager of the recursive operations on subtrees (archive, restore, delete,
+        /// dissolve, clone).
+        /// </summary>
+        public static IObjectOperationManager ObjectOperationManager => _objectOperationManager ??= ComponentHub.GetComponentManager<ObjectOperationManager>();
 
         /// <summary>
         /// Gets the progress manager responsible for rolling the progress of an object up from

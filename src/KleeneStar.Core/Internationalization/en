@@ -2248,3 +2248,37 @@ catalog.delete.title=Delete catalog
 catalog.delete.description=The catalog and its versions are removed; the bound fields keep the options they have.
 automation.action.archive=archive [days done and unchanged]
 maintenance.api.backups.title=Database backups
+
+# the object hierarchy (kleenestar.hierarchy.md): moves, deletes with children
+object.delete.refused.children=The object still holds {0} object(s). Move or delete them first.
+object.move.refused.parent=The new parent does not exist.
+object.move.refused.permission=You may not move the object there.
+
+# recursive operations on an object and its subtree
+operation.api.title=Recursive operations on objects
+operation.refused.kind=This operation is unknown.
+operation.refused.missing=The object does not exist.
+operation.refused.limit=The subtree holds {0} objects; an operation may span at most {1}.
+operation.refused.hidden=The subtree holds {0} object(s) you may not see; nothing was changed.
+operation.refused.permission=You may not change {0} object(s) of the subtree; nothing was changed.
+operation.refused.archived=Everything here is archived already.
+operation.refused.parentarchived=The object above, "{0}", is archived; restore it first.
+operation.refused.active=There is nothing archived here to restore.
+
+# summary of a recursive run the worker finished
+operation.notification.completed=Operation completed
+operation.notification.failed=Operation stopped
+operation.notification.archive=Archived with its contents.
+operation.notification.restore=What was archived with it is restored.
+operation.notification.delete=Deleted with its contents.
+operation.notification.dissolve=Dissolved; its contents moved up one level.
+operation.notification.clone=Cloned.
+operation.notification.transfer=Moved into another workspace.
+
+# moving an object into another workspace
+object.transfer.label=Move to another workspace…
+transfer.refused.workspace=Choose another workspace than the object's own.
+transfer.refused.classes=No class of the target workspace is chosen for: {0}.
+transfer.refused.create=You may not create objects of the class "{0}" in the target workspace.
+transfer.refused.level=The security level "{0}" has no counterpart in the target class; declassify or choose another class.
+transfer.refused.depth=The objects would sit deeper than {0} levels in the target.

@@ -57,8 +57,10 @@ namespace KleeneStar.Core.WWW.Blog._objectkey_
 
             // a link that addressed the wrong route (e.g. /blog for an issue) is
             // redirected to the detail view matching the object's actual kind
+            // ... and a former key (the object moved to another workspace) leads to the current one
             if (@object is not null &&
-                !string.Equals(@object.Kind, Model.Entities.ObjectKind.Blog, StringComparison.OrdinalIgnoreCase))
+                (!string.Equals(@object.Kind, Model.Entities.ObjectKind.Blog, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(@object.Key, objectParameter?.Value, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new RedirectException(ObjectKindCatalog.ResolveDetailUri(@object));
             }

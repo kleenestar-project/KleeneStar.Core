@@ -37,6 +37,18 @@ namespace KleeneStar.Core.WebManager
         event System.EventHandler<Object> ObjectRemoved;
 
         /// <summary>
+        /// An event that fires after an object was given another parent (or was detached to the
+        /// root of its workspace).
+        /// </summary>
+        /// <remarks>
+        /// It fires in addition to <see cref="ObjectUpdated"/>, after the move was written and
+        /// recorded in the history, and only when the parent actually changed. It carries both
+        /// ends, which an update does not: a listener reacting to content arriving in a place
+        /// (automation, watchers, a live tree) needs to know where the object came from too.
+        /// </remarks>
+        event System.EventHandler<ObjectMovedEventArgs> ObjectMoved;
+
+        /// <summary>
         /// Returns a object based on its id.
         /// </summary>
         /// <param name="objectId">The id of the object.</param>
@@ -245,9 +257,15 @@ namespace KleeneStar.Core.WebManager
         /// Removes the specified object from the manager.
         /// </summary>
         /// <remarks>This method removes the specified object from the manager. If the object does
-        /// not exist in the manager, no action is taken.</remarks>
+        /// not exist in the manager, no action is taken. An object that still has children is
+        /// refused before anything is written - the children would otherwise keep a parent that
+        /// no longer exists, and the history would record a deletion the database refused.</remarks>
         /// <param name="objectId">The object id to be removed. Must not be null.</param>
         /// <returns>The current instance to allow for method chaining.</returns>
+        /// <exception cref="HierarchyConflictException">
+        /// Thrown when the object still has children; <see cref="HierarchyConflictException.Count"/>
+        /// says how many.
+        /// </exception>
         IObjectManager Remove(System.Guid objectId);
 
         /// <summary>
@@ -303,6 +321,63 @@ namespace KleeneStar.Core.WebManager
         /// <exception cref="System.InvalidOperationException">
         /// Thrown when one of the hierarchy rules is violated.
         /// </exception>
+        /// <exception cref="HierarchyConflictException">
+        /// Thrown when another move of the same workspace held the hierarchy lock for too long.
+        /// </exception>
         Object SetParent(System.Guid objectId, System.Guid? parentId);
+
+        /// <summary>
+        /// Sets or clears the parent of the specified object like
+        /// <see cref="SetParent(System.Guid, System.Guid?)"/>, but only while the object still
+        /// has the parent the caller saw.
+        /// </summary>
+        /// <remarks>
+        /// A client that moves what it displays - a tree dragged in a browser - acts on a state
+        /// it loaded earlier. When somebody else moved the object in between, carrying out the
+        /// move would take it from a place the user never saw it in; the expectation turns that
+        /// into a conflict the client can answer by reloading.
+        /// </remarks>
+        /// <param name="objectId">The id of the object whose parent is set.</param>
+        /// <param name="parentId">The id of the new parent, or <c>null</c> to detach.</param>
+        /// <param name="expectedParentId">
+        /// The parent the caller believes the object has, or <c>null</c> when it believes the
+        /// object sits at the root.
+        /// </param>
+        /// <returns>
+        /// The updated object, or <c>null</c> when no object with the supplied id exists.
+        /// </returns>
+        /// <exception cref="System.InvalidOperationException">
+        /// Thrown when one of the hierarchy rules is violated.
+        /// </exception>
+        /// <exception cref="HierarchyConflictException">
+        /// Thrown when the object no longer has the expected parent, or when another move of the
+        /// same workspace held the hierarchy lock for too long.
+        /// </exception>
+        Object SetParent(System.Guid objectId, System.Guid? parentId, System.Guid? expectedParentId);
+    }
+
+    /// <summary>
+    /// Describes a completed move of an object within its workspace's hierarchy.
+    /// </summary>
+    /// <param name="Object">The object as it is after the move.</param>
+    /// <param name="PreviousParentId">The parent it had before, or <c>null</c> for the root.</param>
+    /// <param name="ParentId">The parent it has now, or <c>null</c> for the root.</param>
+    public sealed record ObjectMovedEventArgs(Object Object, System.Guid? PreviousParentId, System.Guid? ParentId);
+
+    /// <summary>
+    /// A change of the object hierarchy that conflicts with the state it would be applied to -
+    /// the object was moved meanwhile, still has children, or another move of the workspace
+    /// is in progress. Unlike a rule violation it is not the request that is wrong but the
+    /// moment, so endpoints answer it with <c>409</c>.
+    /// </summary>
+    /// <param name="message">The reason, in English, for logs and API clients.</param>
+    /// <param name="count">The number of objects the conflict concerns (e.g. children), or zero.</param>
+    public sealed class HierarchyConflictException(string message, int count = 0) : System.InvalidOperationException(message)
+    {
+        /// <summary>
+        /// Gets the number of objects the conflict concerns (e.g. the children that keep an
+        /// object from being removed), or zero.
+        /// </summary>
+        public int Count { get; } = count;
     }
 }

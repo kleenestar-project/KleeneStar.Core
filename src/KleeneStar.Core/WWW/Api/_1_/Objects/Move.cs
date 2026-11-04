@@ -1,5 +1,5 @@
-using System;
-using System.Text;
+﻿using KleeneStar.Core.WebRestApi;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using WebExpress.WebCore.WebAttribute;
@@ -18,14 +18,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
     /// <para>
     /// <c>POST {base}</c> expects a JSON document of the form
     /// <c>{ "node": "SD-17", "parent": "SD-3" }</c> or <c>{ "node": "SD-17", "parent": null }</c>
-    /// (to detach). Both <c>node</c> and <c>parent</c> accept an object key or id.
+    /// (to detach). Both <c>node</c> and <c>parent</c> accept an object key or id. An optional
+    /// <c>expectedParent</c> (key, id or <c>null</c> for the root) names the parent the client
+    /// saw; when the object has another one by now, the move is refused with <c>409</c> instead
+    /// of taking the object from a place the user never saw it in.
     /// </para>
     /// <para>
-    /// The actual re-parenting and its validation (self-parent, cycle, cross-workspace link,
-    /// disallowed child class) are delegated to
-    /// <see cref="WebManager.IObjectManager.SetParent"/>: a missing/unknown node yields
-    /// <c>404</c>, a rule violation yields <c>400</c> with an <c>error</c> message, and a
-    /// successful move yields <c>200</c>.
+    /// Authorization and the re-parenting are <see cref="ObjectMove.Execute"/>: <c>403</c> when
+    /// the caller may not change the object, its new parent or its old one; <c>400</c> with an
+    /// <c>error</c> message for a rule violation (self-parent, cycle, cross-workspace link,
+    /// depth, disallowed child class); <c>409</c> for a conflict; <c>404</c> when the node does
+    /// not resolve; <c>200</c> on success.
     /// </para>
     /// </remarks>
     [Title("kleenestar.core:object.move.api.title")]
@@ -56,8 +59,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </summary>
         /// <param name="request">The incoming request carrying the JSON body.</param>
         /// <returns>
-        /// <c>200</c> on success, <c>404</c> when the node cannot be resolved, or <c>400</c> when
-        /// the payload is malformed, the parent cannot be resolved, or a hierarchy rule is violated.
+        /// <c>200</c> on success, <c>404</c> when the node cannot be resolved, <c>403</c> when the
+        /// caller may not move it there, <c>409</c> on a conflict, or <c>400</c> when the payload is
+        /// malformed, the parent cannot be resolved, or a hierarchy rule is violated.
         /// </returns>
         [Method(RequestMethod.POST)]
         public IResponse Persist(IRequest request)
@@ -73,73 +77,89 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             }
             catch (JsonException)
             {
-                return Error("The request body is not a valid JSON document.");
+                return ObjectMove.BadRequest("The request body is not a valid JSON document.");
             }
 
-            if (payload is null || string.IsNullOrWhiteSpace(payload.Node))
+            var batch = payload?.Nodes is { Count: > 0 };
+
+            if (payload is null || (!batch && string.IsNullOrWhiteSpace(payload.Node)))
             {
-                return Error("The request body must be a JSON document of the form { \"node\": \"KEY\", \"parent\": \"KEY\" } or { \"node\": \"KEY\", \"parent\": null }.");
+                return ObjectMove.BadRequest("The request body must be a JSON document of the form { \"node\": \"KEY\", \"parent\": \"KEY\" }, { \"node\": \"KEY\", \"parent\": null } or { \"nodes\": [\"KEY\", …], \"parent\": … }.");
             }
 
-            var node = Resolve(payload.Node);
+            Model.Entities.Object parent = null;
+
+            if (!string.IsNullOrWhiteSpace(payload.Parent))
+            {
+                parent = ObjectMove.Resolve(payload.Parent);
+
+                if (parent is null)
+                {
+                    return ObjectMove.BadRequest($"The parent object '{payload.Parent}' does not exist.");
+                }
+            }
+
+            if (batch)
+            {
+                return MoveAll(payload, parent, request);
+            }
+
+            var node = ObjectMove.Resolve(payload.Node);
             if (node is null)
             {
                 return new ResponseNotFound();
             }
 
-            if (!global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(node, request))
-            {
-                return new ResponseForbidden();
-            }
+            return ObjectMove.Execute(node, parent, payload.ExpectedParent, request, out _)
+                ?? new ResponseOK();
+        }
 
-            Guid? parentId = null;
+        /// <summary>
+        /// Moves several objects below one parent, each on its own: one refused move does not
+        /// keep the others in place, and the answer reports every object.
+        /// </summary>
+        /// <param name="payload">The body.</param>
+        /// <param name="parent">The resolved parent, or <see langword="null"/> for the root.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><c>200</c> with <c>{ moved, refused, results: [{ node, status, error }] }</c>.</returns>
+        private static IResponse MoveAll(MovePayload payload, Model.Entities.Object parent, IRequest request)
+        {
+            var results = new System.Collections.Generic.List<object>();
+            var moved = 0;
 
-            if (!string.IsNullOrWhiteSpace(payload.Parent))
+            // the other open pages hear of the batch once, not once per object
+            using var notices = global::KleeneStar.Core.WebManager.ObjectChangeNotices.Batch();
+
+            foreach (var token in payload.Nodes.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(System.StringComparer.OrdinalIgnoreCase))
             {
-                var parent = Resolve(payload.Parent);
-                if (parent is null)
+                var node = ObjectMove.Resolve(token);
+
+                if (node is null)
                 {
-                    return Error($"The parent object '{payload.Parent}' does not exist.");
+                    results.Add(new { node = token, status = 404, error = "The object does not exist." });
+                    continue;
                 }
 
-                parentId = parent.Id;
+                var expectation = payload.ExpectedParents is { } expected
+                    && expected.TryGetValue(token, out var stated)
+                        ? stated
+                        : default;
+
+                var result = ObjectMove.Attempt(node, parent, expectation, request);
+
+                if (result.Status == 200)
+                {
+                    moved++;
+                }
+
+                results.Add(new { node = token, status = result.Status, error = result.Error, code = result.Code });
             }
 
-            try
-            {
-                var updated = CoreHub.ObjectManager.SetParent(node.Id, parentId);
+            var body = new { moved, refused = results.Count - moved, results };
 
-                return updated is null ? new ResponseNotFound() : new ResponseOK();
-            }
-            catch (InvalidOperationException ex)
+            return new ResponseOK
             {
-                return Error(ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Resolves an object by its id (when the token is a <see cref="Guid"/>) or otherwise by
-        /// its key.
-        /// </summary>
-        /// <param name="token">The object id or key.</param>
-        /// <returns>The object, or <see langword="null"/> when no match exists.</returns>
-        private static Model.Entities.Object Resolve(string token)
-        {
-            return Guid.TryParse(token, out var id)
-                ? CoreHub.ObjectManager.GetObject(id)
-                : CoreHub.ObjectManager.GetObjectByKey(token);
-        }
-
-        /// <summary>
-        /// Wraps an error message into a JSON <c>400</c> response.
-        /// </summary>
-        /// <param name="message">The error message.</param>
-        /// <returns>The response.</returns>
-        private static IResponse Error(string message)
-        {
-            return new ResponseBadRequest
-            {
-                Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { error = message }, _jsonOptions))
+                Content = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body, _jsonOptions))
             }
                 .AddHeaderContentType("application/json");
         }
@@ -159,6 +179,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             /// the object from its parent.
             /// </summary>
             public string Parent { get; set; }
+
+            /// <summary>
+            /// Gets or sets the parent the client saw: a key or id, <c>null</c> for the root, or
+            /// absent (<see cref="JsonValueKind.Undefined"/>) when the client states none.
+            /// </summary>
+            public JsonElement ExpectedParent { get; set; }
+
+            /// <summary>
+            /// Gets or sets several objects to move below <see cref="Parent"/> at once, as keys
+            /// or ids; takes the place of <see cref="Node"/>.
+            /// </summary>
+            public System.Collections.Generic.List<string> Nodes { get; set; }
+
+            /// <summary>
+            /// Gets or sets, for a batch, the parent the client saw per object (key or id as
+            /// in <see cref="Nodes"/> -> key, id or <c>null</c>).
+            /// </summary>
+            public System.Collections.Generic.Dictionary<string, JsonElement> ExpectedParents { get; set; }
         }
     }
 }

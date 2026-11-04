@@ -43,6 +43,11 @@ namespace KleeneStar.Core.WebManager
         public event EventHandler<Model.Entities.Object> ObjectRemoved;
 
         /// <summary>
+        /// An event that fires after an object was given another parent.
+        /// </summary>
+        public event EventHandler<ObjectMovedEventArgs> ObjectMoved;
+
+        /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="componentHub">The component hub.</param>
@@ -92,8 +97,10 @@ namespace KleeneStar.Core.WebManager
                 .WhereEqualsIgnoreCase(x => x.Key, key)
                 .WithPaging(0, 1);
 
-            return GetObjects(query)
-                .FirstOrDefault();
+            // a former key (the object moved to another workspace) still leads to it - read
+            // narrowed like the key itself
+            return GetObjects(query).FirstOrDefault()
+                ?? (ModelHub.GetObjectIdByAlias(key.Trim()) is Guid moved ? GetObject(moved) : null);
         }
 
         /// <summary>
@@ -144,8 +151,12 @@ namespace KleeneStar.Core.WebManager
             // from what the caller happens to be cleared for would be handed out twice
             using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
 
+            // a key given up by an object that moved to another workspace stays its alias, so it
+            // is never handed out again (transfer)
             var next = GetObjects(query)
-                .Select(x => pattern.Match(x.Key ?? string.Empty))
+                .Select(x => x.Key)
+                .Concat(ModelHub.GetAliasKeysWithPrefix(prefix))
+                .Select(x => pattern.Match(x ?? string.Empty))
                 .Where(m => m.Success)
                 .Select(m => int.TryParse(m.Groups[1].Value, out var number) ? number : 0)
                 .DefaultIfEmpty(0)
@@ -438,6 +449,14 @@ namespace KleeneStar.Core.WebManager
 
             objectEntity.Kind = DeriveKind(objectEntity);
 
+            var parent = objectEntity.ParentId is Guid parentId ? ObjectHierarchy.Read(parentId) : null;
+
+            // a new object below a parent at the deepest level would sit past the limit
+            if (parent is not null)
+            {
+                MeasureDepth(objectEntity.Id, parent, (CoreHub.HierarchySettings ?? new HierarchySettings()).EffectiveMaxDepth);
+            }
+
             using var scope = CoreHub.CommitManager.BeginCommit
             (
                 objectEntity.Id,
@@ -447,9 +466,15 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Add(objectEntity);
 
+            // the derived path index follows every parent write (phase 3)
+            ObjectPathIndex.Added(objectEntity);
+
             RecordProperties(objectEntity.Id, null, objectEntity);
 
             ObjectAdded?.Invoke(this, objectEntity);
+
+            // the other open pages reload their lists (folded into one inside a batch)
+            ObjectChangeNotices.Notify(objectEntity.Id);
 
             // create notification. The key and the link are what turn the entry in the
             // notification center from "an object was created" into one the user can act on.
@@ -476,6 +501,8 @@ namespace KleeneStar.Core.WebManager
 
             var previous = GetObject(objectEntity.Id);
 
+            var previousParentId = (previous ?? ObjectHierarchy.Read(objectEntity.Id))?.ParentId;
+
             using var scope = CoreHub.CommitManager.BeginCommit
             (
                 objectEntity.Id,
@@ -485,9 +512,17 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Update(objectEntity);
 
+            // a changed parent moves the object's row and its subtree's in the path index
+            if (previousParentId != objectEntity.ParentId)
+            {
+                ObjectPathIndex.Moved(objectEntity);
+            }
+
             RecordProperties(objectEntity.Id, previous, objectEntity);
 
             ObjectUpdated?.Invoke(this, objectEntity);
+
+            ObjectChangeNotices.Notify(objectEntity.Id);
 
             // create notification
             CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.object.updated", objectEntity);
@@ -502,20 +537,48 @@ namespace KleeneStar.Core.WebManager
         /// The terminal <see cref="CommitType.Deleted"/> commit is appended before the row is
         /// dropped, while the key and the field values can still be read. The chain itself is
         /// not deleted with the object: what an object contained before it was removed is the
-        /// part of the history an audit most often asks for.
+        /// part of the history an audit most often asks for. It is attributed to the identity
+        /// acting on the call chain - it used to name the object's last editor.
+        /// <para>
+        /// An object that still has children is refused <em>before</em> the commit is written.
+        /// The parent relation is a restricting foreign key, so the database would refuse the
+        /// row anyway - but only after the terminal commit had already claimed a deletion that
+        /// never happened. The children are counted without narrowing: a child the caller cannot
+        /// see still holds on to its parent.
+        /// </para>
         /// </remarks>
         /// <param name="objectId">The object id to be removed. Must not be null.</param>
         /// <returns>The current instance to allow for method chaining.</returns>
+        /// <exception cref="HierarchyConflictException">The object still has children.</exception>
         public IObjectManager Remove(Guid objectId)
         {
             var objectEntry = GetObject(objectId);
 
             if (objectEntry is not null)
             {
-                CoreHub.CommitManager.AddCommit(objectId, CommitType.Deleted, [], objectEntry.UpdaterId ?? Guid.Empty);
+                var children = ModelHub.CountObjects(new Query<Model.Entities.Object>()
+                    .Where(x => x.ParentId == objectId));
+
+                if (children > 0)
+                {
+                    throw new HierarchyConflictException
+                    (
+                        $"The object still contains {children.ToString(CultureInfo.InvariantCulture)} object(s); move or remove them first.",
+                        children
+                    );
+                }
+
+                // the deletion is the act of whoever is acting now, not of the object's last
+                // editor; nobody acting (a compensation, a repair) records it without an author,
+                // just as the audit log names the actor from the session
+                var actor = CoreHub.SessionManager?.GetCurrentIdentityId(null) ?? Guid.Empty;
+
+                CoreHub.CommitManager.AddCommit(objectId, CommitType.Deleted, [], actor);
 
                 ModelHub.Remove(objectEntry);
                 ObjectRemoved?.Invoke(this, objectEntry);
+
+                ObjectChangeNotices.Notify(objectEntry.Id);
             }
 
             return this;
@@ -688,8 +751,9 @@ namespace KleeneStar.Core.WebManager
         /// Sets or clears the parent of the specified object after validating the
         /// hierarchy rules: the parent must exist, must not be the object itself, must
         /// not be one of the object's descendants (no cycles), must live in the same
-        /// workspace, and — when the parent's class declares allowed child classes —
-        /// the object's class must be among them. An empty
+        /// workspace, must not push any object of the moved subtree below
+        /// <see cref="HierarchySettings.MaxDepth"/>, and — when the parent's class declares
+        /// allowed child classes — the object's class must be among them. An empty
         /// <see cref="Model.Entities.Class.AllowedChildren"/> list is treated as
         /// "composition not restricted" so existing data stays linkable.
         /// </summary>
@@ -701,7 +765,66 @@ namespace KleeneStar.Core.WebManager
         /// <exception cref="InvalidOperationException">
         /// Thrown when one of the hierarchy rules is violated.
         /// </exception>
+        /// <exception cref="HierarchyConflictException">
+        /// Thrown when another move of the workspace held the hierarchy lock for too long.
+        /// </exception>
         public Model.Entities.Object SetParent(Guid objectId, Guid? parentId)
+        {
+            return Move(objectId, parentId, expect: false, expectedParentId: null);
+        }
+
+        /// <summary>
+        /// Sets or clears the parent of the specified object like
+        /// <see cref="SetParent(Guid, Guid?)"/>, but only while the object still has the
+        /// parent the caller saw.
+        /// </summary>
+        /// <param name="objectId">The id of the object whose parent is set.</param>
+        /// <param name="parentId">The id of the new parent, or <c>null</c> to detach.</param>
+        /// <param name="expectedParentId">
+        /// The parent the caller believes the object has, or <c>null</c> for the root.
+        /// </param>
+        /// <returns>
+        /// The updated object, or <c>null</c> when no object with the supplied id exists.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when one of the hierarchy rules is violated.
+        /// </exception>
+        /// <exception cref="HierarchyConflictException">
+        /// Thrown when the object no longer has the expected parent, or when another move of
+        /// the workspace held the hierarchy lock for too long.
+        /// </exception>
+        public Model.Entities.Object SetParent(Guid objectId, Guid? parentId, Guid? expectedParentId)
+        {
+            return Move(objectId, parentId, expect: true, expectedParentId);
+        }
+
+        /// <summary>
+        /// Carries out a move: validates it and writes it under the hierarchy lock of the
+        /// object's workspace, so the tree the rules are checked against is the tree the move
+        /// is written into.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The cycle check walks up, not down.</b> "Is the new parent inside the moved
+        /// subtree?" is the same question as "is the moved object an ancestor of the new
+        /// parent?", and the second one is answered by following the parent links of the
+        /// target to the root - at most <see cref="HierarchySettings.MaxDepth"/> reads -
+        /// instead of reading the whole subtree of the moved object, one query per node.
+        /// </para>
+        /// <para>
+        /// The walks read <b>without narrowing</b>: an ancestor or a descendant the caller
+        /// cannot see is still part of the tree, and a cycle through a classified object is
+        /// still a cycle. Nothing the walks read reaches the caller beyond the refusal. The
+        /// object and the new parent themselves are read narrowed, so a caller cannot move
+        /// what it does not see, nor into what it does not see.
+        /// </para>
+        /// </remarks>
+        /// <param name="objectId">The id of the object whose parent is set.</param>
+        /// <param name="parentId">The id of the new parent, or <c>null</c> to detach.</param>
+        /// <param name="expect">Whether <paramref name="expectedParentId"/> is checked.</param>
+        /// <param name="expectedParentId">The parent the caller believes the object has.</param>
+        /// <returns>The updated object, or <c>null</c> when no object with the id exists.</returns>
+        private Model.Entities.Object Move(Guid objectId, Guid? parentId, bool expect, Guid? expectedParentId)
         {
             var objectEntity = GetObject(objectId);
 
@@ -710,16 +833,36 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
+            using var hierarchy = HierarchyLock.Enter(objectEntity.WorkspaceId);
+
+            // read again under the lock: a move that finished while this one waited has
+            // changed the state the checks below must see
+            objectEntity = GetObject(objectId);
+
+            if (objectEntity is null)
+            {
+                return null;
+            }
+
+            if (expect && objectEntity.ParentId != expectedParentId)
+            {
+                throw new HierarchyConflictException("The object was moved by somebody else in the meantime; reload and try again.");
+            }
+
+            var previousParentId = objectEntity.ParentId;
+
             if (parentId is null)
             {
-                if (objectEntity.ParentId is null)
+                if (previousParentId is null)
                 {
                     return objectEntity;
                 }
 
                 objectEntity.ParentId = null;
-                objectEntity.Updated = DateTime.UtcNow;
+                StampMove(objectEntity);
                 Update(objectEntity);
+
+                ObjectMoved?.Invoke(this, new ObjectMovedEventArgs(objectEntity, previousParentId, null));
 
                 return objectEntity;
             }
@@ -741,9 +884,15 @@ namespace KleeneStar.Core.WebManager
                 throw new InvalidOperationException("Parent and child must belong to the same workspace.");
             }
 
-            if (GetDescendants(objectId).Any(d => d.Id == parentId.Value))
+            var maxDepth =(CoreHub.HierarchySettings ?? new HierarchySettings()).EffectiveMaxDepth;
+            var parentDepth = MeasureDepth(objectId, parent, maxDepth);
+
+            // the moved object lands one level below its parent, and the deepest object of its
+            // subtree as many levels below that as the subtree is high
+            if (parentDepth + 1 + MeasureHeight(objectId, maxDepth - parentDepth - 1) > maxDepth)
             {
-                throw new InvalidOperationException("The chosen parent is a descendant of the object; the link would create a cycle.");
+                throw new InvalidOperationException(
+                    $"The move would place objects deeper than {maxDepth.ToString(CultureInfo.InvariantCulture)} levels.");
             }
 
             var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
@@ -755,16 +904,145 @@ namespace KleeneStar.Core.WebManager
                     $"Objects of this class are not allowed beneath '{parentClass.Name}' (see the class's allowed children).");
             }
 
-            if (objectEntity.ParentId == parentId)
+            if (previousParentId == parentId)
             {
                 return objectEntity;
             }
 
             objectEntity.ParentId = parentId;
-            objectEntity.Updated = DateTime.UtcNow;
+            StampMove(objectEntity);
             Update(objectEntity);
 
+            ObjectMoved?.Invoke(this, new ObjectMovedEventArgs(objectEntity, previousParentId, parentId));
+
             return objectEntity;
+        }
+
+        /// <summary>
+        /// Stamps a move onto the object: the time, and the identity acting on this call chain
+        /// as its updater.
+        /// </summary>
+        /// <remarks>
+        /// The commit of an update is attributed to <see cref="Model.Entities.Object.UpdaterId"/>,
+        /// and a move used to leave it as it was - so the move was recorded under whoever had
+        /// edited the object last, a real person's name under somebody else's act. Nobody acting
+        /// (the system, a repair) clears it instead: <see cref="Guid.Empty"/> is never written
+        /// into an identity reference.
+        /// </remarks>
+        /// <param name="objectEntity">The object being moved.</param>
+        private static void StampMove(Model.Entities.Object objectEntity)
+        {
+            var actor = CoreHub.SessionManager?.GetCurrentIdentityId(null) ?? Guid.Empty;
+
+            objectEntity.UpdaterId = actor == Guid.Empty ? null : actor;
+            objectEntity.Updated = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Returns the level the supplied parent sits at (a root object is level one) and
+        /// refuses when the moved object is among its ancestors.
+        /// </summary>
+        /// <param name="objectId">The id of the object being moved.</param>
+        /// <param name="parent">The prospective parent.</param>
+        /// <param name="maxDepth">The deepest permitted level.</param>
+        /// <returns>The level of <paramref name="parent"/>.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// The move would close a cycle, the parent already sits at the deepest level, or the
+        /// parent's own ancestry is circular.
+        /// </exception>
+        private int MeasureDepth(Guid objectId, Model.Entities.Object parent, int maxDepth)
+        {
+            // the path index answers without a walk: the parent's path names every ancestor
+            if (ObjectPathIndex.Ancestors(parent.Id) is { } ancestors)
+            {
+                if (parent.Id == objectId || ancestors.Contains(objectId))
+                {
+                    throw new InvalidOperationException("The chosen parent is a descendant of the object; the link would create a cycle.");
+                }
+
+                var level = ancestors.Count + 1;
+
+                if (level >= maxDepth)
+                {
+                    throw new InvalidOperationException(
+                        $"The chosen parent already sits at the deepest permitted level ({maxDepth.ToString(CultureInfo.InvariantCulture)}).");
+                }
+
+                return level;
+            }
+
+            // the system asks: the ancestry is the tree's, not what the caller is cleared for
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
+            var visited = new HashSet<Guid>();
+            var current = parent;
+            var depth = 0;
+
+            while (current is not null)
+            {
+                if (current.Id == objectId)
+                {
+                    throw new InvalidOperationException("The chosen parent is a descendant of the object; the link would create a cycle.");
+                }
+
+                if (!visited.Add(current.Id))
+                {
+                    throw new InvalidOperationException("The ancestry of the chosen parent is circular; the hierarchy needs repair.");
+                }
+
+                if (++depth >= maxDepth)
+                {
+                    throw new InvalidOperationException(
+                        $"The chosen parent already sits at the deepest permitted level ({maxDepth.ToString(CultureInfo.InvariantCulture)}).");
+                }
+
+                current = current.ParentId is Guid next ? GetObject(next) : null;
+            }
+
+            return depth;
+        }
+
+        /// <summary>
+        /// Returns how many levels the subtree below the supplied object reaches (zero for an
+        /// object without children), reading at most one level more than
+        /// <paramref name="limit"/> - a subtree deeper than that is refused anyway, and how
+        /// much deeper does not matter.
+        /// </summary>
+        /// <param name="objectId">The root of the subtree.</param>
+        /// <param name="limit">The number of levels the subtree may reach.</param>
+        /// <returns>The height, or <paramref name="limit"/> + 1 when it exceeds the limit.</returns>
+        private static int MeasureHeight(Guid objectId, int limit)
+        {
+            // one query over the path range when the index is complete
+            if (ObjectPathIndex.Height(objectId) is int height_)
+            {
+                return Math.Min(height_, limit + 1);
+            }
+
+            var frontier = new List<Guid> { objectId };
+            var visited = new HashSet<Guid> { objectId };
+            var height = 0;
+
+            while (height <= limit)
+            {
+                var ids = frontier;
+
+                // unrestricted on purpose (ModelHub directly): a hidden grandchild still
+                // occupies its level
+                frontier = [.. ModelHub.GetObjects(new Query<Model.Entities.Object>()
+                        .Where(x => x.ParentId != null && ids.Contains(x.ParentId.Value)))
+                    .Select(x => x.Id)
+                    .Where(visited.Add)];
+
+                if (frontier.Count == 0)
+                {
+                    return height;
+                }
+
+                height++;
+            }
+
+            return height;
         }
 
         /// <summary>
