@@ -143,6 +143,222 @@
     }
 }
 
+/* ============================================================ field sheet */
+
+/* the details of an object (ObjectFieldSheet): one row per field, the label the quiet half with
+   a glyph for the field type, the value in the shape its type reads. The label column is as wide as the longest name (capped),
+   not a share of the pane - a wide pane would otherwise open a gulf between name and value - and
+   every row takes it over as a subgrid, so the values line up on one edge. The sheet is a size
+   container, so a narrow preview pane stacks the name above its value instead of squeezing both */
+.ks-field-sheet {
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: fit-content(16rem) minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+}
+
+.ks-field-row,
+.ks-field-sheet-more {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+}
+
+.ks-field-sheet-more-summary {
+    grid-column: 1 / -1;
+}
+
+.ks-field-row {
+    box-sizing: border-box;
+    column-gap: 1.5rem;
+    align-items: start;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--wx-border-color-translucent, var(--wx-border-color));
+    border-radius: var(--wx-border-radius-sm, 4px);
+}
+
+.ks-field-row:last-child,
+.ks-field-sheet-more > .ks-field-row:last-child {
+    border-bottom: none;
+}
+
+.ks-field-row:hover {
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding-top: 0.35rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.875em;
+    font-weight: 500;
+}
+
+.ks-field-label[title] {
+    cursor: help;
+}
+
+.ks-field-icon {
+    flex: none;
+    width: 1em;
+    opacity: 0.7;
+}
+
+.ks-field-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-field-required {
+    color: var(--wx-danger);
+}
+
+.ks-field-value {
+    min-width: 0;
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    overflow-wrap: anywhere;
+}
+
+/* the inline editor spans the value column, so the pen sits at the row's end and the whole
+   value is something to aim at */
+.ks-field-value > .wx-smart-edit {
+    width: 100%;
+    margin: 0;
+    align-items: center;
+}
+
+.ks-field-value > .wx-smart-edit .pencil {
+    right: 0;
+    background: transparent;
+    color: var(--wx-secondary-color);
+}
+
+.ks-field-value > .wx-smart-edit:hover .pencil {
+    color: var(--wx-primary);
+}
+
+.ks-field-value > .wx-smart-edit > form {
+    width: 100%;
+}
+
+/* unset values say so quietly */
+.ks-field-none,
+.ks-field-value .wx-smart-edit-placeholder {
+    color: var(--wx-tertiary-color, var(--wx-secondary-color));
+    font-style: italic;
+    font-size: 0.875em;
+}
+
+/* choices, priorities, yes/no and tags read as chips */
+.ks-field-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.ks-field-chip {
+    --ks-chip-color: var(--wx-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--ks-chip-color);
+    background: color-mix(in srgb, var(--ks-chip-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ks-chip-color) 30%, transparent);
+}
+
+.ks-field-chip::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--ks-chip-color);
+}
+
+.ks-field-chip-primary { --ks-chip-color: var(--wx-primary); }
+.ks-field-chip-success { --ks-chip-color: var(--wx-success); }
+.ks-field-chip-secondary { --ks-chip-color: var(--wx-secondary-color); }
+
+.ks-field-chip-tag {
+    --ks-chip-color: var(--wx-secondary-color);
+    border-radius: var(--wx-border-radius-sm, 4px);
+}
+
+.ks-field-chip-tag::before {
+    content: none;
+}
+
+.ks-field-color {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--wx-font-monospace);
+    font-size: 0.875em;
+}
+
+.ks-field-swatch {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: var(--wx-border-radius-sm, 4px);
+    border: 1px solid var(--wx-border-color);
+}
+
+.ks-field-rating {
+    color: var(--wx-warning);
+    letter-spacing: 0.1em;
+}
+
+.ks-field-multiline {
+    white-space: pre-wrap;
+}
+
+.ks-field-prose > :first-child { margin-top: 0; }
+.ks-field-prose > :last-child { margin-bottom: 0; }
+
+/* the fields the object has not filled, folded after the filled ones (preview pane) */
+.ks-field-sheet-more {
+    margin-top: 0.35rem;
+}
+
+.ks-field-sheet-more-summary {
+    padding: 0.35rem 0.5rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.875em;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ks-field-sheet-more-summary:hover {
+    color: var(--wx-primary);
+}
+
+@container (max-width: 28rem) {
+    .ks-field-row,
+    .ks-field-sheet-more {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.1rem;
+    }
+
+    .ks-field-label {
+        padding-top: 0.15rem;
+    }
+
+    .ks-field-value {
+        min-height: 1.75rem;
+    }
+}
+
 /* ============================================================= attributes */
 
 /* The key/value rows of the reference zone: the key is the quiet half, and the pair sits on
@@ -245,9 +461,9 @@
 
 /* the reduced view is read inside a detail pane, which is narrower than the work zone and
    already framed by the list beside it - its key/value rows take the same layout as the ones
-   in the reference zone rather than inventing a third */
-#object-preview-property-section .wx-section-body > div,
-#object-preview-field-section .wx-section-body > div {
+   in the reference zone rather than inventing a third. The field values are no such rows any
+   more: they are the field sheet (ObjectFieldSheet), which lays itself out */
+#object-preview-property-section .wx-section-body > div {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -256,9 +472,7 @@
 }
 
 #object-preview-property-section .wx-section-body > div > span[id$="_name"],
-#object-preview-field-section .wx-section-body > div > span[id$="_name"],
-#object-preview-property-section .wx-section-body > div > i,
-#object-preview-field-section .wx-section-body > div > i {
+#object-preview-property-section .wx-section-body > div > i {
     color: var(--wx-secondary-color);
 }
 
@@ -538,8 +752,11 @@
    included - became a growing flex column. That also beat `.tab-pane:not(.active)` by the
    id's weight, so a list tab stayed laid out invisibly after switching away from it and
    pushed the next tab (dashboard, kanban, scrum) a whole screen down. A hidden tab pane is
-   therefore never touched either. */
-#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)):not(:has(.wx-detail :is(.ks-comment-dock, .ks-object-engagement))):not(.tab-pane:not(.active)) {
+   therefore never touched either. Nor is the pane's own body: it is the framework's scroll
+   container (overflow auto, shrinking to the pane), and `flex: 1 0 auto` stopped it shrinking -
+   it grew to its content and the pane, which clips, could no longer be scrolled. The boxes
+   inside it still grow, so a short object keeps its dock at the foot of the pane. */
+#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)):not(:has(.wx-detail :is(.ks-comment-dock, .ks-object-engagement))):not(.tab-pane:not(.active)):not(.wx-detail-body) {
     display: flex;
     flex-direction: column;
     flex: 1 0 auto;

@@ -54,6 +54,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Attachments>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Order(0)]
     [Cache]
     public sealed class ObjectAttachmentCardFragment : FragmentControlPanel

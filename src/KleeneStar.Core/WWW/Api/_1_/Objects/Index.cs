@@ -1234,8 +1234,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// The base <see cref="RestApiCrudFormData"/> binder only writes payload entries
         /// that match a public property of <see cref="Model.Entities.Object"/>; any other
         /// key (typically a field name like <c>AffectedCI</c>) is silently dropped. The
-        /// inline <c>ControlSmartEdit</c> on the object detail page (see
-        /// <c>ObjectItemDetailFragment</c>) PUTs exactly such payloads — a single
+        /// inline <c>ControlSmartEdit</c> of the object sheet (see
+        /// <c>ObjectFieldSheet</c>) PUTs exactly such payloads — a single
         /// <c>{ "FieldName": "new value" }</c> document per edit — so this method fills
         /// the gap by upserting the matching <see cref="Model.Entities.Value"/> row.
         /// Payload keys arrive in lower case (see
@@ -1337,7 +1337,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// Serializes a single field-payload value into the string form persisted in
         /// <see cref="Model.Entities.Value.Data"/>. Tag-style list payloads collapse to
         /// a comma-separated representation that matches the parse logic of
-        /// <c>ObjectItemDetailFragment.BuildInputValue</c>.
+        /// <c>ObjectFieldSheet.CreateInputValue</c>.
         /// </summary>
         private static string SerializePayloadValue(object value)
         {
