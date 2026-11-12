@@ -1,3 +1,5 @@
+using KleeneStar.Model.Entities;
+using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebData;
@@ -49,15 +51,17 @@ namespace KleeneStar.Core.WebFragment.Profile
         };
 
         /// <summary>
-        /// Gets the selection control for the language of the user interface.
+        /// Gets the country control for the language of the user interface: every offered
+        /// language under the flag of its country (<see cref="UiLanguage.Country"/>);
+        /// <see cref="Model.Converters.LanguageConverter"/> maps the chosen country back to the
+        /// language code the identity stores.
         /// </summary>
-        public ControlDataFormItemInputSelection Language { get; } = new()
+        public ControlFormItemInputCountry Language { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Identity.Language),
             Label = _ => "kleenestar.core:profile.account.language.label",
             Help = _ => "kleenestar.core:profile.account.language.help",
-            StickySelection = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Profile.Language>().ToString())
+            Countries = _ => UiLanguage.All.Select(x => x.Country)
         };
 
         /// <summary>
