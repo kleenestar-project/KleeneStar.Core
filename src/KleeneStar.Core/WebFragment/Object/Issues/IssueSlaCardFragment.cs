@@ -51,7 +51,7 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
     /// </remarks>
     [Section<SectionPropertyPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
-    [Order(0)]
+    [Order(1)]
     [Cache]
     public sealed class IssueSlaCardFragment : FragmentControlPanel
     {

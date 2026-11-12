@@ -49,7 +49,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionPropertyPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
-    [Order(1)]
+    [Order(0)]
     [Cache]
     public sealed class ObjectPropertyWorkflowCardFragment : FragmentControlPanel
     {
