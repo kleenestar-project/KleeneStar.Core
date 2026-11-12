@@ -63,6 +63,9 @@ namespace KleeneStar.Core
             // accounts cannot sign in until it is fixed
             WebIdentity.OpenIdConnectAuthenticationSource.RegisterConfigured(applicationContext.PluginContext?.Settings, applicationContext, componentHub);
 
+            // the theme, mode and adjustments each reader picked on the appearance page
+            WebTheme.AppearanceRegistration.Register<WWW.Api._1_.Appearance.Theme, WWW.Api._1_.Appearance.Scheme>(applicationContext);
+
             // a failure here is left to escape: WebExpress logs it, records the application in
             // IApplicationManager.FailedApplications and answers /health and /health/live with
             // 503 until a restart retries the migration and the seed
@@ -209,6 +212,8 @@ namespace KleeneStar.Core
         public void Dispose()
         {
             _backgroundWorker?.Dispose();
+
+            WebTheme.AppearanceRegistration.Remove(CoreHub.ApplicationContext);
         }
 
         /// <summary>

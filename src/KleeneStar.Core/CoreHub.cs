@@ -62,6 +62,7 @@ namespace KleeneStar.Core
         private static ShareManager _shareManager;
         private static ObjectTagManager _objectTagManager;
         private static ObjectDraftManager _objectDraftManager;
+        private static AppearanceManager _appearanceManager;
         private static ValueManager _valueManager;
         private static CommitManager _commitManager;
         private static ObjectRelationManager _objectRelationManager;
@@ -305,6 +306,12 @@ namespace KleeneStar.Core
         /// change, and what publishing turns into a revision.
         /// </summary>
         public static IObjectDraftManager ObjectDraftManager => _objectDraftManager ??= ComponentHub.GetComponentManager<ObjectDraftManager>();
+
+        /// <summary>
+        /// Gets the appearance manager, which keeps the theme, light or dark choice and the
+        /// adjustments (accent, font size, density, motion) every identity picked for itself.
+        /// </summary>
+        public static IAppearanceManager AppearanceManager => _appearanceManager ??= ComponentHub.GetComponentManager<AppearanceManager>();
 
         /// <summary>
         /// Gets the value manager responsible for the per-object per-field value rows
