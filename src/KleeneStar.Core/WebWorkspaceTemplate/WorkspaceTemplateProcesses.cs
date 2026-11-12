@@ -10,7 +10,7 @@ using WebExpress.WebCore.Internationalization;
 namespace KleeneStar.Core.WebWorkspaceTemplate
 {
     /// <summary>
-    /// Sets up the processes a template brings - approval policies and automation rules - in
+    /// Sets up the processes a template brings - its approval policies (automation rules are a plugin's, see <see cref="WebManager.IWorkspaceTemplateManager.TemplateApplied"/>) - in
     /// the workspace it created.
     /// </summary>
     /// <remarks>
@@ -86,51 +86,6 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
                 }
             }
 
-            foreach (var automation in template.Automations ?? [])
-            {
-                Class @class = null;
-
-                if (automation.Class is not null && !classes.TryGetValue(automation.Class, out @class))
-                {
-                    result.Skipped.Add($"{automation.Name}: the workspace has no class '{automation.Class}'.");
-                    continue;
-                }
-
-                var name = Text(automation.Name, culture);
-
-                // applying a template again adds what is missing, not a second copy of each rule
-                if (CoreHub.AutomationManager.GetRules(workspaceId).Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
-                var rule = new AutomationRule
-                {
-                    Id = Guid.NewGuid(),
-                    WorkspaceId = workspaceId,
-                    ClassId = @class?.Id,
-                    Name = name,
-                    Description = Text(automation.Description, culture),
-                    Trigger = automation.Trigger,
-                    TriggerParameter = string.IsNullOrWhiteSpace(automation.Parameter) ? null : Resolve(automation.Parameter, creator, culture),
-                    Condition = automation.Condition,
-                    Actions = Resolve(automation.Actions, creator, culture),
-                    RunAsId = identityId == Guid.Empty ? null : identityId,
-                    CreatedById = identityId == Guid.Empty ? null : identityId,
-
-                    // a rule with nobody to act as would fail its first job; it waits for one
-                    State = identityId == Guid.Empty ? AutomationRuleState.Disabled : AutomationRuleState.Active
-                };
-
-                if (Refused(CoreHub.AutomationManager.Validate(rule), rule.Name, result))
-                {
-                    continue;
-                }
-
-                CoreHub.AutomationManager.AddRule(rule);
-                result.AutomationRules.Add(rule);
-            }
-
             return result;
         }
 
@@ -154,12 +109,13 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         }
 
         /// <summary>
-        /// Translates a text that may be an i18n key.
+        /// Translates a text that may be an i18n key - in the creator's language, as everything a
+        /// template sets up. Public, so a plugin setting up its part of a template does the same.
         /// </summary>
         /// <param name="text">The text or key.</param>
         /// <param name="culture">The language.</param>
         /// <returns>The text.</returns>
-        private static string Text(string text, CultureInfo culture)
+        public static string Text(string text, CultureInfo culture)
         {
             if (string.IsNullOrWhiteSpace(text))
             {

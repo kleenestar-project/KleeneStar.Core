@@ -71,7 +71,7 @@ namespace KleeneStar.Core.WebManager
             }
 
             var account = CoreHub.IdentityManager.GetIdentityByLogin(login);
-            var source = AuthenticationSourceCatalog.Resolve(account);
+            var source = CoreHub.AuthenticationSourceManager.Resolve(account);
 
             if (account is null || source is null || !source.AcceptsPassword)
             {
@@ -137,7 +137,7 @@ namespace KleeneStar.Core.WebManager
                 return CredentialResult.Of(CredentialOutcome.UnknownAccount);
             }
 
-            if (!AuthenticationSourceCatalog.ManagesPassword(account))
+            if (!CoreHub.AuthenticationSourceManager.ManagesPassword(account))
             {
                 return CredentialResult.Of(CredentialOutcome.ExternalAccount);
             }
@@ -145,7 +145,7 @@ namespace KleeneStar.Core.WebManager
             // an account that never had a password here gets one through a reset link, never
             // by a change that nothing could prove
             if (!IdentityPassword.IsUsable(account.PasswordHash)
-                || !AuthenticationSourceCatalog.Resolve(account).VerifyPassword(account, currentPassword ?? string.Empty))
+                || !CoreHub.AuthenticationSourceManager.Resolve(account).VerifyPassword(account, currentPassword ?? string.Empty))
             {
                 return CredentialResult.Of(CredentialOutcome.WrongPassword);
             }
@@ -182,7 +182,7 @@ namespace KleeneStar.Core.WebManager
                 return CredentialResult.Of(CredentialOutcome.UnknownAccount);
             }
 
-            if (!AuthenticationSourceCatalog.ManagesPassword(account))
+            if (!CoreHub.AuthenticationSourceManager.ManagesPassword(account))
             {
                 return CredentialResult.Of(CredentialOutcome.ExternalAccount);
             }
@@ -227,7 +227,7 @@ namespace KleeneStar.Core.WebManager
             // moved to an external source in the meantime is not this installation's to set
             var account = CoreHub.IdentityManager.GetIdentity(reset.IdentityId);
 
-            return account is not null && account.State == IdentityState.Active && AuthenticationSourceCatalog.ManagesPassword(account)
+            return account is not null && account.State == IdentityState.Active && CoreHub.AuthenticationSourceManager.ManagesPassword(account)
                 ? reset
                 : null;
         }
@@ -268,6 +268,38 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Records the identifier an external source knows an account by.
+        /// </summary>
+        /// <param name="identityId">The account.</param>
+        /// <param name="subject">The subject; blank clears it.</param>
+        /// <returns><see langword="true"/> when the subject was recorded.</returns>
+        public bool LinkExternalSubject(Guid identityId, string subject)
+        {
+            var account = CoreHub.IdentityManager.GetIdentity(identityId);
+            var source = CoreHub.AuthenticationSourceManager.Resolve(account);
+
+            // an internal account has no subject, and an unregistered source vouches for nothing
+            if (account is null || source is null || !source.IsExternal)
+            {
+                return false;
+            }
+
+            var trimmed = string.IsNullOrWhiteSpace(subject) ? null : subject.Trim();
+
+            if (trimmed is not null)
+            {
+                var holder = CoreHub.IdentityManager.GetIdentityBySource(account.AuthenticationSource, trimmed);
+
+                if (holder is not null && holder.Id != identityId)
+                {
+                    return false;
+                }
+            }
+
+            return ModelHub.SetExternalSubject(identityId, trimmed);
+        }
+
+        /// <summary>
         /// Answers the stored account an external sign-in stands for.
         /// </summary>
         /// <param name="sourceKey">The key of the external source.</param>
@@ -276,7 +308,7 @@ namespace KleeneStar.Core.WebManager
         public Identity SignInExternal(string sourceKey, ExternalAccountClaims claims)
         {
             var key = IdentitySource.Normalize(sourceKey);
-            var source = AuthenticationSourceCatalog.GetSource(key);
+            var source = CoreHub.AuthenticationSourceManager.GetSource(key);
 
             if (key is null || source is null || !source.IsExternal || string.IsNullOrWhiteSpace(claims?.Subject))
             {

@@ -93,9 +93,9 @@ Both kinds are persisted as plain, lower-case string keys (defaulting to `issue`
 
 ### Extensibility (add-ons)
 
-The UI-side counterpart of the persisted key is the `IObjectKind` descriptor (key, i18n label, icon, order, overview route, and the per-kind **detail route** `DetailUri(objectKey)` plus an optional **edit route** `EditUri(objectKey)`) registered in the `ObjectKindCatalog`. Because each kind now owns its own detail view (see *Object Detail View* below), `ObjectKindCatalog.ResolveDetailUri(object)` and `ResolveEditUri(object)` are the **single dispatch points** every object link uses to reach the view matching an object's kind; an unknown key (e.g. of an uninstalled add-on) falls back to the issue route. The core registers its three built-in kinds; an add-on introduces a new kind by:
+The UI-side counterpart of the persisted key is the `IObjectKind` descriptor (key, i18n label, icon, order, overview route, and the per-kind **detail route** `DetailUri(objectKey)` plus an optional **edit route** `EditUri(objectKey)`) registered in the `ObjectKindManager`. Because each kind now owns its own detail view (see *Object Detail View* below), `CoreHub.ObjectKindManager.ResolveDetailUri(object)` and `ResolveEditUri(object)` are the **single dispatch points** every object link uses to reach the view matching an object's kind; an unknown key (e.g. of an uninstalled add-on) falls back to the issue route. The core registers its three built-in kinds; an add-on introduces a new kind by:
 
-1. implementing `IObjectKind` — including `DetailUri`/`EditUri` — and calling `ObjectKindCatalog.Register(...)` from its plugin initialization,
+1. implementing `IObjectKind` — including `DetailUri`/`EditUri` — as a **public sealed** class with a public parameterless constructor, which the `ObjectKindManager` finds in the plugin's assembly (no registration; `Register` stays for a kind that is no type),
 2. contributing an overview page for the kind (a workspace-scoped page like `WWW/Documents/{workspacekey}`) and a detail page (an object-scoped page like `WWW/Document/{objectkey}`) that `DetailUri` returns,
 3. deriving a sidebar link from `ObjectKindSidebarLinkFragment` and scoping it to the kind overviews and the per-kind detail pages, and
 4. contributing the kind's view fragments scoped to its overview and detail pages.
@@ -323,7 +323,7 @@ The object overview page is the central view for displaying objects of a specifi
 
 ### Object Management - Object Detail View (Page)
 
-Each **kind** owns its own detail view, reached at a kind-specific route resolved through `ObjectKindCatalog.ResolveDetailUri` (see *Object Kinds*):
+Each **kind** owns its own detail view, reached at a kind-specific route resolved through `CoreHub.ObjectKindManager.ResolveDetailUri` (see *Object Kinds*):
 
 - **Issue** — `/issue/{objectKey}`: the full, form-driven work-item view described in the rest of this section and shown below.
 - **Document** — `/document/{objectKey}` (reading) and `/document/{objectKey}/edit` (editing).

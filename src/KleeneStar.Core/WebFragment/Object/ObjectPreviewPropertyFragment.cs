@@ -99,7 +99,7 @@ namespace KleeneStar.Core.WebFragment.Object
             // the kind is a persisted string key; the catalog turns it into the label the rest
             // of the ui shows, and leaves an add-on kind whose plugin is gone readable as its
             // raw key rather than blank
-            var kind = ObjectKindCatalog.GetKind(@object.Kind);
+            var kind = CoreHub.ObjectKindManager.GetKind(@object.Kind);
 
             section.Add(new ControlAttribute("object-preview-kind")
             {

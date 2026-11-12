@@ -50,7 +50,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
             Icon = _ => new IconFileLines();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
             BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);
-            Uri = renderContext => ObjectKindCatalog.ResolveDetailUri(Resolve(renderContext));
+            Uri = renderContext => CoreHub.ObjectKindManager.ResolveDetailUri(Resolve(renderContext));
         }
 
         /// <summary>

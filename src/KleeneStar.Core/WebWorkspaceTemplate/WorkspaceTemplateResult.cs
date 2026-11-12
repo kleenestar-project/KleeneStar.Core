@@ -89,7 +89,7 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         public IReadOnlyList<PermissionAssignment> Permissions { get; init; } = [];
 
         /// <summary>
-        /// Gets the approval policies and automation rules set up, and what was skipped.
+        /// Gets the approval policies set up, and what was skipped - by the core and by the plugins that listened.
         /// </summary>
         public WorkspaceTemplateProcessResult Processes { get; init; } = new();
     }

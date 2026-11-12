@@ -251,12 +251,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Operations._workspacekey_
             {
                 if (operation.Kind == ObjectOperationKinds.Clone && operation.ReferenceId is Guid copy && CoreHub.ObjectManager.GetObject(copy) is { } clone)
                 {
-                    result = ObjectKindCatalog.ResolveDetailUri(clone)?.ToString();
+                    result = CoreHub.ObjectKindManager.ResolveDetailUri(clone)?.ToString();
                 }
                 else if (operation.Kind is not (ObjectOperationKinds.Delete or ObjectOperationKinds.Dissolve)
                     && CoreHub.ObjectManager.GetObject(operation.RootId) is { } root)
                 {
-                    result = ObjectKindCatalog.ResolveDetailUri(root)?.ToString();
+                    result = CoreHub.ObjectKindManager.ResolveDetailUri(root)?.ToString();
                 }
             }
 

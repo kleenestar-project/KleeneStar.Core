@@ -62,7 +62,7 @@ namespace KleeneStar.Core.WebFragment.Landing
 
             foreach (var entry in pinned)
             {
-                var kind = ObjectKindCatalog.GetKind(entry.Kind);
+                var kind = CoreHub.ObjectKindManager.GetKind(entry.Kind);
                 var updated = string.Format
                 (
                     culture,
@@ -75,7 +75,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                     "landing-pinned-" + entry.Id.ToString("N"),
                     ObjectIcon.Resolve(entry, kind?.Icon ?? new IconObject()),
                     entry.Summary,
-                    ObjectKindCatalog.ResolveDetailUri(entry),
+                    CoreHub.ObjectKindManager.ResolveDetailUri(entry),
                     meta: LandingHtml.Join(entry.Key, updated)
                 ));
             }

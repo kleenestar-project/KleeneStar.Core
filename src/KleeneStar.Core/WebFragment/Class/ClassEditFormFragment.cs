@@ -224,7 +224,7 @@ namespace KleeneStar.Core.WebFragment.Class
 
             // the kind options come from the extensible object-kind catalog, so add-on
             // kinds automatically become selectable
-            KindSelection.Add(ObjectKindCatalog.Kinds
+            KindSelection.Add(CoreHub.ObjectKindManager.Kinds
                 .Select(kind => new ControlFormItemInputSelectionItem(kind.Key)
                 {
                     Text = _ => kind.Label

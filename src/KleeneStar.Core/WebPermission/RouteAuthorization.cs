@@ -46,7 +46,7 @@ namespace KleeneStar.Core.WebPermission
         {
             "class", "classes", "field", "fields", "form", "forms", "priority", "priorities",
             "status", "statuses", "sla", "slas", "calendar", "calendars", "securitylevel",
-            "securitylevels", "workflow", "workflows", "template", "templates", "relations", "automation", "integration", "approvalpolicies", "planning", "catalogs"
+            "securitylevels", "workflow", "workflows", "template", "templates", "relations", "approvalpolicies", "planning", "catalogs"
         };
 
         /// <summary>

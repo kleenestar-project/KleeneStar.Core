@@ -7,7 +7,7 @@ namespace KleeneStar.Core.WebInsight
     /// Describes a type of insight tab - one way of showing the objects an insight selects,
     /// such as a table, a dashboard, a Kanban board or the reports. The core registers its
     /// types; a plugin contributes another by registering its own descriptor with
-    /// <see cref="InsightViewTypeCatalog.Register"/>, together with the tab template that draws it.
+    /// <see cref="CoreHub.InsightViewTypeManager.Register"/>, together with the tab template that draws it.
     /// </summary>
     /// <remarks>
     /// The descriptor is the semantic side of the persisted

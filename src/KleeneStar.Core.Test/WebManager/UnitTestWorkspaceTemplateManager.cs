@@ -53,12 +53,6 @@ namespace KleeneStar.Core.Test.WebManager
 
             public int Order => 1;
 
-            public IEnumerable<WorkspaceTemplateAutomation> Automations =>
-            [
-                new WorkspaceTemplateAutomation { Name = "Welcome", Class = "Ticket", Trigger = "object.created", Actions = "comment Welcome." },
-                new WorkspaceTemplateAutomation { Name = "Lost", Class = "Missing", Trigger = "object.created", Actions = "comment Lost." }
-            ];
-
             public IEnumerable<WorkspaceTemplateClass> Classes =>
             [
                 new WorkspaceTemplateClass
@@ -716,8 +710,9 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
-        /// Applying a template sets up its approval policies and automation rules - acting as and
-        /// approved by the creator - skips what does not validate, and adds nothing twice.
+        /// Applying a template sets up its approval policies - approved by the creator - skips
+        /// what does not validate, and adds nothing twice. Automation rules are not the core's:
+        /// the templates plugin sets them up on <see cref="IWorkspaceTemplateManager.TemplateApplied"/>.
         /// </summary>
         [Fact]
         public void ApplySetsUpTheProcesses()
@@ -738,33 +733,62 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Equal("Lead: any author", policy.Steps);
             Assert.NotNull(policy.RequestStatusId);
 
-            var rule = Assert.Single(result.Processes.AutomationRules);
-            Assert.Equal(AuthorId, rule.RunAsId);
-            Assert.Equal(AutomationRuleState.Active, rule.State);
-
             Assert.Contains(result.Processes.Skipped, x => x.StartsWith("Broken approval", StringComparison.Ordinal));
-            Assert.Contains(result.Processes.Skipped, x => x.StartsWith("Lost", StringComparison.Ordinal));
 
             var again = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId, AuthorId);
 
             Assert.Empty(again.Processes.ApprovalPolicies);
-            Assert.Empty(again.Processes.AutomationRules);
-            Assert.Single(CoreHub.AutomationManager.GetRules(WorkspaceId));
         }
 
         /// <summary>
-        /// Without a creator, there is nobody to approve and nobody to act as: the policies are
-        /// skipped and the rules wait disabled.
+        /// Without a creator, there is nobody to approve: the policies are skipped.
         /// </summary>
         [Fact]
-        public void ApplyWithoutCreatorDisablesTheRules()
+        public void ApplyWithoutCreatorSkipsTheApprovals()
         {
-            Seed(nameof(ApplyWithoutCreatorDisablesTheRules));
+            Seed(nameof(ApplyWithoutCreatorSkipsTheApprovals));
 
             var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId);
 
             Assert.Empty(result.Processes.ApprovalPolicies);
-            Assert.Equal(AutomationRuleState.Disabled, Assert.Single(result.Processes.AutomationRules).State);
+            Assert.Contains(result.Processes.Skipped, x => x.Contains("without a creator", StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// The application is announced once its structure and policies exist, with the template,
+        /// the workspace, the creator and the processes a listener may add its skips to - which
+        /// reach the result.
+        /// </summary>
+        [Fact]
+        public void ApplyAnnouncesTheApplication()
+        {
+            var database = nameof(ApplyAnnouncesTheApplication);
+            Seed(database);
+
+            var announced = new List<WorkspaceTemplateApplication>();
+            void Listen(object sender, WorkspaceTemplateApplication application)
+            {
+                announced.Add(application);
+                application.Processes.Skipped.Add("Listener: noted.");
+            }
+
+            CoreHub.WorkspaceTemplateManager.TemplateApplied += Listen;
+
+            try
+            {
+                var result = CoreHub.WorkspaceTemplateManager.Apply("test.probe", WorkspaceId, AuthorId);
+
+                var application = Assert.Single(announced);
+                Assert.Equal("test.probe", application.Template.Key);
+                Assert.Equal(WorkspaceId, application.WorkspaceId);
+                Assert.Equal(AuthorId, application.IdentityId);
+                Assert.Same(result.Processes, application.Processes);
+                Assert.Contains("Listener: noted.", result.Processes.Skipped);
+            }
+            finally
+            {
+                CoreHub.WorkspaceTemplateManager.TemplateApplied -= Listen;
+            }
         }
     }
 }

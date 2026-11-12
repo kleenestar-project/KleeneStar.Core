@@ -1,4 +1,3 @@
-using KleeneStar.Core.WebAutomation;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System.Diagnostics;
@@ -124,52 +123,6 @@ namespace KleeneStar.Core.Test.Load
 
                 db.SaveChanges();
             });
-
-            CoreHub.AutomationManager.AddRule(new AutomationRule
-            {
-                Name = "every special ticket",
-                WorkspaceId = WorkspaceId,
-                Trigger = AutomationTriggerCatalog.Schedule,
-                TriggerParameter = "60",
-                Condition = "Summary ~ \"special\"",
-                Actions = "comment internal: checked",
-                RunAsId = AgentId,
-                State = AutomationRuleState.Active
-            });
-
-            var creation = new AutomationRule
-            {
-                Name = "on creation",
-                WorkspaceId = WorkspaceId,
-                Trigger = AutomationTriggerCatalog.ObjectCreated,
-                Actions = "comment internal: welcome",
-                RunAsId = AgentId,
-                State = AutomationRuleState.Active
-            };
-
-            CoreHub.AutomationManager.AddRule(creation);
-
-            var queued = 0;
-
-            Measure("scheduler over 60,000 objects", TimeSpan.FromSeconds(60), () => queued = CoreHub.AutomationManager.RunSchedules(DateTime.UtcNow));
-            Assert.Equal(Tickets / 1000, queued);
-
-            Measure("raise 2,000 events", TimeSpan.FromSeconds(60), () =>
-            {
-                for (var index = 0; index < 2000; index++)
-                {
-                    CoreHub.AutomationManager.Raise(new AutomationEvent { Trigger = AutomationTriggerCatalog.ObjectCreated, ObjectId = ids[index], Occurrence = "load:" + index });
-                }
-            });
-
-            Measure("work off the queue", TimeSpan.FromSeconds(180), () =>
-            {
-                while (CoreHub.AutomationManager.ProcessDue(100) > 0)
-                {
-                }
-            });
-
-            Assert.Equal(2000, ModelHub.GetAutomationJobs([creation.Id], AutomationJobState.Succeeded, 5000).Count);
 
             Measure("team load of 200 people", TimeSpan.FromSeconds(60), () => Assert.Equal(200, CoreHub.PlanningManager.GetTeamLoad(WorkspaceId, DateTime.UtcNow).Count));
 

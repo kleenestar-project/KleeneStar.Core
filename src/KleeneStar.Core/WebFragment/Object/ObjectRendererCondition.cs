@@ -93,8 +93,8 @@ namespace KleeneStar.Core.WebFragment.Object
 
             // a class that is gone answers nothing rather than the default of a kind nobody
             // declared, so no surface draws around an object that cannot be described - the
-            // reading ObjectRendererCatalog.IsRenderedAs has always had of a null class
-            var key = @class is null ? null : ObjectRendererCatalog.ResolveKey(@class);
+            // reading CoreHub.ObjectRendererManager.IsRenderedAs has always had of a null class
+            var key = @class is null ? null : CoreHub.ObjectRendererManager.ResolveKey(@class);
 
             _resolved.AddOrUpdate(request, [key]);
 

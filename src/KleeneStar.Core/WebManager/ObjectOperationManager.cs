@@ -33,7 +33,7 @@ namespace KleeneStar.Core.WebManager
     /// </para>
     /// <para>
     /// A run of up to <see cref="HierarchySettings.InlineLimit"/> objects is processed in the
-    /// request; a larger one waits for <see cref="WebAutomation.AutomationWorker"/>, which calls
+    /// request; a larger one waits for <see cref="WebMaintenance.BackgroundWorker"/>, which calls
     /// <see cref="ProcessDue"/>. Processing holds the workspace's <see cref="HierarchyLock"/>, acts
     /// as the identity that started the run, reads unrestricted (the plan already judged the
     /// caller) and silences the per-object notifications.
@@ -416,7 +416,7 @@ namespace KleeneStar.Core.WebManager
 
                 try
                 {
-                    uri = target is null ? null : WebFragment.Object.ObjectKindCatalog.ResolveDetailUri(target)?.ToString();
+                    uri = target is null ? null : global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolveDetailUri(target)?.ToString();
                 }
                 catch
                 {

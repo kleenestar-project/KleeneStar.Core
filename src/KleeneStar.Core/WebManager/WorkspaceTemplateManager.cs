@@ -50,6 +50,12 @@ namespace KleeneStar.Core.WebManager
         public event EventHandler<IWorkspaceTemplateContext> RemoveWorkspaceTemplate;
 
         /// <summary>
+        /// Raised when a template was applied to a workspace - after its structure, pages and
+        /// approval policies, before its default permissions.
+        /// </summary>
+        public event EventHandler<WorkspaceTemplateApplication> TemplateApplied;
+
+        /// <summary>
         /// Gets every registered template, in catalogue order.
         /// </summary>
         public IEnumerable<IWorkspaceTemplateContext> WorkspaceTemplates => Order(_dictionary.Values.SelectMany(x => x));
@@ -319,6 +325,10 @@ namespace KleeneStar.Core.WebManager
             // the processes come after the structure they run on: a policy names states, a rule
             // names classes, and both are validated against what now exists
             var processes = WorkspaceTemplateProcesses.Apply(template, workspaceId, identityId, culture);
+
+            // what the core does not know - the automation rules of the templates plugin - is set
+            // up by whoever listens, on the structure that now exists
+            TemplateApplied?.Invoke(this, new WorkspaceTemplateApplication(template, workspaceId, identityId, culture, processes));
 
             foreach (var skipped in processes.Skipped)
             {

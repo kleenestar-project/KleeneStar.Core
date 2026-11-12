@@ -1,4 +1,4 @@
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -21,14 +21,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Remove(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var id = AutomationApi.ParseId(AutomationApi.Read<AutomationApi.IdPayload>(request)?.Id);
+            var id = JsonApi.ParseId(JsonApi.Read<JsonApi.IdPayload>(request)?.Id);
             var milestone = id is { } milestoneId ? CoreHub.PlanningManager.GetMilestone(milestoneId) : null;
 
             if (milestone is null || milestone.WorkspaceId != workspace.Id)

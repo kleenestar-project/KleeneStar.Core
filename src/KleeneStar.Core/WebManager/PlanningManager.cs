@@ -321,7 +321,7 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="object">The object.</param>
         /// <returns><see langword="true"/> when its state stands for done.</returns>
-        internal static bool IsDone(ObjectEntity @object)
+        public static bool IsDone(ObjectEntity @object)
         {
             return ObjectProgressManager.OwnProgress(@object) >= 100;
         }

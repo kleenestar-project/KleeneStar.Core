@@ -38,49 +38,12 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
     }
 
     /// <summary>
-    /// An automation rule a template sets up in the workspace it creates.
-    /// </summary>
-    /// <remarks>
-    /// The rule acts as the workspace's creator; created without one, it is stored disabled.
-    /// The actions follow the automation script syntax (<c>kleenestar.automation.md</c>) and may
-    /// carry the placeholders of <see cref="WorkspaceTemplateApproval"/>, so a comment a rule
-    /// writes arrives in the creator's language and a state it moves to matches the translated
-    /// workflow.
-    /// </remarks>
-    public sealed class WorkspaceTemplateAutomation
-    {
-        /// <summary>Gets the name.</summary>
-        public string Name { get; init; }
-
-        /// <summary>Gets the description.</summary>
-        public string Description { get; init; }
-
-        /// <summary>Gets the class the rule is narrowed to, by its name, or <c>null</c>.</summary>
-        public string Class { get; init; }
-
-        /// <summary>Gets the trigger key.</summary>
-        public string Trigger { get; init; }
-
-        /// <summary>Gets the trigger parameter.</summary>
-        public string Parameter { get; init; }
-
-        /// <summary>Gets the WQL condition.</summary>
-        public string Condition { get; init; }
-
-        /// <summary>Gets the actions, one per line.</summary>
-        public string Actions { get; init; }
-    }
-
-    /// <summary>
     /// The processes a template set up.
     /// </summary>
     public sealed class WorkspaceTemplateProcessResult
     {
         /// <summary>Gets the approval policies created.</summary>
         public List<Model.Entities.ApprovalPolicy> ApprovalPolicies { get; } = [];
-
-        /// <summary>Gets the automation rules created.</summary>
-        public List<Model.Entities.AutomationRule> AutomationRules { get; } = [];
 
         /// <summary>Gets what could not be set up, and why.</summary>
         public List<string> Skipped { get; } = [];

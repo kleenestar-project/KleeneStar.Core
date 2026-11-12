@@ -30,7 +30,7 @@ What a running installation recovers on its own after a crash:
 
 |What                         |How
 |-----------------------------|--------------------------------------------------------------------------------------------
-|automation jobs              |persistent queue; a job held by a dead worker is claimed again when its lease runs out; a resumed job continues after its last finished action (`kleenestar.automation.md`)
+|automation jobs              |persistent queue; a job held by a dead worker is claimed again when its lease runs out; a resumed job continues after its last finished action (`KleeneStar.Automation/docs/kleenestar.automation.md`)
 |creations from templates     |an interrupted run is recovered at start (`RecoverInterruptedCreations`, `kleenestar.template.md`)
 |approvals                    |decisions are single per approver and step, concurrent decisions are re-decided on the new state (`kleenestar.approval.md`)
 |catalog refreshes            |a source that cannot be read keeps the current version (`kleenestar.catalog.md`)

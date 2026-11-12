@@ -1,7 +1,6 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebPlanning;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using System;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -29,7 +28,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
         [Method(RequestMethod.POST)]
         public IResponse Save(IRequest request)
         {
-            var payload = AutomationApi.Read<WorkApi.Payload>(request);
+            var payload = JsonApi.Read<WorkApi.Payload>(request);
             var @object = string.IsNullOrWhiteSpace(payload?.Object) ? null : CoreHub.ObjectManager.GetObjectByKey(payload.Object);
 
             if (@object is null)
@@ -47,7 +46,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
 
             if ((original is null && !string.IsNullOrWhiteSpace(payload.Original)) || (remaining is null && !string.IsNullOrWhiteSpace(payload.Remaining)))
             {
-                return AutomationApi.Refuse("Write the estimates as durations, e.g. 2d or 4h.");
+                return JsonApi.Refuse("Write the estimates as durations, e.g. 2d or 4h.");
             }
 
             try
@@ -61,7 +60,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
 
                 var estimate = CoreHub.PlanningManager.GetEstimate(@object.Id);
 
-                return AutomationApi.Json(new { original = estimate.Original, remaining = estimate.Remaining, logged = estimate.Logged, milestoneId = estimate.MilestoneId });
+                return JsonApi.Json(new { original = estimate.Original, remaining = estimate.Remaining, logged = estimate.Logged, milestoneId = estimate.MilestoneId });
             }
             catch (PlanningRefusedException refusal)
             {

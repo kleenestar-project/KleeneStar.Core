@@ -252,7 +252,7 @@ namespace KleeneStar.Core.WebFragment.Object.Blogs
                 Tooltip = _ => post.Key,
                 // frozen so the sidebar's request re-bind cannot repoint every entry at the
                 // currently displayed post (see ResolveDetailUriFrozen)
-                Uri = _ => ObjectKindCatalog.ResolveDetailUriFrozen(post),
+                Uri = _ => CoreHub.ObjectKindManager.ResolveDetailUriFrozen(post),
                 Icon = _ => ObjectIcon.Resolve(post, new IconBlog()),
                 Active = _ => string.Equals(post.Key, currentKey, StringComparison.OrdinalIgnoreCase)
                     ? TypeActive.Active

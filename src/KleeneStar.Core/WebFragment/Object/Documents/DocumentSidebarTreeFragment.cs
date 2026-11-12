@@ -239,7 +239,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 Tooltip = _ => document.Key,
                 // frozen so the sidebar's request re-bind cannot repoint every entry at the
                 // currently displayed document (see ResolveDetailUriFrozen)
-                Uri = _ => ObjectKindCatalog.ResolveDetailUriFrozen(document),
+                Uri = _ => CoreHub.ObjectKindManager.ResolveDetailUriFrozen(document),
                 Icon = _ => ObjectIcon.Resolve(document, new IconFileLines()),
                 Active = _ => string.Equals(document.Key, currentKey, StringComparison.OrdinalIgnoreCase)
                     ? TypeActive.Active

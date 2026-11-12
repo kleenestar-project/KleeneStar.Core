@@ -269,7 +269,7 @@ namespace KleeneStar.Core.WebFragment.Class
             foreach (var item in overview.Recent)
             {
                 var @object = item.Object;
-                var uri = ObjectKindCatalog.ResolveDetailUri(@object);
+                var uri = CoreHub.ObjectKindManager.ResolveDetailUri(@object);
                 var row = new ControlPanel { Classes = ["ks-co-recent-row"] };
 
                 row.Add

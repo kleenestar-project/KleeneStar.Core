@@ -1,6 +1,4 @@
 using KleeneStar.Core.WebApproval;
-using KleeneStar.Core.WebAutomation;
-using KleeneStar.Core.WebAutomation.Actions;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -56,6 +54,12 @@ namespace KleeneStar.Core.WebManager
 
         /// <inheritdoc/>
         public event EventHandler<Approval> ApprovalCompleted;
+
+        /// <summary>
+        /// An event that fires when an approval is requested, ends, or a step runs past its
+        /// deadline - for whoever reacts to approvals (the automation plugin).
+        /// </summary>
+        public event EventHandler<ApprovalOccurrence> ApprovalOccurred;
 
         /// <summary>
         /// Initializes a new instance of the manager. Invoked by WebExpress via reflection.
@@ -246,14 +250,7 @@ namespace KleeneStar.Core.WebManager
             ModelHub.AddApproval(approval);
             ApprovalRequested?.Invoke(this, approval);
 
-            CoreHub.AutomationManager?.Raise(new AutomationEvent
-            {
-                Trigger = AutomationTriggerCatalog.ApprovalRequested,
-                ObjectId = objectId,
-                Subjects = [policy.Name],
-                Occurrence = $"approval:{approval.Id:N}:requested",
-                ActorId = requesterId
-            });
+            ApprovalOccurred?.Invoke(this, new ApprovalOccurrence(ApprovalOccurrenceKind.Requested, approval, requesterId));
 
             if (approval.State == ApprovalState.Pending)
             {
@@ -437,14 +434,9 @@ namespace KleeneStar.Core.WebManager
 
                 overdue++;
 
-                // once per step: the occurrence names the step, so the next check queues nothing
-                CoreHub.AutomationManager?.Raise(new AutomationEvent
-                {
-                    Trigger = AutomationTriggerCatalog.ApprovalOverdue,
-                    ObjectId = approval.ObjectId,
-                    Subjects = [steps[approval.CurrentStep].Name, approval.PolicyName],
-                    Occurrence = $"approval:{approval.Id:N}:overdue:{approval.CurrentStep}"
-                });
+                // raised on every check that finds the step overdue; a listener keys it by
+                // approval and step, so the next check adds nothing
+                ApprovalOccurred?.Invoke(this, new ApprovalOccurrence(ApprovalOccurrenceKind.Overdue, approval, Guid.Empty, steps[approval.CurrentStep].Name));
             }
 
             return overdue;
@@ -507,14 +499,7 @@ namespace KleeneStar.Core.WebManager
 
             var outcome = approval.State.ToString().ToLowerInvariant();
 
-            CoreHub.AutomationManager?.Raise(new AutomationEvent
-            {
-                Trigger = AutomationTriggerCatalog.ApprovalCompleted,
-                ObjectId = approval.ObjectId,
-                Subjects = [outcome, approval.PolicyName],
-                Occurrence = $"approval:{approval.Id:N}:completed",
-                ActorId = actorId
-            });
+            ApprovalOccurred?.Invoke(this, new ApprovalOccurrence(ApprovalOccurrenceKind.Completed, approval, actorId));
 
             var @object = ReadObject(approval.ObjectId);
 
@@ -559,7 +544,7 @@ namespace KleeneStar.Core.WebManager
         /// <returns>Why the move did not happen, or <see langword="null"/> when it did.</returns>
         private static string Move(ObjectEntity @object, Guid statusId, Guid actorId)
         {
-            var field = StandardActions.FieldsOf(@object.ClassId).FirstOrDefault(x => x.FieldType == FieldType.Workflow);
+            var field = ClassFields.Active(@object.ClassId).FirstOrDefault(x => x.FieldType == FieldType.Workflow);
 
             if (field is null)
             {

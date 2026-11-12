@@ -88,7 +88,7 @@ namespace KleeneStar.Core.WebRestApi
                 Key = @object.Key,
                 Class = ClassNameOf(@object),
                 Title = @object.Summary,
-                Uri = ObjectKindCatalog.ResolveDetailUri(@object)?.ToString(),
+                Uri = CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString(),
                 Status = status,
                 StatusColor = color
             };

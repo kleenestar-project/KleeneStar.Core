@@ -195,7 +195,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
 
             var (source, sent) = ReadField(payload, nameof(Model.Entities.Identity.AuthenticationSource));
 
-            if (sent && AuthenticationSourceCatalog.GetSource(IdentitySource.FromId(FirstOf(source))) is null)
+            if (sent && CoreHub.AuthenticationSourceManager.GetSource(IdentitySource.FromId(FirstOf(source))) is null)
             {
                 result.Add
                 (

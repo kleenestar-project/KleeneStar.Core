@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebFragment.Object;
+using KleeneStar.Core.WebManager;
 using System;
 using System.Linq;
 using System.Threading;
@@ -10,7 +11,7 @@ namespace KleeneStar.Core.WebControl
 {
     /// <summary>
     /// The renderer picker of the class dialogs: the entry that clears the field, followed by
-    /// the renderers the <see cref="ObjectRendererCatalog"/> knows.
+    /// the renderers the <see cref="KleeneStar.Core.WebManager.ObjectRendererManager"/> knows.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -26,7 +27,7 @@ namespace KleeneStar.Core.WebControl
     /// list as it stood before any add-on arrived, and the catalog's whole point is that a
     /// contributed renderer becomes selectable without the dialogs knowing it exists. The
     /// options are therefore projected from the catalog when it has changed, watched through
-    /// <see cref="ObjectRendererCatalog.Version"/> so an unchanged catalog costs one read.
+    /// <see cref="CoreHub.ObjectRendererManager.Version"/> so an unchanged catalog costs one read.
     /// </para>
     /// <para>
     /// The list <b>is</b> narrowed to the object type chosen beside it, through the framework's
@@ -94,7 +95,7 @@ namespace KleeneStar.Core.WebControl
         {
             // both catalogs are read, because what an entry says about itself - the object
             // types it belongs to - is the answer of the two together
-            var version = HashCode.Combine(ObjectRendererCatalog.Version, ObjectKindCatalog.Version);
+            var version = HashCode.Combine(CoreHub.ObjectRendererManager.Version, CoreHub.ObjectKindManager.Version);
 
             if (Volatile.Read(ref _projected) == version)
             {
@@ -118,17 +119,17 @@ namespace KleeneStar.Core.WebControl
                 // offered, not merely reachable by never having chosen. It travels as a token
                 // because an option carries its value in its element id and an empty id is
                 // dropped on the client; the endpoint unwraps it back to the unset state
-                Add(new ControlFormItemInputSelectionItem(ObjectRendererCatalog.Automatic)
+                Add(new ControlFormItemInputSelectionItem(ObjectRendererManager.Automatic)
                 {
                     Text = _ => "kleenestar.core:class.renderer.automatic"
                 });
 
-                var kinds = ObjectKindCatalog.Kinds.Count();
+                var kinds = CoreHub.ObjectKindManager.Kinds.Count();
 
-                Add(ObjectRendererCatalog.Renderers
+                Add(CoreHub.ObjectRendererManager.Renderers
                     .Select(renderer =>
                     {
-                        var offered = ObjectRendererCatalog.GetKinds(renderer.Key).ToList();
+                        var offered = CoreHub.ObjectRendererManager.GetKinds(renderer.Key).ToList();
 
                         return new ControlFormItemInputSelectionItem(renderer.Key)
                         {

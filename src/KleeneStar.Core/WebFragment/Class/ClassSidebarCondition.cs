@@ -98,7 +98,7 @@ namespace KleeneStar.Core.WebFragment.Class
         protected override bool Offers(Model.Entities.Class @class)
         {
             // an uninstalled add-on kind keeps what every kind had before the question existed
-            return ObjectKindCatalog.GetKind(@class.Kind)?.ServiceLevels ?? true;
+            return CoreHub.ObjectKindManager.GetKind(@class.Kind)?.ServiceLevels ?? true;
         }
     }
 
@@ -107,7 +107,7 @@ namespace KleeneStar.Core.WebFragment.Class
     /// than as one body of their own (prose, a workbook) - it gates the field and form links. A
     /// prose or spreadsheet class has no mask a field could stand in or a form could arrange: a
     /// blog class always, a document class unless it was switched to the form renderer. The
-    /// answer is the <em>effective</em> renderer (<see cref="ObjectRendererCatalog.IsStructured"/>),
+    /// answer is the <em>effective</em> renderer (<see cref="CoreHub.ObjectRendererManager.IsStructured"/>),
     /// so a class that names none follows its kind.
     /// </summary>
     public sealed class ClassStructuredRendererCondition : ClassSidebarCondition
@@ -115,7 +115,7 @@ namespace KleeneStar.Core.WebFragment.Class
         /// <inheritdoc/>
         protected override bool Offers(Model.Entities.Class @class)
         {
-            return ObjectRendererCatalog.IsStructured(@class);
+            return CoreHub.ObjectRendererManager.IsStructured(@class);
         }
     }
 }

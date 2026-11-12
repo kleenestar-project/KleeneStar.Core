@@ -133,8 +133,8 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(Authenticate_External_AsksTheSource));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-ldap", acceptsPassword: true, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-ldap", acceptsPassword: true, provisions: false));
 
             try
             {
@@ -148,8 +148,8 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-idp");
-                AuthenticationSourceCatalog.Unregister("test-ldap");
+                CoreHub.AuthenticationSourceManager.Unregister("test-idp");
+                CoreHub.AuthenticationSourceManager.Unregister("test-ldap");
             }
         }
 
@@ -166,7 +166,7 @@ namespace KleeneStar.Core.Test.WebManager
             ModelHub.SetPasswordHash(orphan.Id, IdentityPassword.Hash(orphan, Secret), DateTime.UtcNow);
 
             Assert.Null(CoreHub.CredentialManager.Authenticate("erin", Secret));
-            Assert.False(AuthenticationSourceCatalog.ManagesPassword(orphan));
+            Assert.False(CoreHub.AuthenticationSourceManager.ManagesPassword(orphan));
         }
 
         /// <summary>
@@ -203,7 +203,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(PasswordOperations_RefuseExternalAccounts));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
 
             try
             {
@@ -215,7 +215,7 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-idp");
+                CoreHub.AuthenticationSourceManager.Unregister("test-idp");
             }
         }
 
@@ -256,7 +256,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(SignInExternal_MatchesSubjectNotName));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
 
             try
             {
@@ -272,7 +272,7 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-idp");
+                CoreHub.AuthenticationSourceManager.Unregister("test-idp");
             }
         }
 
@@ -285,7 +285,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(SignInExternal_ClaimsAPreparedAccountByVerifiedEmail));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
 
             try
             {
@@ -301,7 +301,7 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-idp");
+                CoreHub.AuthenticationSourceManager.Unregister("test-idp");
             }
         }
 
@@ -314,7 +314,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(SignInExternal_ProvisionsWhereTheSourceSaysSo));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-sso", acceptsPassword: false, provisions: true));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-sso", acceptsPassword: false, provisions: true));
 
             try
             {
@@ -331,7 +331,7 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-sso");
+                CoreHub.AuthenticationSourceManager.Unregister("test-sso");
             }
         }
 
@@ -363,7 +363,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(IdentityUpdate_SourceSwitchDropsThePassword));
 
-            AuthenticationSourceCatalog.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
+            CoreHub.AuthenticationSourceManager.Register(new ExternalSource("test-idp", acceptsPassword: false, provisions: false));
 
             try
             {
@@ -384,7 +384,7 @@ namespace KleeneStar.Core.Test.WebManager
             }
             finally
             {
-                AuthenticationSourceCatalog.Unregister("test-idp");
+                CoreHub.AuthenticationSourceManager.Unregister("test-idp");
             }
         }
 

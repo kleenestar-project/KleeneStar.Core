@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebAutomation.Actions;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebInsight;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebReport;
@@ -113,7 +113,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             {
                 if (!fields.TryGetValue(@object.ClassId, out var classFields))
                 {
-                    classFields = StandardActions.FieldsOf(@object.ClassId);
+                    classFields = ClassFields.Active(@object.ClassId);
                     fields[@object.ClassId] = classFields;
                 }
 

@@ -52,7 +52,7 @@ namespace KleeneStar.Core.WWW.Issue._objectkey_
                 (!string.Equals(@object.Kind, Model.Entities.ObjectKind.Issue, StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(@object.Key, objectParameter?.Value, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new RedirectException(ObjectKindCatalog.ResolveDetailUri(@object));
+                throw new RedirectException(CoreHub.ObjectKindManager.ResolveDetailUri(@object));
             }
 
             // record the visit so this object surfaces at the top of the object dropdown's

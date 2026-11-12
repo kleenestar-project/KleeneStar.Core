@@ -116,7 +116,7 @@ namespace KleeneStar.Core.WebRestApi
                 // view is written for a full-width column
                 PrimaryAction = new ActionMasterDetail(ListDetailControl.ControlId)
                 {
-                    Uri = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog
+                    Uri = global::KleeneStar.Core.CoreHub.ObjectKindManager
                         .ResolvePreviewUri(entity)
                         .BindParameters(request),
                     Item = entity.Id.ToString()

@@ -126,8 +126,6 @@ namespace KleeneStar.Core.WebManager
             Configuration<ObjectView>(h => CoreHub.ObjectViewManager.ObjectViewAdded += h, h => CoreHub.ObjectViewManager.ObjectViewUpdated += h, h => CoreHub.ObjectViewManager.ObjectViewRemoved += h);
             Configuration<NavigatorLink>(h => CoreHub.NavigatorLinkManager.NavigatorLinkAdded += h, h => CoreHub.NavigatorLinkManager.NavigatorLinkUpdated += h, h => CoreHub.NavigatorLinkManager.NavigatorLinkRemoved += h);
             Configuration<ObjectRelationType>(h => CoreHub.ObjectRelationTypeManager.RelationTypeAdded += h, h => CoreHub.ObjectRelationTypeManager.RelationTypeUpdated += h, h => CoreHub.ObjectRelationTypeManager.RelationTypeRemoved += h);
-            Configuration<AutomationRule>(h => CoreHub.AutomationManager.RuleAdded += h, h => CoreHub.AutomationManager.RuleUpdated += h, h => CoreHub.AutomationManager.RuleRemoved += h);
-            Configuration<Webhook>(h => CoreHub.WebhookManager.WebhookAdded += h, h => CoreHub.WebhookManager.WebhookUpdated += h, h => CoreHub.WebhookManager.WebhookRemoved += h);
             Configuration<ApprovalPolicy>(h => CoreHub.ApprovalManager.PolicyAdded += h, h => CoreHub.ApprovalManager.PolicyUpdated += h, h => CoreHub.ApprovalManager.PolicyRemoved += h);
 
             // every decision is evidence: who approved or rejected what, when, and why
@@ -138,8 +136,8 @@ namespace KleeneStar.Core.WebManager
             Configuration<ValueCatalog>(h => CoreHub.ValueCatalogManager.CatalogAdded += h, h => CoreHub.ValueCatalogManager.CatalogUpdated += h, h => CoreHub.ValueCatalogManager.CatalogRemoved += h);
             CoreHub.ValueCatalogManager.VersionPublished += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Created, x, AuditSeverity.Notice);
 
-            // a job that used its last attempt is something an operator has to look at
-            CoreHub.AutomationManager.JobFailed += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Updated, x, AuditSeverity.Warning);
+            // the automation rules and their failed jobs are recorded by the automation plugin,
+            // through RecordChange, when it connects
 
             CoreHub.BrandingManager.BrandingUpdated += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Updated, x, AuditSeverity.Notice);
             CoreHub.MaintenanceManager.MaintenanceUpdated += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Updated, x, AuditSeverity.Notice);

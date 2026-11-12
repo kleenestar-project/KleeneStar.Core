@@ -414,9 +414,9 @@ namespace KleeneStar.Core.WebManager
                 return this;
             }
 
-            foreach (var key in new[] { WebInsight.InsightViewTypeCatalog.Default, InsightViewTypes.Reports })
+            foreach (var key in new[] { global::KleeneStar.Core.WebManager.InsightViewTypeManager.Default, InsightViewTypes.Reports })
             {
-                var type = WebInsight.InsightViewTypeCatalog.Get(key);
+                var type = global::KleeneStar.Core.CoreHub.InsightViewTypeManager.Get(key);
 
                 if (type is null)
                 {
@@ -426,7 +426,7 @@ namespace KleeneStar.Core.WebManager
                 AddView(new InsightView
                 {
                     InsightId = insightId,
-                    ViewType = WebInsight.InsightViewTypeCatalog.Normalize(type.Key),
+                    ViewType = global::KleeneStar.Core.WebManager.InsightViewTypeManager.Normalize(type.Key),
                     Name = nameOf?.Invoke(type.Label) ?? type.Key,
                     State = ObjectViewState.Active
                 });

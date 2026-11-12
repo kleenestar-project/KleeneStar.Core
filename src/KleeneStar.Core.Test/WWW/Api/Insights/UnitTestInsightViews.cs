@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebInsight;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Model.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -97,12 +98,12 @@ namespace KleeneStar.Core.Test.WWW.Api.Insights
                     InsightViewTypes.Scrum, InsightViewTypes.Gantt, InsightViewTypes.Calendar,
                     InsightViewTypes.Reports
                 ],
-                InsightViewTypeCatalog.Types.Select(x => InsightViewTypeCatalog.Normalize(x.Key)).Where(x => x != "timeline")
+                CoreHub.InsightViewTypeManager.Types.Select(x => InsightViewTypeManager.Normalize(x.Key)).Where(x => x != "timeline")
             );
 
-            Assert.Equal(InsightViewTypes.Objects, InsightViewTypeCatalog.Default);
-            Assert.False(InsightViewTypeCatalog.Unregister(InsightViewTypes.Objects));
-            Assert.True(InsightViewTypeCatalog.IsRegistered(" Reports "));
+            Assert.Equal(InsightViewTypes.Objects, InsightViewTypeManager.Default);
+            Assert.False(CoreHub.InsightViewTypeManager.Unregister(InsightViewTypes.Objects));
+            Assert.True(CoreHub.InsightViewTypeManager.IsRegistered(" Reports "));
         }
 
         /// <summary>
@@ -112,19 +113,19 @@ namespace KleeneStar.Core.Test.WWW.Api.Insights
         [Fact]
         public void Catalog_MapsTemplatesBothWays()
         {
-            var types = InsightViewTypeCatalog.Types.ToList();
+            var types = CoreHub.InsightViewTypeManager.Types.ToList();
 
             Assert.Equal(types.Count, types.Select(x => x.Template).Distinct().Count());
 
             foreach (var type in types)
             {
-                var templateId = InsightViewTypeCatalog.TemplateId(type);
+                var templateId = InsightViewTypeManager.TemplateId(type);
 
                 Assert.False(string.IsNullOrWhiteSpace(templateId));
-                Assert.Same(type, InsightViewTypeCatalog.FromTemplateId(templateId.ToUpperInvariant()));
+                Assert.Same(type, CoreHub.InsightViewTypeManager.FromTemplateId(templateId.ToUpperInvariant()));
             }
 
-            Assert.Null(InsightViewTypeCatalog.FromTemplateId("no-such-template"));
+            Assert.Null(CoreHub.InsightViewTypeManager.FromTemplateId("no-such-template"));
         }
 
         /// <summary>
@@ -134,22 +135,22 @@ namespace KleeneStar.Core.Test.WWW.Api.Insights
         [Fact]
         public void Catalog_RegistersAndUnregistersAType()
         {
-            var version = InsightViewTypeCatalog.Version;
+            var version = CoreHub.InsightViewTypeManager.Version;
 
-            InsightViewTypeCatalog.Register(new TimelineViewType());
+            CoreHub.InsightViewTypeManager.Register(new TimelineViewType());
 
             try
             {
-                Assert.NotEqual(version, InsightViewTypeCatalog.Version);
-                Assert.True(InsightViewTypeCatalog.IsRegistered("timeline"));
-                Assert.Equal("Timeline", InsightViewTypeCatalog.Types.Last().Key);
+                Assert.NotEqual(version, CoreHub.InsightViewTypeManager.Version);
+                Assert.True(CoreHub.InsightViewTypeManager.IsRegistered("timeline"));
+                Assert.Equal("Timeline", CoreHub.InsightViewTypeManager.Types.Last().Key);
             }
             finally
             {
-                Assert.True(InsightViewTypeCatalog.Unregister("TIMELINE"));
+                Assert.True(CoreHub.InsightViewTypeManager.Unregister("TIMELINE"));
             }
 
-            Assert.False(InsightViewTypeCatalog.IsRegistered("timeline"));
+            Assert.False(CoreHub.InsightViewTypeManager.IsRegistered("timeline"));
         }
 
         /// <summary>
@@ -158,8 +159,8 @@ namespace KleeneStar.Core.Test.WWW.Api.Insights
         [Fact]
         public void Catalog_RefusesATypeWithoutTemplate()
         {
-            Assert.Throws<ArgumentException>(() => InsightViewTypeCatalog.Register(new TemplatelessViewType()));
-            Assert.False(InsightViewTypeCatalog.IsRegistered("broken"));
+            Assert.Throws<ArgumentException>(() => CoreHub.InsightViewTypeManager.Register(new TemplatelessViewType()));
+            Assert.False(CoreHub.InsightViewTypeManager.IsRegistered("broken"));
         }
 
         /// <summary>

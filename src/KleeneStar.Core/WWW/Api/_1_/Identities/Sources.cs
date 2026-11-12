@@ -12,7 +12,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
     /// Offers the registered authentication sources to the identity dialogs.
     /// </summary>
     /// <remarks>
-    /// Read from <see cref="AuthenticationSourceCatalog"/> on every request, so a source a
+    /// Read from <see cref="KleeneStar.Core.WebManager.AuthenticationSourceManager"/> on every request, so a source a
     /// plugin registers after start-up is offered without a restart. An entry's id is derived
     /// from the source key (<see cref="Model.Entities.IdentitySource.IdOf"/>), because a picker
     /// identifies its entries by guid.
@@ -32,7 +32,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
         /// </summary>
         protected override IQueryable<RestApiSelectionItem> RetrieveItems(IQuery<Model.Entities.Identity> query, IQueryContext context, IRequest request)
         {
-            return AuthenticationSourceCatalog.Sources
+            return CoreHub.AuthenticationSourceManager.Sources
                 .Select(x => new RestApiSelectionItem
                 {
                     Id = Model.Entities.IdentitySource.IdOf(x.Key),

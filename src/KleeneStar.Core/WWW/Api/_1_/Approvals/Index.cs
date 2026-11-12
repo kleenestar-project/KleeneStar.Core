@@ -1,6 +1,5 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using System;
 using System.Linq;
 using WebExpress.WebCore.WebAttribute;
@@ -45,7 +44,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
 
             var callerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
 
-            return AutomationApi.Json(CoreHub.ApprovalManager.GetApprovals(@object.Id).Select(x => ApprovalApi.ToDto(x, callerId)));
+            return JsonApi.Json(CoreHub.ApprovalManager.GetApprovals(@object.Id).Select(x => ApprovalApi.ToDto(x, callerId)));
         }
 
         /// <summary>
@@ -56,7 +55,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
         [Method(RequestMethod.POST)]
         public IResponse Request(IRequest request)
         {
-            var payload = AutomationApi.Read<ApprovalApi.Payload>(request);
+            var payload = JsonApi.Read<ApprovalApi.Payload>(request);
             var @object = string.IsNullOrWhiteSpace(payload?.Object) ? null : CoreHub.ObjectManager.GetObjectByKey(payload.Object);
 
             if (@object is null || !Guid.TryParse(payload.Policy, out var policyId))
@@ -73,7 +72,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
 
             try
             {
-                return AutomationApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Request(@object.Id, policyId, callerId, payload.Reason), callerId));
+                return JsonApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Request(@object.Id, policyId, callerId, payload.Reason), callerId));
             }
             catch (ApprovalRefusedException refusal)
             {

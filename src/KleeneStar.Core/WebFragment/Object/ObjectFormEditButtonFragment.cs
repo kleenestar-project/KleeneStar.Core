@@ -46,7 +46,7 @@ namespace KleeneStar.Core.WebFragment.Object
             Icon = _ => new IconPen();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
             BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);
-            Uri = renderContext => ObjectKindCatalog.ResolveEditUri(Resolve(renderContext));
+            Uri = renderContext => CoreHub.ObjectKindManager.ResolveEditUri(Resolve(renderContext));
         }
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace KleeneStar.Core.WebFragment.Object
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             if (!FragmentContext.Conditions.Check(renderContext?.Request) ||
-                ObjectKindCatalog.ResolveEditUri(Resolve(renderContext)) is null)
+                CoreHub.ObjectKindManager.ResolveEditUri(Resolve(renderContext)) is null)
             {
                 return null;
             }

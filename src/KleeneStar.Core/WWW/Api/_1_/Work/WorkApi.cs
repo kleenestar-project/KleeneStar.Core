@@ -1,5 +1,5 @@
 using KleeneStar.Core.WebManager;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using System;
 using System.Globalization;
 using System.Text;
@@ -83,10 +83,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
         {
             if (!refusal.Forbidden)
             {
-                return AutomationApi.Refuse(refusal.Message);
+                return JsonApi.Refuse(refusal.Message);
             }
 
-            return new ResponseForbidden { Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { message = refusal.Message }, AutomationApi.JsonOptions)) }
+            return new ResponseForbidden { Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { message = refusal.Message }, JsonApi.JsonOptions)) }
                 .AddHeaderContentType("application/json");
         }
     }

@@ -341,7 +341,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 var fields = catalog.FieldCount(@class.Id);
                 var templates = catalog.Templates.Count(x => x.ClassId == @class.Id);
                 var sla = catalog.Sla(renderContext, @class.Id, null);
-                var kind = ObjectKindCatalog.GetKind(@class.Kind)?.Label;
+                var kind = CoreHub.ObjectKindManager.GetKind(@class.Kind)?.Label;
 
                 var card = new ControlTileCard(@class.Id.ToString())
                 {

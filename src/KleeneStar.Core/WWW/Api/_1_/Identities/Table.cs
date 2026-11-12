@@ -180,7 +180,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
             };
 
             // a reset link is offered only where it can set something: an internal account
-            if (AuthenticationSourceCatalog.ManagesPassword(row))
+            if (CoreHub.AuthenticationSourceManager.ManagesPassword(row))
             {
                 var passwordUri = _passwordFormUri?
                     .BindParameters(request)
@@ -210,7 +210,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
         /// <returns>The name.</returns>
         private static string SourceName(Model.Entities.Identity row, IRequest request)
         {
-            var source = AuthenticationSourceCatalog.Resolve(row);
+            var source = CoreHub.AuthenticationSourceManager.Resolve(row);
 
             return source is null
                 ? row.AuthenticationSource

@@ -1,7 +1,6 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebPlanning;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using System;
 using System.Linq;
 using WebExpress.WebCore.WebAttribute;
@@ -43,7 +42,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
             var administrator = ContentAuthorization.MayAdministerWorkspace(@object.WorkspaceId, request);
             var estimate = CoreHub.PlanningManager.GetEstimate(@object.Id);
 
-            return AutomationApi.Json(new
+            return JsonApi.Json(new
             {
                 timeTracking = CoreHub.PlanningManager.IsTimeTracking(@object.WorkspaceId),
                 original = estimate.Original,
@@ -72,7 +71,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
         [Method(RequestMethod.POST)]
         public IResponse Log(IRequest request)
         {
-            var payload = AutomationApi.Read<WorkApi.Payload>(request);
+            var payload = JsonApi.Read<WorkApi.Payload>(request);
             var @object = string.IsNullOrWhiteSpace(payload?.Object) ? null : CoreHub.ObjectManager.GetObjectByKey(payload.Object);
 
             if (@object is null)
@@ -87,7 +86,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
 
             if (Durations.Parse(payload.Duration) is not int minutes)
             {
-                return AutomationApi.Refuse("Write the time spent as a duration, e.g. 1h 30m.");
+                return JsonApi.Refuse("Write the time spent as a duration, e.g. 1h 30m.");
             }
 
             int? remaining = null;
@@ -98,20 +97,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
 
                 if (remaining is null)
                 {
-                    return AutomationApi.Refuse("Write the remaining estimate as a duration, e.g. 4h.");
+                    return JsonApi.Refuse("Write the remaining estimate as a duration, e.g. 4h.");
                 }
             }
 
             if (!WorkApi.TryParseMoment(payload.Started, out var started))
             {
-                return AutomationApi.Refuse("Write when the work began as a date.");
+                return JsonApi.Refuse("Write when the work began as a date.");
             }
 
             try
             {
                 var worklog = CoreHub.PlanningManager.Log(@object.Id, CoreHub.SessionManager.GetCurrentIdentityId(request), started, minutes, payload.Comment, remaining);
 
-                return AutomationApi.Json(new { id = worklog.Id, minutes = worklog.Minutes, started = worklog.Started });
+                return JsonApi.Json(new { id = worklog.Id, minutes = worklog.Minutes, started = worklog.Started });
             }
             catch (PlanningRefusedException refusal)
             {

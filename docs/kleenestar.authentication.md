@@ -6,8 +6,9 @@ account's `AuthenticationSource`: `null` for internal, otherwise the key of a re
 
 ## Sources
 
-There is no enum of sources. `AuthenticationSourceCatalog` is an open registry, like the object
-kinds and renderers; the core registers the internal source (`local`), a plugin registers its own
+There is no enum of sources. `AuthenticationSourceManager` is an open registry, like the object
+kinds and renderers: it finds every public sealed source with a public parameterless constructor of
+any plugin (the core's internal source, `local`), and a plugin registers its own
 `IAuthenticationSource`:
 
 | Member | Meaning |

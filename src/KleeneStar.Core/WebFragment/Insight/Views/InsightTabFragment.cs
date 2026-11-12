@@ -15,7 +15,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
     /// loaded from <c>/api/1/insights/{insightid}/tab</c>; they can be added from the template
     /// picker, moved and closed. Each tab type contributes a template scoped to this fragment
     /// (<c>InsightTab…TemplateFragment</c>) and registered with the
-    /// <see cref="WebInsight.InsightViewTypeCatalog"/>.
+    /// <see cref="KleeneStar.Core.WebManager.InsightViewTypeManager"/>.
     /// </summary>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]

@@ -13,7 +13,7 @@ namespace KleeneStar.Core.WebManager
     /// <remarks>
     /// Internal and external accounts are told apart by their
     /// <see cref="Identity.AuthenticationSource"/> through
-    /// <see cref="WebIdentity.AuthenticationSourceCatalog"/>. Every password operation here
+    /// <see cref="KleeneStar.Core.WebManager.AuthenticationSourceManager"/>. Every password operation here
     /// refuses an external account with <see cref="CredentialOutcome.ExternalAccount"/>: its
     /// password is not this installation's to know, let alone to set.
     /// </remarks>
@@ -119,5 +119,19 @@ namespace KleeneStar.Core.WebManager
         /// <param name="claims">What the source vouched for.</param>
         /// <returns>The account, or <see langword="null"/> when the sign-in stands for none.</returns>
         Identity SignInExternal(string sourceKey, ExternalAccountClaims claims);
+
+        /// <summary>
+        /// Records the identifier an external source knows an account by - what a directory
+        /// synchronization does for the accounts it creates or claims.
+        /// </summary>
+        /// <remarks>
+        /// Only an account of a registered external source takes a subject, and only one no
+        /// other account of that source carries already: the pair names one account, and an
+        /// internal account never gets one.
+        /// </remarks>
+        /// <param name="identityId">The account.</param>
+        /// <param name="subject">The subject; blank clears it.</param>
+        /// <returns><see langword="true"/> when the subject was recorded.</returns>
+        bool LinkExternalSubject(Guid identityId, string subject);
     }
 }

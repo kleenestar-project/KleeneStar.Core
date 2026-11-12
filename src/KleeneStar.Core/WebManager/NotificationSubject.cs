@@ -122,7 +122,7 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
-            var kind = ObjectKindCatalog.GetKind(ObjectKind.Normalize(@object.Kind));
+            var kind = CoreHub.ObjectKindManager.GetKind(ObjectKind.Normalize(@object.Kind));
 
             return kind?.DetailUri(@object.Key)?.ToString();
         }

@@ -129,7 +129,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                 {
                     Text = _ => page.Summary,
                     Icon = _ => icon,
-                    Uri = _ => ObjectKindCatalog.ResolveDetailUri(page)
+                    Uri = _ => CoreHub.ObjectKindManager.ResolveDetailUri(page)
                 };
 
                 nodes.Add(entry.Render(renderContext, visualTree));

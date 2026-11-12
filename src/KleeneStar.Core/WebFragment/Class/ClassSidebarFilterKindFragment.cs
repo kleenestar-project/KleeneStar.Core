@@ -20,7 +20,7 @@ namespace KleeneStar.Core.WebFragment.Class
     /// Modelled on the category filter of the workspace overview: the entries are filter
     /// actions of one exclusive group, so the table, tile and list views receive the picked
     /// kind through their filter binding and resolve it with <see cref="ClassKindFilter"/>.
-    /// The entries follow <see cref="ObjectKindCatalog.Kinds"/>, so a kind an add-on registers
+    /// The entries follow <see cref="CoreHub.ObjectKindManager.Kinds"/>, so a kind an add-on registers
     /// is offered without this fragment knowing it.
     /// </remarks>
     [Section<SectionSidebarPreferences>]
@@ -71,7 +71,7 @@ namespace KleeneStar.Core.WebFragment.Class
                     .Render(renderContext, visualTree)
             };
 
-            foreach (var kind in ObjectKindCatalog.Kinds)
+            foreach (var kind in CoreHub.ObjectKindManager.Kinds)
             {
                 list.Add(new ControlSidebarItemLink(ClassKindFilter.ToFilterId(kind.Key))
                 {

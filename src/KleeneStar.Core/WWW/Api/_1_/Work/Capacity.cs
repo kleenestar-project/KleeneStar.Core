@@ -1,6 +1,6 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebPlanning;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using System;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -36,7 +36,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
 
             var load = CoreHub.PlanningManager.GetPersonalLoad(callerId, DateTime.UtcNow);
 
-            return AutomationApi.Json(new
+            return JsonApi.Json(new
             {
                 weeklyCapacity = load.WeeklyCapacity,
                 remaining = load.RemainingMinutes,
@@ -62,9 +62,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
                 return new ResponseUnauthorized();
             }
 
-            if (Durations.Parse(AutomationApi.Read<WorkApi.Payload>(request)?.Capacity) is not int minutes)
+            if (Durations.Parse(JsonApi.Read<WorkApi.Payload>(request)?.Capacity) is not int minutes)
             {
-                return AutomationApi.Refuse("Write the capacity as a duration, e.g. 32h.");
+                return JsonApi.Refuse("Write the capacity as a duration, e.g. 32h.");
             }
 
             try

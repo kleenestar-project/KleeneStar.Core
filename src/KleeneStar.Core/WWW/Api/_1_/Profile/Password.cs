@@ -109,7 +109,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
                 return result;
             }
 
-            if (!AuthenticationSourceCatalog.ManagesPassword(account))
+            if (!CoreHub.AuthenticationSourceManager.ManagesPassword(account))
             {
                 result.Add(I18N.Translate(request, "kleenestar.core:password.validation.external"), CurrentField);
 
@@ -121,7 +121,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
             var confirm = Read(payload, ConfirmField);
 
             if (!IdentityPassword.IsUsable(account.PasswordHash)
-                || !AuthenticationSourceCatalog.Resolve(account).VerifyPassword(account, current ?? string.Empty))
+                || !CoreHub.AuthenticationSourceManager.Resolve(account).VerifyPassword(account, current ?? string.Empty))
             {
                 result.Add(I18N.Translate(request, "kleenestar.core:password.validation.current"), CurrentField);
             }

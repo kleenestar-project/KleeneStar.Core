@@ -228,7 +228,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         /// </returns>
         private static IUri GetUri(Model.Entities.Object row, IRequest request)
         {
-            return global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog
+            return global::KleeneStar.Core.CoreHub.ObjectKindManager
                 .ResolveDetailUri(row)?
                 .BindParameters(request);
         }

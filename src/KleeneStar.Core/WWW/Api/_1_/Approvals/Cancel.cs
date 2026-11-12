@@ -1,6 +1,5 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -30,7 +29,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
         [Method(RequestMethod.POST)]
         public IResponse Withdraw(IRequest request)
         {
-            var payload = AutomationApi.Read<ApprovalApi.Payload>(request);
+            var payload = JsonApi.Read<ApprovalApi.Payload>(request);
             var approval = ApprovalApi.Resolve(payload, out var @object);
 
             if (approval is null)
@@ -43,7 +42,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
 
             try
             {
-                return AutomationApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Cancel(approval.Id, callerId, administrator), callerId));
+                return JsonApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Cancel(approval.Id, callerId, administrator), callerId));
             }
             catch (ApprovalRefusedException refusal)
             {

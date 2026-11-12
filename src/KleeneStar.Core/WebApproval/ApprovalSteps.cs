@@ -1,6 +1,8 @@
-using KleeneStar.Core.WebAutomation.Actions;
+using Group = KleeneStar.Model.Entities.Group;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Model.Entities;
+using ObjectEntity = KleeneStar.Model.Entities.Object;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -8,8 +10,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using WebExpress.WebIndex.Queries;
-using Group = KleeneStar.Model.Entities.Group;
-using ObjectEntity = KleeneStar.Model.Entities.Object;
 
 namespace KleeneStar.Core.WebApproval
 {
@@ -294,7 +294,7 @@ namespace KleeneStar.Core.WebApproval
                     .FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
             }
 
-            return StandardActions.ResolveIdentity(text.Trim());
+            return IdentityResolver.Resolve(text.Trim());
         }
 
         /// <summary>

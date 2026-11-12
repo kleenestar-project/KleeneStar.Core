@@ -258,7 +258,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 (
                     result,
                     kindSent ? kind : existingItem?.Kind,
-                    WebFragment.Object.ObjectRendererCatalog.Unwrap(rendererSent ? submitted : existingItem?.Renderer),
+                    global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(rendererSent ? submitted : existingItem?.Renderer),
                     request
                 );
             }
@@ -403,7 +403,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// <param name="request">The request, for the culture the message is written in.</param>
         private static void ValidateRenderer(IRestApiValidationResult result, string kind, string renderer, IRequest request)
         {
-            if (WebFragment.Object.ObjectRendererCatalog.IsOffered(kind, renderer))
+            if (global::KleeneStar.Core.CoreHub.ObjectRendererManager.IsOffered(kind, renderer))
             {
                 return;
             }
@@ -411,7 +411,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
             var offered = string.Join
             (
                 ", ",
-                WebFragment.Object.ObjectRendererCatalog.GetRenderers(kind)
+                global::KleeneStar.Core.CoreHub.ObjectRendererManager.GetRenderers(kind)
                     .Select(x => Translate(request, x.Label))
             );
 
@@ -465,7 +465,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
 
             // the picker's 'follow the object type' entry travels as a token because an option
             // cannot carry an empty value; it becomes the unset state here, before persistence
-            newItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(newItem.Renderer);
+            newItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(newItem.Renderer);
 
             CoreHub.ClassManager.Add(newItem);
 
@@ -508,7 +508,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
 
             fieldMap.BindTo(newItem);
 
-            newItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(newItem.Renderer);
+            newItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(newItem.Renderer);
 
             // a clone lives where its original lives; the clone form does not carry the
             // workspace, and a class without one is refused by the foreign key
@@ -547,7 +547,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
 
             var res = base.Update(existingItem, payload, request);
 
-            existingItem.Renderer = WebFragment.Object.ObjectRendererCatalog.Unwrap(existingItem.Renderer);
+            existingItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(existingItem.Renderer);
 
             if (avatarSent)
             {

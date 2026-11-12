@@ -1,5 +1,4 @@
-﻿using KleeneStar.Core.WebAutomation;
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebTheme;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
@@ -25,9 +24,10 @@ namespace KleeneStar.Core
     public sealed class KleeneStarApplication : IApplication
     {
         /// <summary>
-        /// The worker running the automation queue, started with the application.
+        /// The worker running the core's background work, started with the application. The
+        /// automation queue is the automation plugin's and has a worker of its own.
         /// </summary>
-        private AutomationWorker _automationWorker;
+        private WebMaintenance.BackgroundWorker _backgroundWorker;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -110,10 +110,9 @@ namespace KleeneStar.Core
         {
             try
             {
-                CoreHub.AutomationManager.Connect();
                 CoreHub.ApprovalManager.Connect();
 
-                _automationWorker = new AutomationWorker();
+                _backgroundWorker = new WebMaintenance.BackgroundWorker();
             }
             catch (Exception ex)
             {
@@ -209,7 +208,7 @@ namespace KleeneStar.Core
         /// </summary>
         public void Dispose()
         {
-            _automationWorker?.Dispose();
+            _backgroundWorker?.Dispose();
         }
 
         /// <summary>

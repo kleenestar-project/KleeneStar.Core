@@ -1,5 +1,5 @@
 using KleeneStar.Core.WebManager;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Core.WWW.Api._1_.Work;
 using KleeneStar.Model.Entities;
 using System;
@@ -25,21 +25,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Save(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var payload = AutomationApi.Read<MilestonePayload>(request);
+            var payload = JsonApi.Read<MilestonePayload>(request);
 
             if (payload is null)
             {
-                return AutomationApi.Refuse("The request body must describe a milestone.");
+                return JsonApi.Refuse("The request body must describe a milestone.");
             }
 
-            var id = AutomationApi.ParseId(payload.Id);
+            var id = JsonApi.ParseId(payload.Id);
             var milestone = id is { } milestoneId ? CoreHub.PlanningManager.GetMilestone(milestoneId) : new Milestone { WorkspaceId = workspace.Id };
 
             if (milestone is null || milestone.WorkspaceId != workspace.Id)
@@ -53,7 +53,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
             {
                 if (!WorkApi.TryParseMoment(payload.Due, out var moment))
                 {
-                    return AutomationApi.Refuse("Write the due date as a date.");
+                    return JsonApi.Refuse("Write the due date as a date.");
                 }
 
                 due = moment;
@@ -68,7 +68,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
             {
                 CoreHub.PlanningManager.SaveMilestone(milestone);
 
-                return AutomationApi.Json(new { id = milestone.Id, name = milestone.Name, due = milestone.Due, state = milestone.State.ToString().ToLowerInvariant() });
+                return JsonApi.Json(new { id = milestone.Id, name = milestone.Name, due = milestone.Due, state = milestone.State.ToString().ToLowerInvariant() });
             }
             catch (PlanningRefusedException refused)
             {

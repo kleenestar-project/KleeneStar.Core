@@ -1,5 +1,5 @@
 using KleeneStar.Core.WebManager;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model.Entities;
 using System;
 using WebExpress.WebCore.WebAttribute;
@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
         [Method(RequestMethod.POST)]
         public IResponse Record(IRequest request)
         {
-            var payload = AutomationApi.Read<ApprovalApi.Payload>(request);
+            var payload = JsonApi.Read<ApprovalApi.Payload>(request);
             var approval = ApprovalApi.Resolve(payload, out _);
 
             if (approval is null)
@@ -52,14 +52,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Approvals
 
             if (verdict is null)
             {
-                return AutomationApi.Refuse("Choose to approve or to reject.");
+                return JsonApi.Refuse("Choose to approve or to reject.");
             }
 
             var callerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
 
             try
             {
-                return AutomationApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Decide(approval.Id, callerId, verdict.Value, payload.Reason), callerId));
+                return JsonApi.Json(ApprovalApi.ToDto(CoreHub.ApprovalManager.Decide(approval.Id, callerId, verdict.Value, payload.Reason), callerId));
             }
             catch (ApprovalRefusedException refusal)
             {

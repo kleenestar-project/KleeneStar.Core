@@ -61,7 +61,7 @@ namespace KleeneStar.Core.WWW.Document._objectkey_
                 (!string.Equals(@object.Kind, Model.Entities.ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(@object.Key, objectParameter?.Value, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new RedirectException(ObjectKindCatalog.ResolveDetailUri(@object));
+                throw new RedirectException(CoreHub.ObjectKindManager.ResolveDetailUri(@object));
             }
 
             // record the visit so this document surfaces at the top of the object

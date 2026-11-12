@@ -118,7 +118,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Identities
             {
                 result.Add(I18N.Translate(request, "kleenestar.core:setting.identity.password.validation.unknown"), nameof(PasswordReset.IdentityId));
             }
-            else if (!WebIdentity.AuthenticationSourceCatalog.ManagesPassword(account))
+            else if (!global::KleeneStar.Core.CoreHub.AuthenticationSourceManager.ManagesPassword(account))
             {
                 result.Add(I18N.Translate(request, "kleenestar.core:setting.identity.password.validation.external"), nameof(PasswordReset.IdentityId));
             }

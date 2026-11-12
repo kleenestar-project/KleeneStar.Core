@@ -106,9 +106,6 @@ namespace KleeneStar.Core.Test.WWW.Api
         /// <returns>The endpoint calls.</returns>
         private static IEnumerable<(string Name, Func<IRequest, IResponse> Call)> Configuration()
         {
-            yield return ("automation", new global::KleeneStar.Core.WWW.Api._1_.Automation._workspacekey_.Index().Retrieve);
-            yield return ("automation jobs", new global::KleeneStar.Core.WWW.Api._1_.Automation._workspacekey_.Jobs().Retrieve);
-            yield return ("webhooks", new global::KleeneStar.Core.WWW.Api._1_.Webhooks._workspacekey_.Index().Retrieve);
             yield return ("approval policies", new global::KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_.Index().Retrieve);
             yield return ("planning", new global::KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_.Index().Retrieve);
             yield return ("catalogs", new global::KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_.Index().Retrieve);

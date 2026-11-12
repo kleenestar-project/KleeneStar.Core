@@ -580,7 +580,7 @@ namespace KleeneStar.Core.WebRestApi
             // the reading view is addressed through the kind catalog rather than through a
             // route named here, so a kind brings its own detail page without this base
             // knowing it
-            var uri = ObjectKindCatalog.ResolveDetailUri(entity.Kind ?? Kind, entity.Key);
+            var uri = CoreHub.ObjectKindManager.ResolveDetailUri(entity.Kind ?? Kind, entity.Key);
             var starred = starredIds.Contains(entity.Id);
 
             // a parent chain that loops back on itself would otherwise recurse forever

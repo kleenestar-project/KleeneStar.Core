@@ -1,6 +1,5 @@
 using KleeneStar.Core.WebMaintenance;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using System;
 using System.IO;
 using System.Linq;
@@ -35,7 +34,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Maintenance
                 return new ResponseForbidden();
             }
 
-            return AutomationApi.Json(new
+            return JsonApi.Json(new
             {
                 directory = DatabaseBackups.Directory,
                 backups = DatabaseBackups.List().Select(x => new { file = x.File, size = x.Size, created = x.Created })
@@ -59,11 +58,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Maintenance
             {
                 var backup = DatabaseBackups.Create(DateTime.UtcNow);
 
-                return AutomationApi.Json(new { file = backup.File, size = backup.Size, created = backup.Created, integrity = backup.Integrity });
+                return JsonApi.Json(new { file = backup.File, size = backup.Size, created = backup.Created, integrity = backup.Integrity });
             }
             catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException)
             {
-                return AutomationApi.Refuse(ex.Message);
+                return JsonApi.Refuse(ex.Message);
             }
         }
     }

@@ -28,6 +28,14 @@ namespace KleeneStar.Core
         private static ClassManager _classManager;
         private static FieldManager _fieldManager;
         private static SecurityLevelManager _securityLevelManager;
+        private static ObjectKindManager _objectKindManager;
+        private static ObjectKindManager _objectKindManagerDetached;
+        private static ObjectRendererManager _objectRendererManager;
+        private static ObjectRendererManager _objectRendererManagerDetached;
+        private static AuthenticationSourceManager _authenticationSourceManager;
+        private static AuthenticationSourceManager _authenticationSourceManagerDetached;
+        private static InsightViewTypeManager _insightViewTypeManager;
+        private static InsightViewTypeManager _insightViewTypeManagerDetached;
         private static FormManager _formManager;
         private static PriorityManager _priorityManager;
         private static WorkflowManager _workflowManager;
@@ -62,8 +70,6 @@ namespace KleeneStar.Core
         private static ObjectOperationManager _objectOperationManager;
         private static ObjectProgressManager _objectProgressManager;
         private static BlueprintManager _blueprintManager;
-        private static AutomationManager _automationManager;
-        private static WebhookManager _webhookManager;
         private static ApprovalManager _approvalManager;
         private static PlanningManager _planningManager;
         private static ValueCatalogManager _valueCatalogManager;
@@ -122,6 +128,34 @@ namespace KleeneStar.Core
         /// and for deciding who is cleared to see an object carrying one.
         /// </summary>
         public static ISecurityLevelManager SecurityLevelManager => _securityLevelManager ??= ComponentHub.GetComponentManager<SecurityLevelManager>();
+
+        /// <summary>
+        /// Gets the object kinds (document, blog, issue, asset and those of the plugins).
+        /// </summary>
+        /// <remarks>
+        /// Like the other registries below it is answered without a host too - a manager that
+        /// knows the core's own kinds - because these lookups are pure and used from code that
+        /// runs in tests and before the application is up. That stand-in is never cached as the
+        /// manager: once the host is up, the host's manager (which follows the plugins) answers.
+        /// </remarks>
+        public static IObjectKindManager ObjectKindManager => _objectKindManager ?? (_objectKindManager = ComponentHub?.GetComponentManager<ObjectKindManager>()) ?? (_objectKindManagerDetached ??= WebManager.ObjectKindManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the renderers an object is read and written through (prose, form, spreadsheet
+        /// and those of the plugins).
+        /// </summary>
+        public static IObjectRendererManager ObjectRendererManager => _objectRendererManager ?? (_objectRendererManager = ComponentHub?.GetComponentManager<ObjectRendererManager>()) ?? (_objectRendererManagerDetached ??= WebManager.ObjectRendererManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the sources accounts are authenticated by (the internal one, those of the
+        /// plugins and those registered per configuration entry).
+        /// </summary>
+        public static IAuthenticationSourceManager AuthenticationSourceManager => _authenticationSourceManager ?? (_authenticationSourceManager = ComponentHub?.GetComponentManager<AuthenticationSourceManager>()) ?? (_authenticationSourceManagerDetached ??= WebManager.AuthenticationSourceManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the tab types an insight can show.
+        /// </summary>
+        public static IInsightViewTypeManager InsightViewTypeManager => _insightViewTypeManager ?? (_insightViewTypeManager = ComponentHub?.GetComponentManager<InsightViewTypeManager>()) ?? (_insightViewTypeManagerDetached ??= WebManager.InsightViewTypeManager.CreateDetached());
 
         /// <summary>
         /// Gets the form manager responsible for managing forms within the class.
@@ -329,16 +363,6 @@ namespace KleeneStar.Core
         /// Gets the manager keeping the classes that follow a blueprint in step with it.
         /// </summary>
         public static IBlueprintManager BlueprintManager => _blueprintManager ??= ComponentHub.GetComponentManager<BlueprintManager>();
-
-        /// <summary>
-        /// Gets the automation platform: its rules and its persistent job queue.
-        /// </summary>
-        public static IAutomationManager AutomationManager => _automationManager ??= ComponentHub.GetComponentManager<AutomationManager>();
-
-        /// <summary>
-        /// Gets the connections of the workspaces to other systems: incoming and outgoing webhooks.
-        /// </summary>
-        public static IWebhookManager WebhookManager => _webhookManager ??= ComponentHub.GetComponentManager<WebhookManager>();
 
         /// <summary>
         /// Gets the multi-step approvals: the policies and the approvals that follow them.

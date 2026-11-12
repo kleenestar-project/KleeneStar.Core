@@ -68,14 +68,14 @@ namespace KleeneStar.Core.WebFragment.Landing
 
             foreach (var (@event, @object) in entries)
             {
-                var kind = ObjectKindCatalog.GetKind(@object.Kind);
+                var kind = CoreHub.ObjectKindManager.GetKind(@object.Kind);
 
                 list.Add(LandingRow.Build
                 (
                     "landing-activity-" + @event.Id.ToString("N"),
                     WebControl.ObjectIcon.Resolve(@object, kind?.Icon ?? new IconObject()),
                     @object.Summary,
-                    ObjectKindCatalog.ResolveDetailUri(@object),
+                    CoreHub.ObjectKindManager.ResolveDetailUri(@object),
                     meta: LandingHtml.Join(Sentence(@event, renderContext), LandingHtml.Age(@event.Timestamp, renderContext))
                 ));
             }

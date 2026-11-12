@@ -118,7 +118,7 @@ namespace KleeneStar.Core.WebRestApi
                 // nobody signed in has read nothing rather than everything: the marker says what
                 // is new to *this* reader, and there is no reader to speak of
                 Read = identityId == Guid.Empty ? null : CoreHub.ObjectManager.IsRead(identityId, x.Id),
-                Uri = ObjectKindCatalog.ResolveDetailUri(x)?.ToString()
+                Uri = CoreHub.ObjectKindManager.ResolveDetailUri(x)?.ToString()
             })];
         }
 

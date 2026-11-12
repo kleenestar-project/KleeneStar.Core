@@ -1,6 +1,5 @@
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using System;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -24,7 +23,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Work
         [Method(RequestMethod.POST)]
         public IResponse Remove(IRequest request)
         {
-            var payload = AutomationApi.Read<WorkApi.Payload>(request);
+            var payload = JsonApi.Read<WorkApi.Payload>(request);
             var worklog = Guid.TryParse(payload?.Id, out var id) ? CoreHub.PlanningManager.GetWorklog(id) : null;
             var @object = worklog is null ? null : CoreHub.ObjectManager.GetObject(worklog.ObjectId);
 

@@ -26,7 +26,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// couple of dozen rows would be furniture in the way.
     /// <para>
     /// A row carries the object's key and summary and the route into it, which comes from
-    /// <see cref="ObjectKindCatalog"/> - so a shared document opens in the document view
+    /// <see cref="KleeneStar.Core.WebManager.ObjectKindManager"/> - so a shared document opens in the document view
     /// and a watched issue in the issue view without this class knowing either kind. The
     /// row is deliberately one line of text: the client controller flattens a row to a
     /// single text node, so structure placed beneath it would be lost.
@@ -162,7 +162,7 @@ namespace KleeneStar.Core.WebFragment.Landing
         private ControlListItem BuildRow(Model.Entities.Object entry)
         {
             var id = entry.Id.ToString("N");
-            var kind = ObjectKindCatalog.GetKind(entry.Kind);
+            var kind = CoreHub.ObjectKindManager.GetKind(entry.Kind);
             var text = entry.Key + "  " + entry.Summary;
 
             return new ControlListItemLink("landing-" + Key + "-" + id)
@@ -170,7 +170,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                 Text = _ => text,
                 Tooltip = _ => entry.Summary,
                 Icon = _ => ObjectIcon.Resolve(entry, kind?.Icon ?? new IconObject()),
-                Uri = _ => ObjectKindCatalog.ResolveDetailUri(entry)
+                Uri = _ => CoreHub.ObjectKindManager.ResolveDetailUri(entry)
             };
         }
     }

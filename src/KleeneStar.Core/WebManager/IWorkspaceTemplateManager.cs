@@ -41,6 +41,13 @@ namespace KleeneStar.Core.WebManager
         event EventHandler<IWorkspaceTemplateContext> RemoveWorkspaceTemplate;
 
         /// <summary>
+        /// Raised when a template was applied to a workspace - after its structure, pages and
+        /// approval policies, before its default permissions - so a plugin sets up what the core
+        /// does not know, such as automation rules (<c>KleeneStar.Templates</c>).
+        /// </summary>
+        event EventHandler<WebWorkspaceTemplate.WorkspaceTemplateApplication> TemplateApplied;
+
+        /// <summary>
         /// Gets every registered template, ordered by <see cref="IWorkspaceTemplate.Order"/> and
         /// then by key.
         /// </summary>

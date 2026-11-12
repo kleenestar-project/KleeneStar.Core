@@ -53,7 +53,7 @@ namespace KleeneStar.Core.WWW.Objects
                 ? CoreHub.ObjectManager.GetObject(objectId)
                 : null;
 
-            var previewUri = ObjectKindCatalog.ResolvePreviewUri(@object);
+            var previewUri = CoreHub.ObjectKindManager.ResolvePreviewUri(@object);
 
             if (previewUri is not null)
             {

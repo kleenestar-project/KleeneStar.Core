@@ -1,7 +1,6 @@
 using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebRestApi;
-using KleeneStar.Core.WWW.Api._1_.Automation;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -37,14 +36,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
         [Method(RequestMethod.GET)]
         public IResponse Retrieve(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            return AutomationApi.Json(CoreHub.ValueCatalogManager.GetCatalogs(workspace.Id).Select(x => new
+            return JsonApi.Json(CoreHub.ValueCatalogManager.GetCatalogs(workspace.Id).Select(x => new
             {
                 id = x.Id,
                 name = x.Name,
@@ -72,22 +71,22 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Save(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var payload = AutomationApi.Read<CatalogPayload>(request);
+            var payload = JsonApi.Read<CatalogPayload>(request);
 
             if (payload is null)
             {
-                return AutomationApi.Refuse("The request body must describe a catalog.");
+                return JsonApi.Refuse("The request body must describe a catalog.");
             }
 
             var callerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
-            var id = AutomationApi.ParseId(payload.Id);
+            var id = JsonApi.ParseId(payload.Id);
             var catalog = id is { } catalogId ? CoreHub.ValueCatalogManager.GetCatalog(catalogId) : null;
 
             if (id is not null && (catalog is null || (catalog.WorkspaceId is not null && catalog.WorkspaceId != workspace.Id)))
@@ -147,7 +146,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
 
                 if (problems.Count > 0)
                 {
-                    return AutomationApi.Refuse(string.Join(" ", problems));
+                    return JsonApi.Refuse(string.Join(" ", problems));
                 }
 
                 CoreHub.ValueCatalogManager.SaveCatalog(catalog);
@@ -158,11 +157,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
                     CoreHub.ValueCatalogManager.Refresh(catalog.Id);
                 }
 
-                return AutomationApi.Json(new { id = catalog.Id, name = catalog.Name });
+                return JsonApi.Json(new { id = catalog.Id, name = catalog.Name });
             }
             catch (ArgumentException ex)
             {
-                return AutomationApi.Refuse(ex.Message);
+                return JsonApi.Refuse(ex.Message);
             }
         }
 
@@ -203,7 +202,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
             }
             catch (ArgumentException ex)
             {
-                return AutomationApi.Refuse(ex.Message);
+                return JsonApi.Refuse(ex.Message);
             }
         }
 
@@ -217,7 +216,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Catalogs._workspacekey_
         {
             var stored = CoreHub.ValueCatalogManager.GetCatalog(catalog.Id);
 
-            return AutomationApi.Json(new
+            return JsonApi.Json(new
             {
                 changed = version is not null,
                 version = stored?.CurrentVersion,

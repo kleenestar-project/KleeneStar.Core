@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebInsight;
+using KleeneStar.Core.WebManager;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -19,7 +20,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
     /// </summary>
     /// <remarks>
     /// Each tab is bound to the tab template its view type names in the
-    /// <see cref="InsightViewTypeCatalog"/>; a tab whose type nobody registers any more is left
+    /// <see cref="KleeneStar.Core.WebManager.InsightViewTypeManager"/>; a tab whose type nobody registers any more is left
     /// out (and kept), and a template the catalog does not know cannot be added. Reading needs the
     /// right to read the insight's content, arranging - adding, removing, reordering, renaming,
     /// coloring - the right to change it.
@@ -61,7 +62,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
 
             return CoreHub.InsightManager.GetViews(insight.Id)
                 .Where(x => x.State == ObjectViewState.Active)
-                .Select(x => (View: x, Type: InsightViewTypeCatalog.Get(x.ViewType)))
+                .Select(x => (View: x, Type: CoreHub.InsightViewTypeManager.Get(x.ViewType)))
                 .Where(x => x.Type is not null)
                 .Select(x => ToTab(x.View, x.Type, request))
                 .ToList();
@@ -83,8 +84,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 return null;
             }
 
-            var type = InsightViewTypeCatalog.FromTemplateId(templateId)
-                ?? InsightViewTypeCatalog.Get(InsightViewTypeCatalog.Default);
+            var type = CoreHub.InsightViewTypeManager.FromTemplateId(templateId)
+                ?? CoreHub.InsightViewTypeManager.Get(InsightViewTypeManager.Default);
 
             if (type is null)
             {
@@ -94,7 +95,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             var view = new InsightView
             {
                 InsightId = insight.Id,
-                ViewType = InsightViewTypeCatalog.Normalize(type.Key),
+                ViewType = InsightViewTypeManager.Normalize(type.Key),
                 Name = I18N.Translate(request, type.Label),
                 State = ObjectViewState.Active
             };
@@ -224,7 +225,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
                 Title = view.Name,
                 TabColor = view.Color,
                 Icon = (type.Icon as WebExpress.WebUI.WebIcon.Icon)?.Class,
-                TemplateId = InsightViewTypeCatalog.TemplateId(type),
+                TemplateId = InsightViewTypeManager.TemplateId(type),
                 Binding = BuildBinding(view, request)
             };
         }

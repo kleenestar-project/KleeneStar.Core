@@ -54,7 +54,7 @@ namespace KleeneStar.Core.Test.WWW.Api.Classes
         {
             CoreHubFixture.Initialize(nameof(ResolveKindLabel_ReadsTheCatalog));
 
-            var document = ObjectKindCatalog.GetKind(ObjectKind.Document);
+            var document = CoreHub.ObjectKindManager.GetKind(ObjectKind.Document);
 
             Assert.NotNull(document);
 

@@ -70,7 +70,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                         "landing-support-" + key + "-" + page.Id.ToString("N"),
                         icon,
                         page.Summary,
-                        ObjectKindCatalog.ResolveDetailUri(page)
+                        CoreHub.ObjectKindManager.ResolveDetailUri(page)
                     ));
                 }
 

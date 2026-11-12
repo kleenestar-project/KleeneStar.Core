@@ -122,7 +122,7 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The object detail URI, or null if none is available.</returns>
         private static IUri GetUri(Model.Entities.Object @object, IRequest request)
         {
-            return global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog
+            return global::KleeneStar.Core.CoreHub.ObjectKindManager
                 .ResolveDetailUri(@object);
         }
     }

@@ -61,7 +61,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
             }
 
             // dispatch to the detail view matching the object's kind (/issue, /document, …)
-            var target = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog
+            var target = global::KleeneStar.Core.CoreHub.ObjectKindManager
                 .ResolveDetailUri(@object)?
                 .BindParameters(request);
 

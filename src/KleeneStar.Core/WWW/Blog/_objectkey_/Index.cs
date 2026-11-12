@@ -62,7 +62,7 @@ namespace KleeneStar.Core.WWW.Blog._objectkey_
                 (!string.Equals(@object.Kind, Model.Entities.ObjectKind.Blog, StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(@object.Key, objectParameter?.Value, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new RedirectException(ObjectKindCatalog.ResolveDetailUri(@object));
+                throw new RedirectException(CoreHub.ObjectKindManager.ResolveDetailUri(@object));
             }
 
             // record the visit so this post surfaces at the top of the object dropdown's

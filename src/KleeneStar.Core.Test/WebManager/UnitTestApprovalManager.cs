@@ -1,5 +1,4 @@
 using KleeneStar.Core.WebApproval;
-using KleeneStar.Core.WebAutomation;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebWorkflow;
 using KleeneStar.Model;
@@ -347,53 +346,6 @@ namespace KleeneStar.Core.Test.WebManager
             CoreHub.ApprovalManager.Decide(CoreHub.ApprovalManager.GetApprovals(rejectedId)[0].Id, ManagerId, ApprovalVerdict.Reject, "Too risky.");
 
             Assert.Contains(StateOf(rejectedId), new[] { RejectedId.ToString(), "Rejected" });
-        }
-
-        /// <summary>
-        /// A step that takes longer than it may raises <c>approval.overdue</c> once, and a rule
-        /// reacting to it is queued once.
-        /// </summary>
-        [Fact]
-        public void Overdue_IsRaisedOncePerStep()
-        {
-            var database = nameof(Overdue_IsRaisedOncePerStep);
-            Seed(database);
-
-            var policy = Policy("Board: any group:CAB within 4h");
-            var rule = new AutomationRule
-            {
-                Name = "escalate overdue",
-                WorkspaceId = WorkspaceId,
-                Trigger = AutomationTriggerCatalog.ApprovalOverdue,
-                Actions = "escalate",
-                RunAsId = ManagerId,
-                State = AutomationRuleState.Active
-            };
-
-            CoreHub.AutomationManager.AddRule(rule);
-
-            var approval = CoreHub.ApprovalManager.Request(Change(database, "Slow board"), policy.Id, RequesterId, null);
-
-            Assert.Equal(0, CoreHub.ApprovalManager.RaiseOverdue(DateTime.UtcNow.AddHours(3)));
-            Assert.Equal(1, CoreHub.ApprovalManager.RaiseOverdue(DateTime.UtcNow.AddHours(5)));
-            Assert.Equal(1, CoreHub.ApprovalManager.RaiseOverdue(DateTime.UtcNow.AddHours(6)));
-
-            Assert.Single(ModelHub.GetAutomationJobs([rule.Id], null, 10));
-            Assert.Equal(ApprovalState.Pending, CoreHub.ApprovalManager.GetApproval(approval.Id).State);
-        }
-
-        /// <summary>
-        /// A rule's <c>approval</c> line names a policy of its workspace and class.
-        /// </summary>
-        [Fact]
-        public void ApprovalAction_IsValidatedAgainstThePolicies()
-        {
-            Seed(nameof(ApprovalAction_IsValidatedAgainstThePolicies));
-
-            var policy = Policy("Manager: any manager");
-
-            Assert.Empty(CoreHub.AutomationManager.Validate(new AutomationRule { Name = "ok", WorkspaceId = WorkspaceId, Trigger = AutomationTriggerCatalog.ObjectCreated, Actions = $"approval {policy.Name}" }));
-            Assert.Contains(CoreHub.AutomationManager.Validate(new AutomationRule { Name = "no", WorkspaceId = WorkspaceId, Trigger = AutomationTriggerCatalog.ObjectCreated, Actions = "approval nonexistent" }), x => x.StartsWith("Line 1:", StringComparison.Ordinal));
         }
 
         /// <summary>

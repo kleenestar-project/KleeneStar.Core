@@ -168,7 +168,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
         public static string ResolveKindLabel(Model.Entities.Class row, IRequest request)
         {
             var key = Model.Entities.ObjectKind.Normalize(row?.Kind);
-            var kind = ObjectKindCatalog.GetKind(key);
+            var kind = CoreHub.ObjectKindManager.GetKind(key);
 
             if (kind is null)
             {

@@ -9,7 +9,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
     /// <summary>
     /// Base of the tab templates of an insight: the icon, the name and the description the
     /// template picker offers are those of the view type the template draws, read from the
-    /// <see cref="InsightViewTypeCatalog"/>, so a type is described in one place.
+    /// <see cref="KleeneStar.Core.WebManager.InsightViewTypeManager"/>, so a type is described in one place.
     /// </summary>
     public abstract class InsightTabTemplateFragmentBase : FragmentControlDataTabTemplate, IScope
     {
@@ -22,9 +22,9 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
             : base(fragmentContext)
         {
             // the picker emits the raw values, so the i18n keys are translated here
-            Icon = _ => InsightViewTypeCatalog.Get(key)?.Icon;
-            Name = renderContext => I18N.Translate(renderContext, InsightViewTypeCatalog.Get(key)?.Label ?? key);
-            Description = renderContext => I18N.Translate(renderContext, InsightViewTypeCatalog.Get(key)?.Description ?? string.Empty);
+            Icon = _ => CoreHub.InsightViewTypeManager.Get(key)?.Icon;
+            Name = renderContext => I18N.Translate(renderContext, CoreHub.InsightViewTypeManager.Get(key)?.Label ?? key);
+            Description = renderContext => I18N.Translate(renderContext, CoreHub.InsightViewTypeManager.Get(key)?.Description ?? string.Empty);
         }
     }
 }

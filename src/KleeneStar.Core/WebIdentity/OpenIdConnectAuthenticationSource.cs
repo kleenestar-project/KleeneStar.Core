@@ -186,7 +186,7 @@ namespace KleeneStar.Core.WebIdentity
 
                     var source = new OpenIdConnectAuthenticationSource(settings);
 
-                    AuthenticationSourceCatalog.Register(source);
+                    CoreHub.AuthenticationSourceManager.Register(source);
                     componentHub?.IdentityProviderManager?.Register(source, applicationContext);
 
                     registered.Add(source);

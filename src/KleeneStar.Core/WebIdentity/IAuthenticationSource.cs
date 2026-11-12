@@ -9,7 +9,7 @@ namespace KleeneStar.Core.WebIdentity
     /// <remarks>
     /// The core ships one - the internal source, <see cref="LocalAuthenticationSource"/>, whose
     /// passwords this installation keeps - and a plugin adds more through
-    /// <see cref="AuthenticationSourceCatalog.Register"/>: a directory that checks a password
+    /// <see cref="CoreHub.AuthenticationSourceManager.Register"/>: a directory that checks a password
     /// itself (LDAP), or an identity provider the browser is sent to (OpenID Connect, see
     /// <see cref="OpenIdConnectAuthenticationSource"/>). The two questions every surface asks
     /// of a source are the two flags: may the sign-in form's password be checked for this

@@ -79,7 +79,7 @@ namespace KleeneStar.Core.WebFragment.Object
             // the request the pane was fetched with carries this object's key, and re-binding
             // would rewrite the trailing segment of any route that declares one - the frozen
             // form keeps the target pointing at the object the pane is showing
-            var uri = ObjectKindCatalog.ResolveDetailUriFrozen(@object);
+            var uri = CoreHub.ObjectKindManager.ResolveDetailUriFrozen(@object);
 
             if (uri is null)
             {

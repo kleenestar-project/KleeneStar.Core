@@ -43,6 +43,13 @@ namespace KleeneStar.Core.WebManager
         event EventHandler<Approval> ApprovalCompleted;
 
         /// <summary>
+        /// An event that fires when an approval is requested, ends, or a step runs past its
+        /// deadline - for whoever reacts to approvals (the automation plugin). An overdue step
+        /// fires once per check that finds it overdue; a listener deduplicates by approval and step.
+        /// </summary>
+        event EventHandler<WebApproval.ApprovalOccurrence> ApprovalOccurred;
+
+        /// <summary>
         /// Returns the policies of a workspace, or of every workspace.
         /// </summary>
         /// <param name="workspaceId">The workspace, or <see langword="null"/>.</param>

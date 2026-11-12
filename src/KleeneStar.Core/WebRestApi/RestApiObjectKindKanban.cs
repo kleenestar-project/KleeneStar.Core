@@ -12,6 +12,7 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebIndex.Wql;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
 
@@ -143,6 +144,13 @@ namespace KleeneStar.Core.WebRestApi
         {
             return ModelHub.CreateDbContext();
         }
+
+        /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the board
+        /// reads the database. The board filter itself is applied in memory (<see cref="ApplyWql"/>
+        /// leaves the query alone), so this only governs what the framework base would translate.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
 
         /// <summary>
         /// Leaves the query alone: the board filter is applied in memory by <see cref="Narrow"/>,

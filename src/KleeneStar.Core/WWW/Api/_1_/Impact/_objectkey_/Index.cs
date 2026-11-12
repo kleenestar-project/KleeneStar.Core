@@ -115,7 +115,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Impact._objectkey_
                 State = category is null ? null : ObjectBoardProjection.CategoryLabel(category),
                 StateColor = category?.Color ?? NeutralColor,
                 Image = ObjectIcon.Uri(@object),
-                Uri = ObjectKindCatalog.ResolveDetailUri(@object)?.ToString(),
+                Uri = CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString(),
                 Shape = "rect",
                 BackgroundColor = isOrigin ? "var(--wx-primary)" : null,
                 ForegroundColor = isOrigin ? "#ffffff" : null

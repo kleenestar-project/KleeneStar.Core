@@ -163,7 +163,7 @@ namespace KleeneStar.Core.WebFragment.Landing
         private static IControl BuildEntry((Model.Entities.Object Object, StatusCategory Category) item, IRenderControlContext renderContext)
         {
             var @object = item.Object;
-            var kind = ObjectKindCatalog.GetKind(@object.Kind);
+            var kind = CoreHub.ObjectKindManager.GetKind(@object.Kind);
             var workspace = CoreHub.WorkspaceManager?.GetWorkspace(@object.WorkspaceId)?.Name;
 
             return LandingRow.Build
@@ -171,7 +171,7 @@ namespace KleeneStar.Core.WebFragment.Landing
                 "landing-work-" + @object.Id.ToString("N"),
                 ObjectIcon.Resolve(@object, kind?.Icon ?? new IconObject()),
                 @object.Summary,
-                ObjectKindCatalog.ResolveDetailUri(@object),
+                CoreHub.ObjectKindManager.ResolveDetailUri(@object),
                 meta: LandingHtml.Join(@object.Key, workspace, LandingHtml.Age(@object.Updated, renderContext)),
                 trailing: LandingHtml.StateChip(item.Category)
             );

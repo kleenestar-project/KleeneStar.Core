@@ -129,7 +129,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             // arrange
             Seed(nameof(SwitchedProse_SurvivesOpenAutosavePublishAndReload));
-            Assert.True(ObjectRendererCatalog.IsRenderedAs(CoreHub.ClassManager.GetClass(ClassId), ObjectRenderer.Spreadsheet));
+            Assert.True(CoreHub.ObjectRendererManager.IsRenderedAs(CoreHub.ClassManager.GetClass(ClassId), ObjectRenderer.Spreadsheet));
 
             // act: open
             var opened = SpreadsheetWorkbook.Parse(Open());

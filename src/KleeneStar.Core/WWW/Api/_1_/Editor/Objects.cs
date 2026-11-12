@@ -127,7 +127,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Editor
             {
                 key = @object.Key,
                 summary = @object.Summary,
-                uri = ObjectKindCatalog.ResolveDetailUri(@object)?.ToString(),
+                uri = CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString(),
                 icon = ObjectIcon.Uri(@object),
                 kind = @object.Kind,
                 workspace = CoreHub.WorkspaceManager.GetWorkspace(@object.WorkspaceId)?.Name,

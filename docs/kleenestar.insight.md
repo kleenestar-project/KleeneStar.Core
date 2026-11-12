@@ -16,7 +16,7 @@ The tab types the core ships:
 - Calendar - a month, week or agenda grid; moving an entry writes the dates
 - Reports - charts computed from the history of the objects' workflow field
 
-The set of tab types is extensible. There is deliberately no enum of them: `WebInsight/InsightViewTypeCatalog` is an open registry beside the kind, renderer and authentication source catalogs, and a plugin adds a tab type by registering an `IInsightViewType` and declaring a tab template scoped to `InsightTabFragment`. Nothing already written is edited.
+The set of tab types is extensible. There is deliberately no enum of them: `WebManager/InsightViewTypeManager` is an open registry beside the kind, renderer and authentication source managers, and a plugin adds a tab type by shipping a public sealed `IInsightViewType` with a public parameterless constructor (found without registration) and declaring a tab template scoped to `InsightTabFragment`. Nothing already written is edited.
 
 Insights are not embedded in a workspace. They exist on their own in the installation, so a view can aggregate objects across workspaces - restricted, as every read is, to what the reader may see. An insight grants no rights on what it shows: it only selects and presents objects the reader could open anyway, and changing an object through an insight needs the same right it needs anywhere else.
 
@@ -116,7 +116,7 @@ The **reports** are computed from the history of the workflow field, replayed fr
 |Component                       |Role
 |--------------------------------|------------------------------------------------------------------
 |`InsightManager`                |Lifecycle of insights and tabs, board persistence, events.
-|`InsightViewTypeCatalog`        |Open registry of tab types; maps a stored tab to its template and back (`TemplateId`, `FromTemplateId`).
+|`InsightViewTypeManager`        |Open registry of tab types; maps a stored tab to its template and back (`TemplateId`, `FromTemplateId`).
 |`IInsightViewType`              |Descriptor of one tab type (`Key`, `Label`, `Description`, `Icon`, `Order`, `Template`); `CoreInsightViewTypes.cs` holds the core's seven, `Model.Entities.InsightViewTypes` their keys.
 |`InsightScope`                  |The insight of a route, its read/arrange rights and its objects.
 |`InsightQuickfilterBase`        |Base of the two quickfilter endpoints of an insight.

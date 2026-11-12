@@ -70,7 +70,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     // reduced reading view of the object into its pane
                     PrimaryAction = new ActionMasterDetail(ListDetailControl.ControlId)
                     {
-                        Uri = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog.ResolvePreviewUri(x),
+                        Uri = global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolvePreviewUri(x),
                         Item = x.Id.ToString()
                     }.ToJson()
                 });

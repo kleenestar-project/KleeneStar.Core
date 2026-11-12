@@ -51,7 +51,7 @@ namespace KleeneStar.Core.WWW.Objects
                 ? CoreHub.ObjectManager.GetObject(objectId)
                 : null;
 
-            var detailUri = ObjectKindCatalog.ResolveDetailUri(@object);
+            var detailUri = CoreHub.ObjectKindManager.ResolveDetailUri(@object);
 
             if (detailUri is not null)
             {

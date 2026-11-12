@@ -1,5 +1,5 @@
 using KleeneStar.Core.WebAttribute;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model.Entities;
 using System;
 using System.Linq;
@@ -39,14 +39,14 @@ namespace KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_
         [Method(RequestMethod.GET)]
         public IResponse Retrieve(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            return AutomationApi.Json(CoreHub.ApprovalManager.GetPolicies(workspace.Id).Select(ToDto));
+            return JsonApi.Json(CoreHub.ApprovalManager.GetPolicies(workspace.Id).Select(ToDto));
         }
 
         /// <summary>
@@ -57,21 +57,21 @@ namespace KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Save(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var payload = AutomationApi.Read<PolicyPayload>(request);
+            var payload = JsonApi.Read<PolicyPayload>(request);
 
             if (payload is null)
             {
-                return AutomationApi.Refuse("The request body must describe an approval policy.");
+                return JsonApi.Refuse("The request body must describe an approval policy.");
             }
 
-            var id = AutomationApi.ParseId(payload.Id);
+            var id = JsonApi.ParseId(payload.Id);
             var existing = id is { } policyId ? CoreHub.ApprovalManager.GetPolicy(policyId) : null;
 
             if (id is not null && (existing is null || existing.WorkspaceId != workspace.Id))
@@ -89,22 +89,22 @@ namespace KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_
 
             policy.Name = payload.Name?.Trim();
             policy.Description = string.IsNullOrWhiteSpace(payload.Description) ? null : payload.Description.Trim();
-            policy.ClassId = AutomationApi.ParseId(payload.ClassId) ?? Guid.Empty;
+            policy.ClassId = JsonApi.ParseId(payload.ClassId) ?? Guid.Empty;
             policy.Steps = payload.Steps?.Replace("\r\n", "\n");
             policy.State = string.Equals(payload.State, "disabled", StringComparison.OrdinalIgnoreCase)
                 ? ApprovalPolicyState.Disabled
                 : ApprovalPolicyState.Active;
             policy.AllowSelfApproval = string.Equals(payload.AllowSelfApproval, "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(payload.AllowSelfApproval, "on", StringComparison.OrdinalIgnoreCase);
-            policy.RequestStatusId = AutomationApi.ParseId(payload.RequestStatusId);
-            policy.ApprovedStatusId = AutomationApi.ParseId(payload.ApprovedStatusId);
-            policy.RejectedStatusId = AutomationApi.ParseId(payload.RejectedStatusId);
+            policy.RequestStatusId = JsonApi.ParseId(payload.RequestStatusId);
+            policy.ApprovedStatusId = JsonApi.ParseId(payload.ApprovedStatusId);
+            policy.RejectedStatusId = JsonApi.ParseId(payload.RejectedStatusId);
 
             var problems = CoreHub.ApprovalManager.Validate(policy);
 
             if (problems.Count > 0)
             {
-                return AutomationApi.Refuse(string.Join(" ", problems));
+                return JsonApi.Refuse(string.Join(" ", problems));
             }
 
             if (existing is null)
@@ -116,7 +116,7 @@ namespace KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_
                 CoreHub.ApprovalManager.UpdatePolicy(policy);
             }
 
-            return AutomationApi.Json(ToDto(CoreHub.ApprovalManager.GetPolicy(policy.Id)));
+            return JsonApi.Json(ToDto(CoreHub.ApprovalManager.GetPolicy(policy.Id)));
         }
 
         /// <summary>

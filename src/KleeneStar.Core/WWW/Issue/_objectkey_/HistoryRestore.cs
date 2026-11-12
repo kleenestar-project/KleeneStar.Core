@@ -80,7 +80,7 @@ namespace KleeneStar.Core.WWW.Issue._objectkey_
 
             throw new RedirectException
             (
-                ObjectKindCatalog.ResolveDetailUri(@object)?.BindParameters(renderContext.Request)
+                CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.BindParameters(renderContext.Request)
                     ?? CoreHub.GetUri<Index>().BindParameters(new ObjectKeyParameter(keyParameter?.Value))
             );
         }

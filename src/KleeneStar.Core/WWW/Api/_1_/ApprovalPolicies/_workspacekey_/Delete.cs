@@ -1,4 +1,4 @@
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -33,14 +33,14 @@ namespace KleeneStar.Core.WWW.Api._1_.ApprovalPolicies._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Remove(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var id = AutomationApi.ParseId(AutomationApi.Read<AutomationApi.IdPayload>(request)?.Id);
+            var id = JsonApi.ParseId(JsonApi.Read<JsonApi.IdPayload>(request)?.Id);
             var policy = id is { } policyId ? CoreHub.ApprovalManager.GetPolicy(policyId) : null;
 
             if (policy is null || policy.WorkspaceId != workspace.Id)

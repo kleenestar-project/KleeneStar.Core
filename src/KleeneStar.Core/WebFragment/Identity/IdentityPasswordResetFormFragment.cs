@@ -84,7 +84,7 @@ namespace KleeneStar.Core.WebFragment.Identity
                 ? "kleenestar.core:setting.identity.password.validation.unknown"
                 : !AccountAuthorization.IsAdministrator(renderContext.Request)
                     ? "kleenestar.core:setting.identity.password.validation.forbidden"
-                    : !AuthenticationSourceCatalog.ManagesPassword(account)
+                    : !CoreHub.AuthenticationSourceManager.ManagesPassword(account)
                         ? "kleenestar.core:setting.identity.password.validation.external"
                         : null;
 

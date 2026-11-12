@@ -13,7 +13,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// <remarks>
     /// The set of renderers is open, exactly as the set of kinds is: a plugin introduces
     /// one by implementing this interface, registering it in the
-    /// <see cref="ObjectRendererCatalog"/>, and contributing the fragments that draw it -
+    /// <see cref="KleeneStar.Core.WebManager.ObjectRendererManager"/>, and contributing the fragments that draw it -
     /// each gated on <see cref="ObjectRendererCondition"/> so it appears only where its
     /// key is the one the class named. Nothing else in the application has to know the
     /// renderer exists.

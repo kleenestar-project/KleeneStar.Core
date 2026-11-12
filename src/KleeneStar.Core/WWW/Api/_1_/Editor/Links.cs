@@ -107,7 +107,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Editor
         /// <returns>The target, or <see langword="null"/> when the object has no page.</returns>
         private static object Project(ObjectEntity @object)
         {
-            var uri = ObjectKindCatalog.ResolveDetailUri(@object)?.ToString();
+            var uri = CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString();
 
             if (string.IsNullOrWhiteSpace(uri))
             {

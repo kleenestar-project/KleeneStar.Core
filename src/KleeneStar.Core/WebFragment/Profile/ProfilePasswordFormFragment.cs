@@ -103,9 +103,9 @@ namespace KleeneStar.Core.WebFragment.Profile
                 return null;
             }
 
-            if (!AuthenticationSourceCatalog.ManagesPassword(account))
+            if (!CoreHub.AuthenticationSourceManager.ManagesPassword(account))
             {
-                var source = AuthenticationSourceCatalog.Resolve(account);
+                var source = CoreHub.AuthenticationSourceManager.Resolve(account);
                 var name = source is null ? account.AuthenticationSource : I18N.Translate(renderContext, source.Name);
 
                 return new ControlAlert("profile-password-external")

@@ -12,7 +12,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// The set of kinds is open: add-ons introduce a new kind by implementing this
-    /// interface, registering the descriptor in the <see cref="ObjectKindCatalog"/>
+    /// interface, registering the descriptor in the <see cref="KleeneStar.Core.WebManager.ObjectKindManager"/>
     /// (typically from their plugin initialization), contributing an overview page,
     /// and deriving a sidebar link from <see cref="ObjectKindSidebarLinkFragment"/>.
     /// The persisted counterpart of a descriptor is the plain string key stored in

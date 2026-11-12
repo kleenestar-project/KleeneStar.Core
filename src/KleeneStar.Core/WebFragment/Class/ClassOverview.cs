@@ -170,8 +170,8 @@ namespace KleeneStar.Core.WebFragment.Class
             var classId = new ClassIdParameter(@class.Id);
             var kind = ObjectKind.Normalize(@class.Kind);
             var tracksWork = kind is ObjectKind.Issue or ObjectKind.Asset;
-            var structured = ObjectRendererCatalog.IsStructured(@class);
-            var serviceLevels = ObjectKindCatalog.GetKind(@class.Kind)?.ServiceLevels ?? true;
+            var structured = CoreHub.ObjectRendererManager.IsStructured(@class);
+            var serviceLevels = CoreHub.ObjectKindManager.GetKind(@class.Kind)?.ServiceLevels ?? true;
 
             // the workflow is what gives an object a state; a work item without one cannot move
             var workflows = CoreHub.WorkflowManager.GetWorkflows(classId).ToList();

@@ -1,5 +1,5 @@
 using KleeneStar.Core.WebAttribute;
-using KleeneStar.Core.WWW.Api._1_.Automation;
+using KleeneStar.Core.WebRestApi;
 using System;
 using System.Linq;
 using WebExpress.WebCore.WebAttribute;
@@ -31,7 +31,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
         [Method(RequestMethod.GET)]
         public IResponse Retrieve(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
 
             var now = DateTime.UtcNow;
 
-            return AutomationApi.Json(new
+            return JsonApi.Json(new
             {
                 timeTracking = CoreHub.PlanningManager.IsTimeTracking(workspace.Id),
                 team = CoreHub.PlanningManager.GetTeamLoad(workspace.Id, now).Select(x => new
@@ -84,18 +84,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Planning._workspacekey_
         [Method(RequestMethod.POST)]
         public IResponse Save(IRequest request)
         {
-            var refusal = AutomationApi.Authorize(request, out var workspace);
+            var refusal = JsonApi.Authorize(request, out var workspace);
 
             if (refusal is not null)
             {
                 return refusal;
             }
 
-            var payload = AutomationApi.Read<SettingsPayload>(request);
+            var payload = JsonApi.Read<SettingsPayload>(request);
 
             if (!bool.TryParse(payload?.TimeTracking, out var enabled))
             {
-                return AutomationApi.Refuse("Say whether time is tracked: true or false.");
+                return JsonApi.Refuse("Say whether time is tracked: true or false.");
             }
 
             CoreHub.PlanningManager.SetTimeTracking(workspace.Id, enabled);

@@ -914,7 +914,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     created = true,
                     id = @object.Id,
                     key = @object.Key,
-                    uri = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog.ResolveDetailUri(@object)?.ToString()
+                    uri = global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString()
                 }
             };
         }

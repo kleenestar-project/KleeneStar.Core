@@ -162,7 +162,7 @@ namespace KleeneStar.Core.WebRestApi
         {
             return new ActionFrame("object-view-frame")
             {
-                Uri = global::KleeneStar.Core.WebFragment.Object.ObjectKindCatalog
+                Uri = global::KleeneStar.Core.CoreHub.ObjectKindManager
                         .ResolveDetailUri(item)
             };
         }

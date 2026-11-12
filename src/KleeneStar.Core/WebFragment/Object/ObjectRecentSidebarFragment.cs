@@ -29,7 +29,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// objects will appear. Header and entries are emitted as siblings via
     /// <see cref="HtmlList"/> so the sidebar parser picks each of them up as a regular
     /// sidebar item (a wrapper element would be skipped). Entry URIs are frozen through
-    /// <see cref="ObjectKindCatalog.ResolveDetailUriFrozen"/> so the sidebar's request
+    /// <see cref="CoreHub.ObjectKindManager.ResolveDetailUriFrozen"/> so the sidebar's request
     /// re-bind on a detail page cannot repoint every entry at the current object.
     /// </remarks>
     public abstract class ObjectRecentSidebarFragment : FragmentControlSidebarItemLink
@@ -122,7 +122,7 @@ namespace KleeneStar.Core.WebFragment.Object
                     Tooltip = _ => entry.Key,
                     // frozen so the sidebar's request re-bind cannot repoint every entry at
                     // the currently displayed object (see ResolveDetailUriFrozen)
-                    Uri = _ => ObjectKindCatalog.ResolveDetailUriFrozen(entry),
+                    Uri = _ => CoreHub.ObjectKindManager.ResolveDetailUriFrozen(entry),
                     Icon = _ => ObjectIcon.Resolve(entry, new IconObject()),
                     Active = _ => string.Equals(entry.Key, currentKey, StringComparison.OrdinalIgnoreCase)
                         ? TypeActive.Active

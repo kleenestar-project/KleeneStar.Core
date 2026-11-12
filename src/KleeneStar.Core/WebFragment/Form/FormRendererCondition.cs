@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Form
     /// the two answers this condition gives, the way the reading views of an object are gated
     /// on <see cref="ObjectRendererCondition"/>.
     /// <para>
-    /// The answer is the effective renderer of the class, <see cref="ObjectRendererCatalog.ResolveKey(Model.Entities.Class)"/>,
+    /// The answer is the effective renderer of the class, <see cref="CoreHub.ObjectRendererManager.ResolveKey(Model.Entities.Class)"/>,
     /// not the stored key: a class that names nothing follows its kind, and a blog class that
     /// stored <c>form</c> before its kind declined it reads as prose. A route that names no
     /// form, or a form whose class is gone, is neither prose nor structured - both fragments
@@ -48,7 +48,7 @@ namespace KleeneStar.Core.WebFragment.Form
             }
 
             // a workbook arranges no fields either, so it is answered like prose
-            return !ObjectRendererCatalog.IsStructured(@class) == Prose;
+            return !CoreHub.ObjectRendererManager.IsStructured(@class) == Prose;
         }
 
         /// <summary>

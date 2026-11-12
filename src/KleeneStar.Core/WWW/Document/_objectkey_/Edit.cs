@@ -62,7 +62,7 @@ namespace KleeneStar.Core.WWW.Document._objectkey_
             if (@object is not null &&
                 !string.Equals(@object.Kind, Model.Entities.ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
             {
-                throw new RedirectException(ObjectKindCatalog.ResolveDetailUri(@object));
+                throw new RedirectException(CoreHub.ObjectKindManager.ResolveDetailUri(@object));
             }
 
             // the breadcrumb mirrors the reading view; its object crumb links back to the

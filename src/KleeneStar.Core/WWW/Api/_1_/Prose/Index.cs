@@ -137,7 +137,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Prose
         /// <returns>True for a workbook body.</returns>
         internal static bool IsSpreadsheet(Model.Entities.Object @object)
         {
-            return @object is not null && global::KleeneStar.Core.WebFragment.Object.ObjectRendererCatalog.IsRenderedAs
+            return @object is not null && global::KleeneStar.Core.CoreHub.ObjectRendererManager.IsRenderedAs
             (
                 CoreHub.ClassManager.GetClass(@object.ClassId),
                 Model.Entities.ObjectRenderer.Spreadsheet
