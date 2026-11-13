@@ -60,8 +60,9 @@ namespace KleeneStar.Core.Test.WebFragment
 
         /// <summary>
         /// The include is a discoverable plugin include, names the embedded script, and is
-        /// scoped to exactly the detail pages - a list page must not reload because a row was
-        /// edited in a dialog; its table refreshes on its own.
+        /// scoped to exactly the detail pages and the document overview, which shows the home
+        /// page and its editor. A list page must not reload because a row was edited in a dialog;
+        /// its table refreshes on its own.
         /// </summary>
         [Fact]
         public void Include_IsScopedToTheDetailPages()
@@ -72,7 +73,18 @@ namespace KleeneStar.Core.Test.WebFragment
             Assert.True(type.IsSealed && type.IsPublic);
             Assert.True(typeof(IInclude).IsAssignableFrom(type));
             Assert.NotNull(asset);
-            Assert.Equal(DetailPages.OrderBy(x => x.FullName), Scopes(type).OrderBy(x => x.FullName));
+            Assert.Equal
+            (
+                DetailPages.Append(typeof(global::KleeneStar.Core.WWW.Documents._workspacekey_.Index)).OrderBy(x => x.FullName),
+                Scopes(type).OrderBy(x => x.FullName)
+            );
+
+            // on the overview the home page's own fragment names the object the script reloads for
+            Assert.Equal
+            (
+                [typeof(global::KleeneStar.Core.WWW.Documents._workspacekey_.Index)],
+                Scopes(typeof(global::KleeneStar.Core.WebFragment.Object.Documents.DocumentHomeRefreshFragment))
+            );
         }
 
         /// <summary>

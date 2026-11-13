@@ -472,10 +472,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             fieldMap.BindTo(newItem);
 
+            // the home page is created below; a payload cannot reference one
+            newItem.HomeId = null;
+
             CoreHub.WorkspaceManager.Add(newItem);
 
             ApplyTemplate(fieldMap, newItem, request);
             ApplyBlueprint(fieldMap, newItem);
+            EnsureHome(newItem, request);
             RecordCreationAsVisit(newItem, request);
 
             return new RestApiCrudResultCreate();
@@ -619,9 +623,29 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             fieldMap.BindTo(newItem);
 
+            // the original's home page belongs to the original
+            newItem.HomeId = null;
+
             CoreHub.WorkspaceManager.Add(newItem);
 
+            EnsureHome(newItem, request);
+
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Creates the home page of a new workspace unless the template created it already.
+        /// </summary>
+        /// <param name="workspace">The workspace that was just created.</param>
+        /// <param name="request">The request, naming the author and the language of the page.</param>
+        private static void EnsureHome(Workspace workspace, IRequest request)
+        {
+            CoreHub.WorkspaceManager.EnsureHome
+            (
+                workspace.Id,
+                CoreHub.SessionManager.GetCurrentIdentityId(request),
+                request?.Culture
+            );
         }
 
         /// <summary>
@@ -643,6 +667,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // request still answers 200. So it is taken out of the payload before the binder sees
             // it, decoded, and written to the icons directory. See AvatarStorage.
             var avatarSent = payload.Detach(nameof(Workspace.Icon), out var avatar);
+
+            // the home page is the workspace's dedicated document; it is not re-pointed through
+            // the workspace's own form or a hand-written payload
+            payload.Detach(nameof(Workspace.HomeId), out _);
 
             var res = base.Update(existingItem, payload, request);
 

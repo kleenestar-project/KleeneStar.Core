@@ -1,4 +1,5 @@
 using KleeneStar.Model.Entities;
+using WebExpress.WebIndex.Queries;
 
 namespace KleeneStar.Core.Test.WebManager
 {
@@ -307,116 +308,313 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
-        /// Without a choice the home page is the first root of the page tree by summary — which
-        /// is what the overview showed before the setting existed, and is an accident of
-        /// alphabetical order rather than a decision.
+        /// A workspace without a document class gets its home page in a class <c>Page</c>
+        /// created for it, and the page is named as the workspace's home page.
         /// </summary>
         [Fact]
-        public void GetHome_WithoutChoice_FallsBackToFirstRoot()
+        public void EnsureHome_CreatesDedicatedPageAndClass()
         {
-            Seed(nameof(GetHome_WithoutChoice_FallsBackToFirstRoot));
+            Seed(nameof(EnsureHome_CreatesDedicatedPageAndClass));
 
             var workspace = Sample("home1");
             CoreHub.WorkspaceManager.Add(workspace);
 
-            var beta = Document(workspace.Id, "Beta");
-            var alpha = Document(workspace.Id, "Alpha");
-            var child = Document(workspace.Id, "Aardvark", alpha.Id);
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
 
-            Assert.NotNull(child);
-            Assert.Equal(alpha.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
-            Assert.NotEqual(beta.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
+            Assert.NotNull(home);
+            Assert.Equal(ObjectKind.Document, home.Kind);
+            Assert.Null(home.ParentId);
+            Assert.Equal(home.Id, CoreHub.WorkspaceManager.GetWorkspace(workspace.Id).HomeId);
+            Assert.Equal(home.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
+            Assert.True(CoreHub.WorkspaceManager.IsHome(home));
+            Assert.True(CoreHub.WorkspaceManager.IsHome(workspace.Id, home.Id));
+
+            var host = CoreHub.ClassManager.GetClass(home.ClassId);
+
+            Assert.Equal("Page", host?.Name);
+            Assert.Equal(ObjectKind.Document, host?.Kind);
         }
 
         /// <summary>
-        /// A chosen document wins over the fallback, and clearing the choice returns to it —
-        /// which is what the more menu's second state does.
+        /// Ensuring twice writes one page: the second call answers the page the first wrote.
         /// </summary>
         [Fact]
-        public void SetHome_ChoosesAndClears()
+        public void EnsureHome_IsIdempotent()
         {
-            Seed(nameof(SetHome_ChoosesAndClears));
+            Seed(nameof(EnsureHome_IsIdempotent));
 
             var workspace = Sample("home2");
             CoreHub.WorkspaceManager.Add(workspace);
 
-            var alpha = Document(workspace.Id, "Alpha");
-            var zulu = Document(workspace.Id, "Zulu");
+            var first = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+            var second = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
 
-            CoreHub.WorkspaceManager.SetHome(workspace.Id, zulu.Id);
+            Assert.Equal(first.Id, second.Id);
 
-            Assert.Equal(zulu.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
-            Assert.True(CoreHub.WorkspaceManager.IsHome(workspace.Id, zulu.Id));
-            Assert.False(CoreHub.WorkspaceManager.IsHome(workspace.Id, alpha.Id));
+            var documents = CoreHub.ObjectManager.GetObjects(new Query<Model.Entities.Object>()
+                .WhereEquals(x => x.WorkspaceId, workspace.Id));
 
-            CoreHub.WorkspaceManager.SetHome(workspace.Id, null);
-
-            Assert.Equal(alpha.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
-
-            // the fallback is not a choice: nothing offers to reset what nobody set
-            Assert.False(CoreHub.WorkspaceManager.IsHome(workspace.Id, alpha.Id));
+            Assert.Single(documents);
+            Assert.Single(CoreHub.ClassManager.GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspace.Id)));
         }
 
         /// <summary>
-        /// Only a document of this workspace may be chosen. Anything else changes nothing rather
-        /// than storing an id the overview would silently ignore.
+        /// The page is written into the document class rendered as prose, not into the
+        /// spreadsheet class, and no further class is created.
         /// </summary>
         [Fact]
-        public void SetHome_RefusesWhatIsNotItsDocument()
+        public void EnsureHome_UsesTheWorkspacesProseClass()
         {
-            Seed(nameof(SetHome_RefusesWhatIsNotItsDocument));
+            Seed(nameof(EnsureHome_UsesTheWorkspacesProseClass));
 
             var workspace = Sample("home3");
-            var other = Sample("home4");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            var sheets = DocumentClass(workspace.Id, "Calculation", ObjectRenderer.Spreadsheet);
+            var pages = DocumentClass(workspace.Id, "Knowledge");
+
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+
+            Assert.Equal(pages.Id, home.ClassId);
+            Assert.NotEqual(sheets.Id, home.ClassId);
+            Assert.Equal(2, CoreHub.ClassManager.GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspace.Id)).Count());
+        }
+
+        /// <summary>
+        /// There is no fallback: a workspace whose documents are all pages of its tree has no
+        /// home page until one is created for it.
+        /// </summary>
+        [Fact]
+        public void GetHome_WithoutHomePage_IsNull()
+        {
+            Seed(nameof(GetHome_WithoutHomePage_IsNull));
+
+            var workspace = Sample("home4");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            Document(workspace.Id, "Alpha");
+            Document(workspace.Id, "Beta");
+
+            Assert.Null(CoreHub.WorkspaceManager.GetHome(workspace.Id));
+        }
+
+        /// <summary>
+        /// A stored id that references a document of another workspace or an issue is no home
+        /// page.
+        /// </summary>
+        [Fact]
+        public void GetHome_IgnoresWhatIsNotItsDocument()
+        {
+            Seed(nameof(GetHome_IgnoresWhatIsNotItsDocument));
+
+            var workspace = Sample("home5");
+            var other = Sample("home6");
             CoreHub.WorkspaceManager.Add(workspace);
             CoreHub.WorkspaceManager.Add(other);
 
-            var mine = Document(workspace.Id, "Mine");
             var theirs = Document(other.Id, "Theirs");
             var issue = Document(workspace.Id, "An issue", kind: ObjectKind.Issue);
 
-            Assert.Null(CoreHub.WorkspaceManager.SetHome(workspace.Id, theirs.Id));
-            Assert.Null(CoreHub.WorkspaceManager.SetHome(workspace.Id, issue.Id));
-            Assert.Null(CoreHub.WorkspaceManager.SetHome(Guid.NewGuid(), mine.Id));
+            PointHomeAt(workspace.Id, theirs.Id);
+            Assert.Null(CoreHub.WorkspaceManager.GetHome(workspace.Id));
 
-            Assert.False(CoreHub.WorkspaceManager.IsHome(workspace.Id, theirs.Id));
-            Assert.Null(CoreHub.WorkspaceManager.GetWorkspace(workspace.Id).HomeId);
+            PointHomeAt(workspace.Id, issue.Id);
+            Assert.Null(CoreHub.WorkspaceManager.GetHome(workspace.Id));
+            Assert.False(CoreHub.WorkspaceManager.IsHome(issue));
         }
 
         /// <summary>
-        /// A chosen document that has since been deleted falls back rather than leaving the
-        /// overview with nothing to show.
+        /// A referenced document with children is not adopted: it stays in the tree and a new
+        /// home page is created.
         /// </summary>
         [Fact]
-        public void GetHome_StaleChoiceFallsBack()
+        public void EnsureHome_LeavesATreePageInTheTree()
         {
-            Seed(nameof(GetHome_StaleChoiceFallsBack));
+            Seed(nameof(EnsureHome_LeavesATreePageInTheTree));
 
-            var workspace = Sample("home5");
+            var workspace = Sample("home7");
             CoreHub.WorkspaceManager.Add(workspace);
+
+            DocumentClass(workspace.Id, "Knowledge");
 
             var alpha = Document(workspace.Id, "Alpha");
-            var zulu = Document(workspace.Id, "Zulu");
+            var child = Document(workspace.Id, "Aardvark", alpha.Id);
 
-            CoreHub.WorkspaceManager.SetHome(workspace.Id, zulu.Id);
-            CoreHub.ObjectManager.Remove(zulu.Id);
+            PointHomeAt(workspace.Id, alpha.Id);
 
-            Assert.Equal(alpha.Id, CoreHub.WorkspaceManager.GetHome(workspace.Id)?.Id);
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+
+            Assert.NotEqual(alpha.Id, home.Id);
+            Assert.NotNull(CoreHub.ObjectManager.GetObject(alpha.Id));
+            Assert.Equal(alpha.Id, CoreHub.ObjectManager.GetObject(child.Id)?.ParentId);
+            Assert.False(CoreHub.WorkspaceManager.IsHome(alpha));
+            Assert.True(CoreHub.WorkspaceManager.IsHome(home));
         }
 
         /// <summary>
-        /// A workspace holding no documents has no home page, and the overview says so instead
-        /// of rendering an empty card.
+        /// The home page stands outside the page tree: nothing is hung beneath it, and it is
+        /// hung beneath nothing.
         /// </summary>
         [Fact]
-        public void GetHome_WithoutDocuments_IsNull()
+        public void SetParent_KeepsTheHomePageOutOfTheTree()
         {
-            Seed(nameof(GetHome_WithoutDocuments_IsNull));
+            Seed(nameof(SetParent_KeepsTheHomePageOutOfTheTree));
 
-            var workspace = Sample("home6");
+            var workspace = Sample("home8");
             CoreHub.WorkspaceManager.Add(workspace);
 
-            Assert.Null(CoreHub.WorkspaceManager.GetHome(workspace.Id));
+            DocumentClass(workspace.Id, "Knowledge");
+
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+            var page = Document(workspace.Id, "Page");
+
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(page.Id, home.Id));
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.SetParent(home.Id, page.Id));
+        }
+
+        /// <summary>
+        /// Creating an object below the home page is refused, like a move below it. Without the
+        /// check a child would make the home page a page of the tree, and the next start would
+        /// replace it.
+        /// </summary>
+        [Fact]
+        public void Add_BeneathTheHomePage_IsRefused()
+        {
+            Seed(nameof(Add_BeneathTheHomePage_IsRefused));
+
+            var workspace = Sample("home9");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            DocumentClass(workspace.Id, "Knowledge");
+
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+
+            Assert.Throws<InvalidOperationException>(() => Document(workspace.Id, "Child", home.Id));
+            Assert.Empty(CoreHub.ObjectManager.GetObjects(new Query<Model.Entities.Object>()
+                .Where(x => x.ParentId == (Guid?)home.Id)));
+        }
+
+        /// <summary>
+        /// A parent written through an update rather than a move is held to the same rule, in
+        /// both directions.
+        /// </summary>
+        [Fact]
+        public void Update_PuttingTheHomePageIntoTheTree_IsRefused()
+        {
+            Seed(nameof(Update_PuttingTheHomePageIntoTheTree_IsRefused));
+
+            var workspace = Sample("home10");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            DocumentClass(workspace.Id, "Knowledge");
+
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+            var page = Document(workspace.Id, "Page");
+
+            var child = CoreHub.ObjectManager.GetObject(page.Id);
+            child.ParentId = home.Id;
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.Update(child));
+
+            var moved = CoreHub.ObjectManager.GetObject(home.Id);
+            moved.ParentId = page.Id;
+            Assert.Throws<InvalidOperationException>(() => CoreHub.ObjectManager.Update(moved));
+
+            Assert.Null(CoreHub.ObjectManager.GetObject(page.Id)?.ParentId);
+            Assert.Null(CoreHub.ObjectManager.GetObject(home.Id)?.ParentId);
+        }
+
+        /// <summary>
+        /// A referenced document with comments is not adopted, because the home page shows no
+        /// comments. A new home page is created.
+        /// </summary>
+        [Fact]
+        public void EnsureHome_LeavesACommentedPageAPage()
+        {
+            Seed(nameof(EnsureHome_LeavesACommentedPageAPage));
+
+            var workspace = Sample("home11");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            DocumentClass(workspace.Id, "Knowledge");
+
+            var discussed = Document(workspace.Id, "Discussed");
+
+            CoreHub.CommentManager.Add(new Comment
+            {
+                Id = Guid.NewGuid(),
+                ObjectId = discussed.Id,
+                AuthorId = Guid.NewGuid(),
+                Content = "A thought.",
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            });
+
+            PointHomeAt(workspace.Id, discussed.Id);
+
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspace.Id);
+
+            Assert.NotEqual(discussed.Id, home.Id);
+            Assert.False(CoreHub.WorkspaceManager.IsHome(discussed));
+            Assert.True(CoreHub.WorkspaceManager.IsHome(home));
+        }
+
+        /// <summary>
+        /// A referenced document without parent, children and comments is adopted as the home
+        /// page.
+        /// </summary>
+        [Fact]
+        public void EnsureHome_TakesOverAnUnusedPage()
+        {
+            Seed(nameof(EnsureHome_TakesOverAnUnusedPage));
+
+            var workspace = Sample("home12");
+            CoreHub.WorkspaceManager.Add(workspace);
+
+            DocumentClass(workspace.Id, "Knowledge");
+
+            var welcome = Document(workspace.Id, "Welcome");
+
+            PointHomeAt(workspace.Id, welcome.Id);
+
+            Assert.Equal(welcome.Id, CoreHub.WorkspaceManager.EnsureHome(workspace.Id)?.Id);
+        }
+
+        /// <summary>
+        /// Sets <see cref="Workspace.HomeId"/> directly.
+        /// </summary>
+        /// <param name="workspaceId">The workspace.</param>
+        /// <param name="objectId">The document.</param>
+        private static void PointHomeAt(Guid workspaceId, Guid objectId)
+        {
+            var workspace = CoreHub.WorkspaceManager.GetWorkspace(workspaceId);
+            workspace.HomeId = objectId;
+            CoreHub.WorkspaceManager.Update(workspace);
+        }
+
+        /// <summary>
+        /// Creates a document class in a workspace.
+        /// </summary>
+        /// <param name="workspaceId">The owning workspace.</param>
+        /// <param name="name">The class name.</param>
+        /// <param name="renderer">The renderer, or null to follow the kind (prose).</param>
+        /// <returns>The created class.</returns>
+        private static Class DocumentClass(Guid workspaceId, string name, string renderer = null)
+        {
+            var @class = new Class
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                Kind = ObjectKind.Document,
+                Renderer = renderer,
+                WorkspaceId = workspaceId,
+                State = ClassState.Active,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            };
+
+            CoreHub.ClassManager.Add(@class);
+
+            return @class;
         }
 
         /// <summary>

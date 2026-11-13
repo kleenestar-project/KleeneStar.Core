@@ -21,6 +21,7 @@ namespace KleeneStar.Core.WebInclude
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
     public sealed class IncludeObjectRefreshScript : IInclude
     {
     }

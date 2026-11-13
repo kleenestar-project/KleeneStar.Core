@@ -121,11 +121,12 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Resolves the object the request addresses.
+        /// Resolves the object the request addresses. The default reads the object key of the
+        /// route.
         /// </summary>
         /// <param name="renderContext">The render context carrying the object key.</param>
         /// <returns>The object, or <see langword="null"/>.</returns>
-        private static Model.Entities.Object ResolveObject(IRenderControlContext renderContext)
+        protected virtual Model.Entities.Object ResolveObject(IRenderControlContext renderContext)
         {
             return CoreHub.ObjectManager.GetObjectByKey(renderContext?.Request?.GetParameter<ObjectKeyParameter>());
         }

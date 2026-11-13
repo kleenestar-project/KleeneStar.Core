@@ -64,6 +64,13 @@ namespace KleeneStar.Core.WWW.Document._objectkey_
                 throw new RedirectException(CoreHub.ObjectKindManager.ResolveDetailUri(@object));
             }
 
+            // the home page has no detail page; it is read and edited on the document overview
+            if (CoreHub.WorkspaceManager.IsHome(@object))
+            {
+                throw new RedirectException(CoreHub.GetUri<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>()
+                    .BindParameters(new WorkspaceKeyParameter(CoreHub.WorkspaceManager.GetWorkspace(@object.WorkspaceId)?.Key)));
+            }
+
             // record the visit so this document surfaces at the top of the object
             // dropdown's "recently used" list; a detail page is also a subpage of its
             // workspace, so the workspace recency is advanced too

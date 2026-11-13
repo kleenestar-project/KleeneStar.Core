@@ -40,9 +40,10 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            // a workspace opens on the document overview, which shows its home page
             throw new RedirectException
             (
-                CoreHub.GetUri<Issues._workspacekey_.Index>()
+                CoreHub.GetUri<Documents._workspacekey_.Index>()
                     .BindParameters(renderContext.Request)
             );
         }

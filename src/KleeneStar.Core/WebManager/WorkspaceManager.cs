@@ -1,8 +1,10 @@
 ﻿using KleeneStar.Model;
+using KleeneStar.Core.WebWorkspaceTemplate;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebComponent;
@@ -245,93 +247,88 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Returns the documents of a workspace, ordered by summary.
-        /// </summary>
-        /// <param name="workspaceId">The id of the workspace.</param>
-        /// <returns>The documents. The collection may be empty.</returns>
-        private static IReadOnlyList<Model.Entities.Object> GetDocuments(Guid workspaceId)
-        {
-            var query = new Query<Model.Entities.Object>()
-                .WhereEquals(x => x.WorkspaceId, workspaceId)
-                .WhereEquals(x => x.Kind, ObjectKind.Document)
-                .OrderByAsc(x => x.Summary);
-
-            return [.. CoreHub.ObjectManager.GetObjects(query)];
-        }
-
-        /// <summary>
-        /// Returns the document shown as the home page of the supplied workspace: the chosen one
-        /// when there is one, otherwise the first root of the page tree.
+        /// Returns the home page of the supplied workspace: the document
+        /// <see cref="Workspace.HomeId"/> names, when it is still a document of this workspace.
         /// </summary>
         /// <remarks>
-        /// The chosen document is looked for among the workspace's own documents rather than
-        /// fetched by id, which settles the two ways a choice can go stale - the document was
-        /// deleted, or it was moved to another workspace - with the same lookup, and in both
-        /// cases by falling back rather than by showing nothing.
+        /// There is no fallback to another document. The read goes through the object manager, so
+        /// permissions and security levels apply.
         /// </remarks>
         /// <param name="workspaceId">The id of the workspace.</param>
-        /// <returns>The home document, or <see langword="null"/> when the workspace holds no
-        /// documents.</returns>
+        /// <returns>The home document, or <see langword="null"/>.</returns>
         public Model.Entities.Object GetHome(Guid workspaceId)
         {
-            var documents = GetDocuments(workspaceId);
+            var homeId = GetWorkspace(workspaceId)?.HomeId;
 
-            if (documents.Count == 0)
+            if (!homeId.HasValue || homeId.Value == Guid.Empty)
             {
                 return null;
             }
 
-            var chosen = GetWorkspace(workspaceId)?.HomeId;
+            var home = CoreHub.ObjectManager.GetObject(homeId.Value);
 
-            if (chosen.HasValue)
-            {
-                var home = documents.FirstOrDefault(x => x.Id == chosen.Value);
-
-                if (home is not null)
-                {
-                    return home;
-                }
-            }
-
-            // the fallback: the first root of the page tree by summary. A document whose parent
-            // is not itself a document of this workspace counts as a root, so a page hung under
-            // something that has since gone is still reachable here
-            var ids = documents.Select(x => x.Id).ToHashSet();
-
-            return documents.FirstOrDefault(x => !x.ParentId.HasValue || !ids.Contains(x.ParentId.Value))
-                ?? documents[0];
+            return IsHomeCandidate(home, workspaceId) ? home : null;
         }
 
         /// <summary>
-        /// Returns whether the supplied object is the chosen home page of its workspace.
+        /// Returns whether the supplied object is the home page of the supplied workspace.
         /// </summary>
         /// <param name="workspaceId">The id of the workspace.</param>
         /// <param name="objectId">The id of the document.</param>
-        /// <returns><see langword="true"/> when the document was chosen.</returns>
+        /// <returns><see langword="true"/> when the document is the workspace's home page.</returns>
         public bool IsHome(Guid workspaceId, Guid objectId)
         {
             return objectId != Guid.Empty && GetWorkspace(workspaceId)?.HomeId == objectId;
         }
 
         /// <summary>
-        /// Chooses the home page of a workspace, or clears the choice.
+        /// Returns whether the supplied object is the home page of its workspace.
+        /// </summary>
+        /// <param name="object">The object, or <see langword="null"/>.</param>
+        /// <returns><see langword="true"/> when the object is the workspace's home page.</returns>
+        public bool IsHome(Model.Entities.Object @object)
+        {
+            return @object is not null
+                && string.Equals(@object.Kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
+                && IsHome(@object.WorkspaceId, @object.Id);
+        }
+
+        /// <summary>
+        /// Makes sure the supplied workspace has its dedicated home page, creating it when it has
+        /// none.
         /// </summary>
         /// <remarks>
-        /// Only a document of this workspace may be chosen. A caller naming something else - an
-        /// issue, a document of another workspace - changes nothing rather than storing an id
-        /// the overview would silently ignore.
         /// <para>
-        /// The write goes through <see cref="Update"/>, so it raises the same event and reaches
-        /// the audit log the same way any other change to the workspace does. Choosing what a
-        /// whole workspace opens on is a change to the workspace, not a per-user preference like
-        /// a favourite.
+        /// The check and the write run under the workspace's hierarchy lock (process monitor,
+        /// plus the cluster lock when clustered), so two replicas starting at once, or a start
+        /// racing a workspace create, write one page and not two. The existing page is looked
+        /// for unrestricted: a caller who may not read it must not be the reason a second one is
+        /// written.
+        /// </para>
+        /// <para>
+        /// A referenced document with a parent, children or comments is not adopted, because the
+        /// home page is excluded from the tree, has no detail page and shows no comments; adopting
+        /// it would hide its subtree and its comments. It stays a page and a new home page is
+        /// created.
         /// </para>
         /// </remarks>
         /// <param name="workspaceId">The id of the workspace.</param>
-        /// <param name="objectId">The document to show, or <see langword="null"/> to clear.</param>
-        /// <returns>The updated workspace, or <see langword="null"/> when nothing was changed.</returns>
-        public Workspace SetHome(Guid workspaceId, Guid? objectId)
+        /// <param name="identityId">The author of a page that is created. Empty when not known.</param>
+        /// <param name="culture">The language a created page is written in; null for the
+        /// installation's own.</param>
+        /// <param name="template">The template whose home page content is written, or
+        /// <see langword="null"/> for the generic page.</param>
+        /// <returns>The home page, or <see langword="null"/> when the workspace does not exist.</returns>
+        public Model.Entities.Object EnsureHome(Guid workspaceId, Guid identityId = default, CultureInfo culture = null, IWorkspaceTemplate template = null)
         {
+            if (workspaceId == Guid.Empty)
+            {
+                return null;
+            }
+
+            using var hierarchy = HierarchyLock.Enter(workspaceId);
+            using var unrestricted = CoreHub.SecurityLevelManager?.BeginUnrestricted();
+
             var workspace = GetWorkspace(workspaceId);
 
             if (workspace is null)
@@ -339,22 +336,121 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
-            if (objectId.HasValue && !GetDocuments(workspaceId).Any(x => x.Id == objectId.Value))
+            if (workspace.HomeId is { } homeId && homeId != Guid.Empty)
             {
-                return null;
+                var existing = CoreHub.ObjectManager.GetObject(homeId);
+
+                if (IsHomeCandidate(existing, workspaceId) && !InUseAsPage(existing))
+                {
+                    return existing;
+                }
             }
 
-            if (workspace.HomeId == objectId)
+            var classes = CoreHub.ClassManager
+                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
+                .ToList();
+
+            using var silent = CoreHub.BeginSilentNotifications();
+
+            var host = classes
+                .Where(x => string.Equals(x.Kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
+                .Where(x => x.State == ClassState.Active)
+                .Where(x => CoreHub.ObjectRendererManager.IsRenderedAs(x, ObjectRenderer.Prose))
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            if (host is null)
             {
-                return workspace;
+                host = WorkspaceTemplateManager.CreateProseClass(workspaceId, ObjectKind.Document, culture);
+
+                if (host is null)
+                {
+                    return null;
+                }
+
+                classes.Add(host);
             }
 
-            workspace.HomeId = objectId;
-            workspace.Updated = DateTime.UtcNow;
+            var author = identityId == Guid.Empty ? (Guid?)null : identityId;
+            var now = DateTime.UtcNow;
+
+            var home = new Model.Entities.Object
+            {
+                Id = Guid.NewGuid(),
+                Key = CoreHub.ObjectManager.NextObjectKey(workspaceId),
+                Summary = WorkspaceTemplateContent.HomeSummary(workspace, culture),
+                Description = WorkspaceTemplateContent.HomeBody
+                (
+                    workspace,
+                    [.. classes.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)],
+                    culture,
+                    template?.Home
+                ),
+                Icon = host.Icon,
+                Kind = ObjectKind.Document,
+                State = WorkspaceState.Active,
+                WorkspaceId = workspaceId,
+                ClassId = host.Id,
+                CreatorId = author,
+                UpdaterId = author,
+                Created = now,
+                Updated = now
+            };
+
+            CoreHub.ObjectManager.Add(home);
+
+            // read again: the update below must not write back a copy of the workspace that is
+            // older than what the add left behind
+            workspace = GetWorkspace(workspaceId);
+            workspace.HomeId = home.Id;
+            workspace.Updated = now;
 
             Update(workspace);
 
-            return workspace;
+            return home;
+        }
+
+        /// <summary>
+        /// Determines whether the supplied object can be the home page of the workspace: a
+        /// document of that workspace.
+        /// </summary>
+        /// <param name="object">The object, or <see langword="null"/>.</param>
+        /// <param name="workspaceId">The workspace.</param>
+        /// <returns><see langword="true"/> for a document of the workspace.</returns>
+        private static bool IsHomeCandidate(Model.Entities.Object @object, Guid workspaceId)
+        {
+            return @object is not null
+                && @object.WorkspaceId == workspaceId
+                && string.Equals(@object.Kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Determines whether a document is in use as a page: it hangs under another object, has
+        /// objects beneath it, or carries comments.
+        /// </summary>
+        /// <param name="object">The document.</param>
+        /// <returns><see langword="true"/> when taking it over as the home page would take a
+        /// branch or a discussion out of reach.</returns>
+        private static bool InUseAsPage(Model.Entities.Object @object)
+        {
+            if (@object.ParentId.HasValue)
+            {
+                return true;
+            }
+
+            var parentId = (Guid?)@object.Id;
+            var children = new Query<Model.Entities.Object>()
+                .Where(x => x.ParentId == parentId)
+                .WithPaging(0, 1);
+
+            if (CoreHub.ObjectManager.GetObjects(children).Any())
+            {
+                return true;
+            }
+
+            // any comment counts, a deleted one too: its replies and its trace in the thread
+            // belong to the page it was written on
+            return ModelHub.HasComments(@object.Id);
         }
 
         /// <summary>

@@ -126,7 +126,7 @@ namespace KleeneStar.Core.Test.WebPermission
 
         /// <summary>
         /// A page naming a workspace reads its content; the organize page writes it; the
-        /// workspace's own dialogs and the home-page chooser administer it.
+        /// workspace's own dialogs administer it.
         /// </summary>
         [Fact]
         public void AWorkspacePageDemandsWhatThePageDoes()
@@ -139,7 +139,6 @@ namespace KleeneStar.Core.Test.WebPermission
             Assert.Equal(typeof(WorkspaceWriteContentPermission), RouteAuthorization.Resolve("kleenestar.core.www.issues._workspacekey_.organize", route)?.Permission);
             Assert.Equal(typeof(WorkspaceUpdatePermission), RouteAuthorization.Resolve("kleenestar.core.www.workspaces._workspacekey_.edit", route)?.Permission);
             Assert.Equal(typeof(WorkspaceUpdatePermission), RouteAuthorization.Resolve("kleenestar.core.www.workspaces._workspacekey_.permissions", route)?.Permission);
-            Assert.Equal(typeof(WorkspaceUpdatePermission), RouteAuthorization.Resolve("kleenestar.core.www.documents._workspacekey_.home", route)?.Permission);
         }
 
         /// <summary>

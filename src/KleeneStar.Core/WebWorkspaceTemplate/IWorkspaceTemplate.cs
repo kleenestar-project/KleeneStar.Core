@@ -82,5 +82,17 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         /// customers.
         /// </remarks>
         IEnumerable<WorkspaceTemplateClass> Classes { get; }
+
+        /// <summary>
+        /// Gets what the home page of a workspace created from this template says, or
+        /// <see langword="null"/> for the generic page (what the workspace is, its classes and
+        /// the first steps).
+        /// </summary>
+        /// <remarks>
+        /// The home page is the dedicated document of the workspace, shown on the document
+        /// overview (<see cref="WebManager.IWorkspaceManager.EnsureHome"/>). The declaration
+        /// states the purpose of the workspace and how it is worked in.
+        /// </remarks>
+        WorkspaceTemplateHome Home => null;
     }
 }

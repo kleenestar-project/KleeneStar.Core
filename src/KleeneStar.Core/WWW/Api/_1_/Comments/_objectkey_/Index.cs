@@ -403,7 +403,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         {
             var @object = CoreHub.ObjectManager.GetObject(objectId);
 
+            // the home page takes no comments
             return @object is not null
+                && !CoreHub.WorkspaceManager.IsHome(@object)
                 && global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectCommentPermission));
         }
 

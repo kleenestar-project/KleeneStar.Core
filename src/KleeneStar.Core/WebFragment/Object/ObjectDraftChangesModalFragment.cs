@@ -27,6 +27,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Edit>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Edit>]
+    [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
     [Cache]
     public sealed class ObjectDraftChangesModalFragment : ControlModalRemotePage, IFragmentControl<ControlModalRemotePage>
     {

@@ -433,6 +433,12 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// The reason a write is refused that would put the home page of a workspace into its
+        /// page tree.
+        /// </summary>
+        internal const string HomeOutsideTree = "The home page of a workspace stands outside its page tree.";
+
+        /// <summary>
         /// Adds a object to the manager.
         /// </summary>
         /// <remarks>
@@ -450,6 +456,12 @@ namespace KleeneStar.Core.WebManager
             objectEntity.Kind = DeriveKind(objectEntity);
 
             var parent = objectEntity.ParentId is Guid parentId ? ObjectHierarchy.Read(parentId) : null;
+
+            // the home page is not part of the page tree: no object is created below it
+            if (parent is not null && CoreHub.WorkspaceManager?.IsHome(parent) == true)
+            {
+                throw new InvalidOperationException(HomeOutsideTree);
+            }
 
             // a new object below a parent at the deepest level would sit past the limit
             if (parent is not null)
@@ -502,6 +514,19 @@ namespace KleeneStar.Core.WebManager
             var previous = GetObject(objectEntity.Id);
 
             var previousParentId = (previous ?? ObjectHierarchy.Read(objectEntity.Id))?.ParentId;
+
+            // a parent changed through an update follows the same rule as a move: the home page
+            // has no parent and no children
+            if (previousParentId != objectEntity.ParentId && objectEntity.ParentId is Guid newParentId)
+            {
+                var newParent = ObjectHierarchy.Read(newParentId);
+
+                if (CoreHub.WorkspaceManager?.IsHome(objectEntity) == true
+                    || (newParent is not null && CoreHub.WorkspaceManager?.IsHome(newParent) == true))
+                {
+                    throw new InvalidOperationException(HomeOutsideTree);
+                }
+            }
 
             using var scope = CoreHub.CommitManager.BeginCommit
             (
@@ -882,6 +907,12 @@ namespace KleeneStar.Core.WebManager
             if (parent.WorkspaceId != objectEntity.WorkspaceId)
             {
                 throw new InvalidOperationException("Parent and child must belong to the same workspace.");
+            }
+
+            // the home page is not part of the page tree: it has no parent and no children
+            if (CoreHub.WorkspaceManager?.IsHome(parent) == true || CoreHub.WorkspaceManager?.IsHome(objectEntity) == true)
+            {
+                throw new InvalidOperationException(HomeOutsideTree);
             }
 
             var maxDepth =(CoreHub.HierarchySettings ?? new HierarchySettings()).EffectiveMaxDepth;

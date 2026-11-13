@@ -140,43 +140,51 @@ namespace KleeneStar.Core.WebManager
         WorkspaceBookmark RecordVisit(Guid ownerId, Guid workspaceId);
 
         /// <summary>
-        /// Returns the document shown as the home page of the supplied workspace.
+        /// Returns the home page of the supplied workspace: its dedicated document.
         /// </summary>
         /// <remarks>
-        /// The chosen document when somebody chose one and it is still a document of this
-        /// workspace; otherwise the first root of the page tree, ordered by summary, which is
-        /// what the overview showed before the choice existed. The fallback is what makes the
-        /// setting optional rather than a step every new workspace has to go through, and it is
-        /// also the answer for a chosen document that has since been deleted.
+        /// The home page is a dedicated document referenced by <see cref="Workspace.HomeId"/> and
+        /// created by <see cref="EnsureHome"/>. It is not part of the page tree, takes no comments
+        /// and is read and edited on the document overview. The read goes through the object
+        /// manager; a caller without read access gets <see langword="null"/>.
         /// </remarks>
         /// <param name="workspaceId">The id of the workspace.</param>
-        /// <returns>The home document, or <see langword="null"/> when the workspace holds no
-        /// documents at all.</returns>
+        /// <returns>The home document, or <see langword="null"/>.</returns>
         Model.Entities.Object GetHome(Guid workspaceId);
 
         /// <summary>
-        /// Returns whether the supplied object is the chosen home page of its workspace.
+        /// Returns whether the supplied object is the home page of its workspace.
         /// </summary>
-        /// <remarks>
-        /// It answers the <b>choice</b>, not <see cref="GetHome"/>: a document that is only
-        /// being shown because nothing was chosen is not the home page, and offering to "reset"
-        /// it would suggest a setting that was never made.
-        /// </remarks>
         /// <param name="workspaceId">The id of the workspace.</param>
         /// <param name="objectId">The id of the document.</param>
-        /// <returns><see langword="true"/> when the document was chosen as the home page.</returns>
+        /// <returns><see langword="true"/> when the document is the workspace's home page.</returns>
         bool IsHome(Guid workspaceId, Guid objectId);
 
         /// <summary>
-        /// Chooses the document shown as the home page of the supplied workspace, or clears the
-        /// choice when <paramref name="objectId"/> is <see langword="null"/>.
+        /// Returns whether the supplied object is the home page of its workspace.
         /// </summary>
+        /// <param name="object">The object, or <see langword="null"/>.</param>
+        /// <returns><see langword="true"/> when the object is the workspace's home page.</returns>
+        bool IsHome(Model.Entities.Object @object);
+
+        /// <summary>
+        /// Makes sure the supplied workspace has its dedicated home page, creating it when it has
+        /// none.
+        /// </summary>
+        /// <remarks>
+        /// The page is written into a document class of the workspace with the effective renderer
+        /// prose; without such a class the class <c>Page</c> is created. A referenced document with
+        /// a parent, children or comments is not adopted; it stays a page of the tree and a new
+        /// home page is created.
+        /// </remarks>
         /// <param name="workspaceId">The id of the workspace.</param>
-        /// <param name="objectId">The document to show, or <see langword="null"/> to fall back to
-        /// the first root of the page tree.</param>
-        /// <returns>The updated workspace, or <see langword="null"/> when the workspace does not
-        /// exist or the document is not one of its documents.</returns>
-        Workspace SetHome(Guid workspaceId, Guid? objectId);
+        /// <param name="identityId">The author of a page that is created. Empty when not known.</param>
+        /// <param name="culture">The language a created page is written in; null for the
+        /// installation's own.</param>
+        /// <param name="template">The template whose home page content is written, or
+        /// <see langword="null"/> for the generic page.</param>
+        /// <returns>The home page, or <see langword="null"/> when the workspace does not exist.</returns>
+        Model.Entities.Object EnsureHome(Guid workspaceId, Guid identityId = default, System.Globalization.CultureInfo culture = null, WebWorkspaceTemplate.IWorkspaceTemplate template = null);
 
         /// <summary>
         /// Adds a workspace to the workspace manager.

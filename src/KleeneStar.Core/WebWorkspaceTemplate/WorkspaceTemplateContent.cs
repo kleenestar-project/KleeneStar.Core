@@ -93,32 +93,50 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
         }
 
         /// <summary>
-        /// Builds the body of the home page: the banner, what the workspace is for, the classes
-        /// it holds, and what to do first.
+        /// Builds the body of the home page: banner, workspace description, the template's lead
+        /// and sections, the class list, and the generic first steps when the template declares
+        /// no sections.
         /// </summary>
         /// <param name="workspace">The workspace the page belongs to.</param>
         /// <param name="classes">The classes the workspace carries.</param>
         /// <param name="culture">The language the page is written in.</param>
+        /// <param name="home">What the workspace's template says on its home page, or
+        /// <see langword="null"/> for the generic page.</param>
         /// <returns>The body, as rich text.</returns>
-        public static string HomeBody(Workspace workspace, IReadOnlyList<Class> classes, CultureInfo culture)
+        public static string HomeBody(Workspace workspace, IReadOnlyList<Class> classes, CultureInfo culture, WorkspaceTemplateHome home = null)
         {
             var html = new StringBuilder();
 
             html.Append(Banner(workspace, Translate(culture, "kleenestar.core:workspace.template.home.banner")));
 
-            // the workspace's own description leads, because it is what somebody actually wrote
-            // about this workspace; the generic sentence only stands in when there is none. The
-            // editor stores a document, not markup, and this body is markup - appended as it
-            // stands, the serialization is what the reader got under the banner
-            if (!ProseText.IsEmpty(workspace?.Description))
+            // order: workspace description, template lead, generic lead only when both are
+            // missing. A description written in the editor is a document, not markup, and is
+            // converted before it is appended
+            var described = !ProseText.IsEmpty(workspace?.Description);
+
+            if (described)
             {
                 html.Append(DescriptionMarkup(workspace.Description));
             }
-            else
+
+            if (!string.IsNullOrWhiteSpace(home?.Lead))
+            {
+                html.Append("<p>")
+                    .Append(Escape(Translate(culture, home.Lead)))
+                    .Append("</p>");
+            }
+            else if (!described)
             {
                 html.Append("<p>")
                     .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.lead", workspace?.Name)))
                     .Append("</p>");
+            }
+
+            var sections = home?.Sections ?? [];
+
+            foreach (var section in sections)
+            {
+                html.Append(SectionMarkup(section, culture));
             }
 
             html.Append("<h2>")
@@ -140,24 +158,72 @@ namespace KleeneStar.Core.WebWorkspaceTemplate
                     .Append("</p>");
             }
 
-            html.Append("<h2>")
-                .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.next.header")))
-                .Append("</h2>");
-
-            html.Append("<ol>");
-
-            foreach (var step in new[] { "one", "two", "three", "four" })
+            // the generic first steps are rendered only when the template declares no sections
+            if (sections.Count == 0)
             {
-                html.Append("<li>")
-                    .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.next." + step)))
-                    .Append("</li>");
-            }
+                html.Append("<h2>")
+                    .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.next.header")))
+                    .Append("</h2>");
 
-            html.Append("</ol>");
+                html.Append("<ol>");
+
+                foreach (var step in new[] { "one", "two", "three", "four" })
+                {
+                    html.Append("<li>")
+                        .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.next." + step)))
+                        .Append("</li>");
+                }
+
+                html.Append("</ol>");
+            }
 
             html.Append("<p><em>")
                 .Append(Escape(Translate(culture, "kleenestar.core:workspace.template.home.footer")))
                 .Append("</em></p>");
+
+            return html.ToString();
+        }
+
+        /// <summary>
+        /// Renders one section a template declared for its home page.
+        /// </summary>
+        /// <param name="section">The section.</param>
+        /// <param name="culture">The language the section is written in.</param>
+        /// <returns>The section markup, or an empty string for a section without content.</returns>
+        private static string SectionMarkup(WorkspaceTemplateHomeSection section, CultureInfo culture)
+        {
+            if (section is null)
+            {
+                return string.Empty;
+            }
+
+            var html = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(section.Heading))
+            {
+                html.Append("<h2>").Append(Escape(Translate(culture, section.Heading))).Append("</h2>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(section.Text))
+            {
+                html.Append("<p>").Append(Escape(Translate(culture, section.Text))).Append("</p>");
+            }
+
+            var items = (section.Items ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+
+            if (items.Count > 0)
+            {
+                var tag = section.Numbered ? "ol" : "ul";
+
+                html.Append('<').Append(tag).Append('>');
+
+                foreach (var item in items)
+                {
+                    html.Append("<li>").Append(Escape(Translate(culture, item))).Append("</li>");
+                }
+
+                html.Append("</").Append(tag).Append('>');
+            }
 
             return html.ToString();
         }

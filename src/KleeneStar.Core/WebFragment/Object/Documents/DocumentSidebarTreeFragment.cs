@@ -216,6 +216,12 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 .OrderByAsc(x => x.Summary)
                 .WithPaging(0, MaxItems);
 
+            // the home page is not part of the page tree
+            if (workspace.HomeId is { } homeId && homeId != Guid.Empty)
+            {
+                query = query.Where(x => x.Id != homeId);
+            }
+
             return [.. _objectManager.GetObjects(query)];
         }
 

@@ -1,7 +1,11 @@
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Model.Entities;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using System.Reflection;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.WebMessage;
+using WebExpress.WebCore.WebRestApi;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
 
 namespace KleeneStar.Core.Test.WWW.Api.Objects
@@ -104,6 +108,100 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
             Place(none, null);
 
             Assert.All([issue, foreign, belowIssue, unknown, none], x => Assert.Null(x.ParentId));
+        }
+    
+
+        /// <summary>
+        /// The home page of a workspace is no page of the tree: a document created while it is
+        /// named as the open document stays a root.
+        /// </summary>
+        [Fact]
+        public void NothingIsPlacedBelowTheHomePage()
+        {
+            Seed(nameof(NothingIsPlacedBelowTheHomePage));
+            MakeHome(OpenDocumentId);
+
+            var created = new ObjectEntity(Guid.NewGuid()) { WorkspaceId = WorkspaceId, ClassId = PageClassId };
+            Place(created, "KB-1");
+
+            Assert.Null(created.ParentId);
+        }
+
+        /// <summary>
+        /// A create that names the home page as its parent is refused before anything is
+        /// written; one naming an ordinary page is not.
+        /// </summary>
+        [Fact]
+        public void ACreateBelowTheHomePage_IsRefused()
+        {
+            Seed(nameof(ACreateBelowTheHomePage_IsRefused));
+            MakeHome(OpenDocumentId);
+
+            var refused = Validate(("ParentId", OpenDocumentId.ToString()), ("ClassId", PageClassId.ToString()), ("Summary", "child"));
+            var accepted = Validate(("ParentId", OpenIssueId.ToString()), ("ClassId", PageClassId.ToString()), ("Summary", "child"));
+
+            Assert.Contains(refused.Errors, x => x.Field == nameof(ObjectEntity.ParentId));
+            Assert.DoesNotContain(accepted.Errors, x => x.Field == nameof(ObjectEntity.ParentId));
+        }
+
+        /// <summary>
+        /// Names a document as the home page of its workspace.
+        /// </summary>
+        /// <param name="objectId">The document.</param>
+        private static void MakeHome(Guid objectId)
+        {
+            var workspace = CoreHub.WorkspaceManager.GetWorkspace(WorkspaceId);
+            workspace.HomeId = objectId;
+            CoreHub.WorkspaceManager.Update(workspace);
+        }
+
+        /// <summary>
+        /// Runs the endpoint's validation of a create.
+        /// </summary>
+        /// <param name="entries">The payload entries.</param>
+        /// <returns>The validation result.</returns>
+        private static IRestApiValidationResult Validate(params (string Key, object Value)[] entries)
+        {
+            var payload = new RestApiCrudFormData();
+
+            foreach (var (key, value) in entries)
+            {
+                payload[key.ToLowerInvariant()] = value;
+            }
+
+            var endpoint = new global::KleeneStar.Core.WWW.Api._1_.Objects.Index();
+            var validate = endpoint.GetType().GetMethod("Validate", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            return Assert.IsAssignableFrom<IRestApiValidationResult>(validate!.Invoke(endpoint, [null, payload, CreateRequest()]));
+        }
+
+        /// <summary>
+        /// Builds a create request; the culture is what the refusal is translated in.
+        /// </summary>
+        /// <returns>The request.</returns>
+        private static IRequest CreateRequest()
+        {
+            var features = new FeatureCollection();
+            features.Set<IHttpRequestFeature>(new HttpRequestFeature
+            {
+                Method = "POST",
+                Protocol = "HTTP/1.1",
+                Scheme = "http",
+                RawTarget = "/kleenestar/api/1/objects",
+                QueryString = string.Empty,
+                Headers = new HeaderDictionary { ["Host"] = "localhost", ["Accept-Language"] = "en" }
+            });
+            features.Set<IHttpConnectionFeature>(new HttpConnectionFeature
+            {
+                LocalIpAddress = System.Net.IPAddress.Loopback,
+                RemoteIpAddress = System.Net.IPAddress.Loopback
+            });
+            features.Set<IHttpRequestIdentifierFeature>(new HttpRequestIdentifierFeature
+            {
+                TraceIdentifier = nameof(UnitTestObjectPlaceBelowOpenDocument)
+            });
+
+            return new WebExpress.WebCore.WebMessage.HttpContext(features, null!).Request;
         }
     }
 }

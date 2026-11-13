@@ -4,6 +4,7 @@ using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using KleeneStar.Model.Settings;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebApplication;
@@ -96,6 +97,8 @@ namespace KleeneStar.Core
 
             VerifyHierarchy();
 
+            EnsureWorkspaceHomes();
+
             ConnectBlueprints();
 
             StartAutomation();
@@ -169,6 +172,46 @@ namespace KleeneStar.Core
             catch (Exception ex)
             {
                 CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
+        }
+
+        /// <summary>
+        /// Calls <see cref="WebManager.IWorkspaceManager.EnsureHome"/> for every workspace, so a
+        /// workspace without a valid home page receives one. A workspace with a valid home page
+        /// costs one lookup.
+        /// </summary>
+        /// <remarks>
+        /// Runs after the hierarchy verifier, because the home page is written through the object
+        /// manager and its path depends on the repaired tree. A failure is logged per workspace
+        /// and does not stop the remaining workspaces.
+        /// </remarks>
+        private static void EnsureWorkspaceHomes()
+        {
+            IReadOnlyList<Guid> workspaces;
+
+            try
+            {
+                workspaces = [.. CoreHub.WorkspaceManager
+                    .GetWorkspaces(new WebExpress.WebIndex.Queries.Query<Workspace>())
+                    .Select(x => x.Id)];
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+
+                return;
+            }
+
+            foreach (var workspaceId in workspaces)
+            {
+                try
+                {
+                    CoreHub.WorkspaceManager.EnsureHome(workspaceId);
+                }
+                catch (Exception ex)
+                {
+                    CoreHub.HttpServerContext?.Log?.Exception(ex);
+                }
             }
         }
 

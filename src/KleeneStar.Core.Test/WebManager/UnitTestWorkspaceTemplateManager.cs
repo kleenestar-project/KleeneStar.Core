@@ -53,6 +53,20 @@ namespace KleeneStar.Core.Test.WebManager
 
             public int Order => 1;
 
+            public WorkspaceTemplateHome Home => new()
+            {
+                Lead = "Requests arrive here and leave answered.",
+                Sections =
+                [
+                    new WorkspaceTemplateHomeSection
+                    {
+                        Heading = "How we work",
+                        Items = ["Triage first.", "Then <fix>."],
+                        Numbered = true
+                    }
+                ]
+            };
+
             public IEnumerable<WorkspaceTemplateClass> Classes =>
             [
                 new WorkspaceTemplateClass
@@ -404,8 +418,12 @@ namespace KleeneStar.Core.Test.WebManager
             // the page says what the workspace holds, so a class name has to appear in it
             Assert.Contains("Ticket", created.Home.Description);
 
-            // the home page is named as such rather than left to the fallback, which would stop
-            // pointing at it the moment somebody adds a page whose title sorts earlier
+            // and what the template says about working in it, escaped like every other text
+            Assert.Contains("<p>Requests arrive here and leave answered.</p>", created.Home.Description);
+            Assert.Contains("<h2>How we work</h2><ol><li>Triage first.</li><li>Then &lt;fix&gt;.</li></ol>", created.Home.Description);
+            Assert.Null(created.Home.ParentId);
+
+            // the home page is the workspace's dedicated document, named by the workspace
             Assert.True(CoreHub.WorkspaceManager.IsHome(WorkspaceId, created.Home.Id));
             Assert.Equal(created.Home.Id, CoreHub.WorkspaceManager.GetHome(WorkspaceId)?.Id);
         }

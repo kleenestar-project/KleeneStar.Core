@@ -2,7 +2,6 @@ using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
 using System;
-using System.Linq;
 using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -10,7 +9,6 @@ using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
-using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
 
 using ObjectEntity = KleeneStar.Model.Entities.Object;
@@ -24,9 +22,11 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Which document that is belongs to <see cref="IWorkspaceManager.GetHome"/>: the one chosen
-    /// through the document's own more menu, and failing that the first root of the page tree by
-    /// summary.
+    /// The document is resolved by <see cref="IWorkspaceManager.GetHome"/>: the dedicated home
+    /// page of the workspace. It is not part of the page tree and has no detail page; it is read
+    /// here and edited here (<see cref="DocumentHomeEditButtonFragment"/>,
+    /// <see cref="DocumentHomeEditorFragment"/>). It takes no comments, so the page ends with the
+    /// like count.
     /// </para>
     /// <para>
     /// <b>It is the page, not a card on it.</b> A card frames a preview of something that lives
@@ -83,13 +83,13 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 return null;
             }
 
-            var home = _workspaceManager.GetHome(workspace.Id);
+            var home = DocumentHome.Resolve(renderContext.Request);
 
             if (home is null)
             {
                 var empty = new ControlText("document-home-empty")
                 {
-                    Text = _ => "kleenestar.core:object.kind.documents.empty",
+                    Text = _ => "kleenestar.core:workspace.home.empty",
                     Format = _ => TypeFormatText.Paragraph
                 };
 
@@ -138,14 +138,12 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
         }
 
         /// <summary>
-        /// Builds the figures that close the page off: how many liked the document, and how many
-        /// commented on it.
+        /// Builds the figure that closes the page off: how many liked the home page.
         /// </summary>
         /// <remarks>
         /// The like carries an address, so the reader can join it from here rather than only read
         /// the number - see <see cref="ControlLike"/> for why a reader who is not signed in gets
-        /// the figure without one. The comment count is a readout and stays one: commenting
-        /// happens on the document itself, where the thread is.
+        /// the figure without one. There is no comment count: the home page takes no comments.
         /// </remarks>
         /// <param name="renderContext">The render context.</param>
         /// <param name="home">The home document.</param>
@@ -169,23 +167,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
                 Payload = _ => System.Text.Json.JsonSerializer.Serialize(new { @object = home.Key })
             };
 
-            var comments = new ControlFlex
-            (
-                "document-home-comments-" + id,
-                new ControlText
-                {
-                    Text = _ => global::KleeneStar.Core.WebPermission.CommentAudience.Filter(home, CoreHub.CommentManager.GetComments(home.Id)).Count().ToString()
-                },
-                new ControlIcon
-                {
-                    Icon = _ => new IconComment()
-                }
-            )
-            {
-                Classes = ["ks-object-metric"]
-            };
-
-            return new ControlFlex("document-home-metrics-" + id, like, comments)
+            return new ControlFlex("document-home-metrics-" + id, like)
             {
                 Classes = ["ks-object-metrics"]
             };

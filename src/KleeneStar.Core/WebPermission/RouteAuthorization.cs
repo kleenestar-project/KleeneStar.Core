@@ -62,7 +62,7 @@ namespace KleeneStar.Core.WebPermission
         /// </summary>
         private static readonly HashSet<string> WorkspaceAdministrationPages = new(StringComparer.OrdinalIgnoreCase)
         {
-            "edit", "delete", "clone", "avatar", "permissions", "home"
+            "edit", "delete", "clone", "avatar", "permissions"
         };
 
         /// <summary>

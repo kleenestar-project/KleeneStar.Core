@@ -147,7 +147,8 @@ namespace KleeneStar.Core.WebFragment.Object
             var keyParameter = renderContext?.Request?.GetParameter<ObjectKeyParameter>();
             var @object = _objectManager.GetObjectByKey(keyParameter?.Value);
 
-            if (@object is null)
+            // the home page of a workspace takes no comments
+            if (@object is null || CoreHub.WorkspaceManager.IsHome(@object))
             {
                 return null;
             }

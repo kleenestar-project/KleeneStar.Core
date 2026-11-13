@@ -379,7 +379,48 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var result = base.Validate(existingItem, payload, request);
 
+            result = ValidateParent(existingItem, payload, request, result);
+
             return ValidateSecurityLevel(existingItem, payload, request, result);
+        }
+
+        /// <summary>
+        /// Refuses a create that names the home page of a workspace as the parent.
+        /// </summary>
+        /// <remarks>
+        /// The home page is not part of the page tree. An update with a parent is a move and is
+        /// refused by <see cref="IObjectManager.SetParent(Guid, Guid?)"/>; a create binds the
+        /// parent onto the new row and is refused here, before anything is written. The parent is
+        /// read unrestricted, so the rule also holds for a home page the caller cannot read; the
+        /// message does not reveal it.
+        /// </remarks>
+        /// <param name="existingItem">The currently persisted item (null for create).</param>
+        /// <param name="payload">The submitted payload.</param>
+        /// <param name="request">The request, for the culture of the message.</param>
+        /// <param name="result">The validation result to add to.</param>
+        /// <returns>The validation result, for chaining.</returns>
+        private static IRestApiValidationResult ValidateParent(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request, IRestApiValidationResult result)
+        {
+            if (existingItem is not null
+                || !payload.TryGetGuid(nameof(Model.Entities.Object.ParentId), out var parentId)
+                || parentId == Guid.Empty)
+            {
+                return result;
+            }
+
+            var parent = global::KleeneStar.Core.WebManager.ObjectHierarchy.Read(parentId);
+
+            if (!CoreHub.WorkspaceManager.IsHome(parent))
+            {
+                return result;
+            }
+
+            return result.Add
+            (
+                I18N.Translate(request, "kleenestar.core:workspace.home.parent.refused"),
+                nameof(Model.Entities.Object.ParentId),
+                "workspace.home.parent"
+            );
         }
 
         /// <summary>
@@ -946,7 +987,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             var parent = CoreHub.ObjectManager.GetObjectByKey(key);
             var kind = CoreHub.ClassManager.GetClass(@object.ClassId)?.Kind;
 
+            // no object is placed below the home page
             if (parent is not null
+                && !CoreHub.WorkspaceManager.IsHome(parent)
                 && parent.WorkspaceId == @object.WorkspaceId
                 && string.Equals(ObjectKind.Normalize(parent.Kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(ObjectKind.Normalize(kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase))

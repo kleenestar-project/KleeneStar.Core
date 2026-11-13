@@ -57,11 +57,9 @@ workspace.inherited.placeholder=Wählen Sie den übergeordneten Arbeitsbereich, 
 # die Startseite eines Arbeitsbereichs: das Dokument, auf dem seine DokumentenÃ¼bersicht öffnet.
 # Wird im Menü dieser Übersicht gewählt und gilt für alle — anders als der Stern an einem
 # Dokument, der einer Person gehört
-workspace.home.automatic=Automatisch (erste Seite des Baums)
-workspace.home.help=Jeder, der diesen Arbeitsbereich öffnet, landet darauf. Bleibt es automatisch, zeigt die Übersicht die erste Seite des Baums.
-workspace.home.label=Startseite wählen
-workspace.home.placeholder=Wählen Sie das Dokument, auf dem die Übersicht öffnet.
-workspace.home.title=Startseite
+workspace.home.edit.label=Startseite bearbeiten
+workspace.home.empty=Dieser Arbeitsbereich hat noch keine Startseite. Sie wird mit dem Arbeitsbereich angelegt, für einen Arbeitsbereich ohne Startseite beim nächsten Start.
+workspace.home.parent.refused=Die Startseite eines Arbeitsbereichs steht außerhalb des Seitenbaums; darunter lässt sich nichts anlegen.
 workspace.key.help=Der Schlüssel des Arbeitsbereiches. Er muss eindeutig sein.
 workspace.key.label=Schlüssel
 workspace.blueprint.label=Blueprint-Workspace
@@ -149,11 +147,11 @@ workspace.template.home.classes.header=Was hier lebt
 workspace.template.home.classes.intro=Dieser Arbeitsbereich enthält {0} Klassen. Jede sammelt eine Art von Dingen, und jede lässt sich umbenennen, um Felder erweitern oder entfernen.
 workspace.template.home.classes.empty=Dieser Arbeitsbereich hat noch keine Klassen. Legen Sie die erste in seiner Verwaltung an; sie erscheint hier, sobald Sie diese Seite überarbeiten.
 workspace.template.home.next.header=Erste Schritte
-workspace.template.home.next.one=Schreiben Sie diese Seite um. Sie ist ein gewöhnliches Dokument — öffnen Sie den Editor und sagen Sie, wofür dieser Arbeitsbereich wirklich da ist.
+workspace.template.home.next.one=Schreiben Sie diese Seite um. Sie ist das eigene Dokument des Arbeitsbereichs: Öffnen Sie den Editor mit „Startseite bearbeiten“ und sagen Sie, wofür dieser Arbeitsbereich wirklich da ist.
 workspace.template.home.next.two=Legen Sie den ersten Vorgang in einer der Klassen oben an und sehen Sie, wie er sich in der Übersicht liest.
 workspace.template.home.next.three=Ergänzen Sie die Ansichten, in denen Sie arbeiten. Beide Übersichten starten mit einer kuratierten Liste und einem Dashboard — Tabelle, Liste und Kanban-Board liegen einen Klick entfernt in der Reiterleiste.
 workspace.template.home.next.four=Entscheiden Sie, wer diesen Arbeitsbereich sehen darf, und geben Sie den Gruppen, die darin arbeiten, ihre Berechtigungen.
-workspace.template.home.footer=Mit dem Arbeitsbereich angelegt. Nichts daran ist besonders — es ist ein Dokument wie jedes andere.
+workspace.template.home.footer=Dies ist die Startseite des Arbeitsbereichs. Sie öffnet die Dokumentübersicht, steht außerhalb des Seitenbaums und kann von allen bearbeitet werden, die im Arbeitsbereich schreiben dürfen.
 workspace.template.post.summary={0} ist eröffnet
 workspace.template.post.banner=Ein neuer Arbeitsbereich
 workspace.template.post.lead={0} wurde aus der Vorlage {1} erstellt. Dies ist der erste Eintrag in seiner Chronik.

@@ -319,7 +319,16 @@ namespace KleeneStar.Core.WebManager
 
             all = [.. all.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)];
 
-            var home = ApplyProse(workspace, template, all, ObjectKind.Document, identityId, culture);
+            // the home page is created by the workspace manager; the result names it only when
+            // this call created it
+            var priorHome = CoreHub.WorkspaceManager.GetWorkspace(workspaceId)?.HomeId;
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspaceId, identityId, culture, template);
+
+            if (home is not null && home.Id == priorHome)
+            {
+                home = null;
+            }
+
             var openingPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture);
 
             // the processes come after the structure they run on: a policy names states, a rule
@@ -694,14 +703,6 @@ namespace KleeneStar.Core.WebManager
 
             CoreHub.ObjectManager.Add(page);
 
-            // the home page is named as such rather than left to be guessed. The overview falls
-            // back to the first root of the page tree, which would happen to be this page today
-            // and stop being it the moment somebody adds one whose title sorts earlier
-            if (document)
-            {
-                CoreHub.WorkspaceManager.SetHome(workspace.Id, page.Id);
-            }
-
             return page;
         }
 
@@ -717,7 +718,7 @@ namespace KleeneStar.Core.WebManager
         /// <param name="kind">The prose kind the class holds.</param>
         /// <param name="culture">The language the description is written in.</param>
         /// <returns>The class, or <see langword="null"/> for a kind that is not a prose kind.</returns>
-        private static Class CreateProseClass(Guid workspaceId, string kind, CultureInfo culture)
+        internal static Class CreateProseClass(Guid workspaceId, string kind, CultureInfo culture)
         {
             if (string.Equals(kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
             {

@@ -17,14 +17,14 @@ A template could have been an entity: a row an administrator edits, with child r
 A template is knowledge about a domain, written down once and true for every installation that shares that domain. Kept as data it would have to be seeded into every new database, migrated whenever its shape changed, and held in step with each deployment by hand — and the first administrator to edit a seeded row would leave the installation permanently unable to take the improved version. Kept as code it is versioned, installable and removable by the same mechanism as everything else a plugin brings, and an installation that wants its own shapes ships its own plugin instead of editing somebody else's rows.
 It follows that templates are **read-only at runtime**. What an administrator changes is the workspace a template produced, never the template. The two part company at the moment of creation and never meet again: nothing links a workspace back to the template it came from, because a workspace that drifted from its template is not wrong, it is finished.
 
-|                    | Template as data                                  | Template as code
-|--------------------|---------------------------------------------------|--------------------------------------------
-| Lives in           | the installation's database                       | a plugin assembly
-| Arrives by         | seeding                                           | installing the plugin
-| Changes by         | editing a row                                     | shipping a version
-| Removed by         | deleting rows, everywhere, by hand                | uninstalling the plugin
-| Editable in the UI | yes — and then unable to take an update           | no
-| Own shapes by      | editing the shipped rows                          | shipping a plugin beside them
+|                   |Template as data                        |Template as code
+|-------------------|----------------------------------------|--------------------------------------------
+|Lives in           |the installation's database             |a plugin assembly
+|Arrives by         |seeding                                 |installing the plugin
+|Changes by         |editing a row                           |shipping a version
+|Removed by         |deleting rows, everywhere, by hand      |uninstalling the plugin
+|Editable in the UI |yes — and then unable to take an update |no
+|Own shapes by      |editing the shipped rows                |shipping a plugin beside them
 
 ## The Manager
 
@@ -47,27 +47,29 @@ Setting the workspace up is the manager's job (`Apply`) rather than the caller's
 
 It is **five** steps, not one. A workspace that arrived with its classes and nothing else still had to be assembled by hand — both overviews an empty tab strip, no page saying what the place is for, an empty timeline — which is the afternoon the templates exist to save in the first place. So applying a template produces:
 
-| Step | What is created                                                                 | Skipped when
-|------|---------------------------------------------------------------------------------|--------------------------------------
-| 1    | the **classes** the template names, each with its **structure** (see below)      | the workspace already carries the name
-| 2    | the starting **views** of the issue and asset overviews                          | the kind already carries a tab of that name
-| 3    | the **home page**, a document                                                    | the workspace already holds a document
-| 4    | the **opening post**, a blog entry                                               | the workspace already holds a post
-| 5    | the **default permissions** (`WorkspacePermissionDefaults`)                      | the workspace already carries any grant
+|Step |What is created                                                             |Skipped when
+|-----|----------------------------------------------------------------------------|-------------------------------------
+|1    |the **classes** the template names, each with its **structure** (see below) |the workspace already carries the name
+|2    |the starting **views** of the issue and asset overviews                     |the kind already carries a tab of that name
+|3    |the **home page**, the workspace's dedicated document (`EnsureHome`)        |the workspace already has its home page
+|4    |the **opening post**, a blog entry                                          |the workspace already holds a post
+|5    |the **default permissions** (`WorkspacePermissionDefaults`)                 |the workspace already carries any grant
 
 The order is the order of dependence. Everything is created **after** the workspace, because it all belongs to it: there is nothing to attach any of it to until it exists. A workspace stored while its setup failed is one an administrator can finish by hand; the other order would leave classes belonging to nothing. For the same reason a step that fails does not stop the ones after it.
 
 The two overviews keep separate tab sets, so the same layout exists once for issues and once for assets:
 
-| Overview | Views created                           | Left to the user
-|----------|-----------------------------------------|--------------------------------
-| Issues   | curated list, dashboard, Scrum          | table, list, Kanban, Gantt, scheduler
-| Assets   | curated list, dashboard                 | table, list, Kanban
+|Overview |Views created                  |Left to the user
+|---------|-------------------------------|--------------------------------
+|Issues   |curated list, dashboard, Scrum |table, list, Kanban, Gantt, scheduler
+|Assets   |curated list, dashboard        |table, list, Kanban
 
 Each leads with its own curated list, because the tab strip has **no built-in first entry** — everything in it comes from the persisted views, so whichever view is ordered first is what the overview opens on.
 It is a *starting* set, not the catalogue. The seeded workspaces carry every layout, and handing a new workspace all of them turned out to be the wrong default: a table and a list of the same rows, beside a board nobody asked for, is six tabs to read before the first item exists. What is created is somewhere to land, the shape of the work, and — for issues — the Scrum view. Everything else is one click away in the tab strip's own template picker, and is left to whoever decides they want it. Assets get no Scrum view at all: the asset overview embeds no Scrum template, so the type is neither offered nor resolvable there.
-The two pages need a class of their kind to live in. It is one the workspace already has when the template names one — a knowledge base gets the home page, an announcement channel gets the post — and otherwise the workspace is given the one class it is missing (`Page` for documents, `News` for posts). A home page is not an optional extra of a workspace, and a class holding one page is a smaller surprise than a workspace with nowhere to write.
-The home page is **named as such** (`Workspace.HomeId`) rather than left to be guessed. Without a choice the document overview falls back to the first root of the page tree by summary, which would happen to be this page today and stop being it the moment somebody adds one whose title sorts earlier. Anybody can point it somewhere else later from the document overview's own more menu — *choose home page* — and picking the automatic entry returns to the fallback.
+The opening post needs a blog class. `Apply` uses a blog class the workspace has; otherwise it creates the class `News`. The home page needs a document class rendered as prose; `EnsureHome` uses the first such class of the workspace (the knowledge base, if the template declares one) and otherwise creates the class `Page`.
+The home page is a **dedicated document** referenced by `Workspace.HomeId` and created by `IWorkspaceManager.EnsureHome`. It is not part of the page tree, has no detail page (its address redirects to the document overview), takes no comments, and is edited on the document overview by callers with write permission on it (*Edit home page*). `EnsureHome` runs for a workspace created from a template, for a plain or cloned create through `/api/1/workspaces`, and at start for every workspace without a home page. A referenced document with a parent, children or comments is not adopted; it stays a page of the tree, and a new home page is created. No object can be created or moved below the home page.
+
+**The template declares the content** (`IWorkspaceTemplate.Home`, type `WorkspaceTemplateHome`): a lead stating the purpose of the workspace, and sections, each with a heading, an optional paragraph and a list of points or numbered steps. `WorkspaceTemplateContent.HomeBody` renders the banner, the workspace description, the lead, the sections, the list of the workspace's classes and a footer; the generic first steps are rendered only when the template declares no sections. The shipped templates declare their home pages in `KleeneStar.Templates` with `WorkspaceTemplateBase.HomePage`, `Section` and `Steps`, in English, shipped as derived keys like every other template text. The seeded demo workspaces receive the same content in English (`KleeneStarDbSeeder.Homes.cs`).
 What the pages say is written by `WorkspaceTemplateContent`, and it is written **once, at creation**, in the language of whoever created the workspace rather than the installation's default: the person filling in the wizard is reading it in one particular language, and an author is going to rewrite the page anyway. A page that silently changed language under an author who had edited it would be worse than one written in the wrong one. Both carry a banner drawn from the product's own mark in the workspace's accent colour. The page stores only its relative address, `/kleenestar/api/1/workspaces/banner?workspace=<id>&caption=<text>` (`WWW/Api/_1_/Workspaces/Banner`, 404 for a workspace the reader may not read), and the drawing follows the workspace's key and colour. It used to be an inline `data:` SVG; since WebExpress 2026-10-29 the reading view cleans stored markup with the editor's url policy (http(s) or relative only), which left those pages with a broken image - pages created before then still carry one.
 The class descriptions are written the same way. A template names them as i18n keys - a template is code, and code speaks every language of the installation - but a class is data: its description is read in the class table, edited in the class dialog and shown on every surface that lists classes, and none of those translates a stored string. Stored as a key, the description stayed `kleenestar.templates:template.servicedesk.class.ticket` everywhere but in the opening post, which happened to pass it through the translator. `Apply` therefore resolves each key once, in the creator's language, and the class carries a sentence (`WorkspaceTemplateManager.Describe`). A description that is not a key comes back unchanged, so a template may name free text as well.
 The permissions come **last**, so everything above is set up while the workspace is still the creator's alone to shape, and they describe the finished workspace: the installation's administrators (`Group.AdministratorsId`) get `workspace_admin_policy`, every signed-in account (the built-in group `Group.AuthenticatedId`) gets `workspace_edit_policy`, and nothing is granted to the built-in `Group.AnonymousId` - which is what shuts a visitor who is not signed in out once the workspace is administered. Only the administrators see the class pages; the creator does too only if they are one of them. A workspace that already carries a grant keeps what its administrators chose. The demo workspaces the seeder writes start with the same grants; see *Permissions Model* in [kleenestar.workspace.md](kleenestar.workspace.md).
@@ -78,14 +80,14 @@ An unknown template key creates nothing and raises nothing. That is the ordinary
 
 A class name is not a class. An incident needs the lifecycle it moves through, the scale it is ranked on, the fields somebody fills in, the forms it is filed and read through, and - because somebody is waiting for it - the hours its clock runs in and the promises that clock measures. A workspace whose classes arrived as bare names had every one of those built by hand afterwards, which is the afternoon again. So a template declares the **structure** of each class beside it, and `Apply` writes it into the class it creates:
 
-| Part           | Declared as                    | Written as
-|----------------|--------------------------------|--------------------------------------------------------------
-| priorities     | `WorkspaceTemplatePriority`    | the class's scale, in the declared order
-| lifecycle      | `WorkspaceTemplateWorkflow`    | the states (with their status category), the workflow placing them - the first state starts it, the marked ones end it - and the transitions between them
-| fields         | `WorkspaceTemplateField`       | the fields; the workflow field is bound to that workflow
-| forms          | derived from the fields        | the create, edit and view forms, a tab per declared tab; a portal-visible class also gets a self-service form of its portal fields, flagged as the portal's request template
-| calendars      | `WorkspaceTemplateCalendar`    | the working hours (every weekday written, the unworked ones disabled) and holidays
-| agreements     | `WorkspaceTemplateSla`         | the SLA policies with their targets, scope rules and escalation levels, each running in the calendar it names or the class's default one
+|Part        |Declared as                 |Written as
+|------------|----------------------------|--------------------------------------------------------------
+|priorities  |`WorkspaceTemplatePriority` |the class's scale, in the declared order
+|lifecycle   |`WorkspaceTemplateWorkflow` |the states (with their status category), the workflow placing them - the first state starts it, the marked ones end it - and the transitions between them
+|fields      |`WorkspaceTemplateField`    |the fields; the workflow field is bound to that workflow
+|forms       |derived from the fields     |the create, edit and view forms, a tab per declared tab; a portal-visible class also gets a self-service form of its portal fields, flagged as the portal's request template
+|calendars   |`WorkspaceTemplateCalendar` |the working hours (every weekday written, the unworked ones disabled) and holidays
+|agreements  |`WorkspaceTemplateSla`      |the SLA policies with their targets, scope rules and escalation levels, each running in the calendar it names or the class's default one
 
 The order is again the order of dependence: states before the workflow that places them, the workflow before the field bound to it, fields before the forms that reference them, calendars before the agreements that run in them. The parts refer to each other **by the name the template declared** - a transition's two states, an agreement's calendar and pause states - because nothing has an id before the workspace exists. A reference that names nothing is dropped rather than stored dangling.
 Three rules keep it from doing damage:
@@ -105,24 +107,24 @@ Because the parts refer to each other by the declared name, the references are m
 
 The `KleeneStar.Templates` plugin declares, per template, classes that belong to its domain and the structure that goes with them:
 
-| Template                 | Classes, and what their structure follows
-|--------------------------|--------------------------------------------------------------------------------------------------
-| Service Desk             | **ITIL 4**: ticket (single point of contact, triage), incident (impact × urgency, P1-P5, major incident, resolution code, on-hold pause, P1/P2 on the 24/7 calendar), service request (catalog item, approval, fulfilment), problem (root cause, workaround, known error), change (standard / normal / emergency, assessment, authorization, schedule, implementation, review), knowledge, announcements
-| Software Development     | agile task, defect lifecycle with severity and reproduction steps, sprint, repository, pipeline, specification (form-rendered review cycle), documentation, release notes
-| Configuration Database   | **ITIL service configuration management**: configuration item (asset lifecycle, business criticality), typed relationship, change request, vulnerability (remediation deadline by severity), compliance control, policy, approval
-| Finance                  | budget cycle, invoice processing, cost center, contract, forecast, monetary approval
-| Human Resources          | employee lifecycle, organization unit, position (recruiting), onboarding (ready before the first day), absence request, training
-| Product Management       | feature (RICE, MoSCoW), requirement, roadmap (now / next / later), release plan, use case, stakeholder map
-| Procurement              | purchase-to-pay: supplier qualification, tender, purchase order, goods receipt, invoice with three-way match, contract
+|Template                 |Classes, and what their structure follows
+|-------------------------|-------------------------------------------------------------------------------------------------
+|Service Desk             |**ITIL 4**: ticket (single point of contact, triage), incident (impact × urgency, P1-P5, major incident, resolution code, on-hold pause, P1/P2 on the 24/7 calendar), service request (catalog item, approval, fulfilment), problem (root cause, workaround, known error), change (standard / normal / emergency, assessment, authorization, schedule, implementation, review), knowledge, announcements
+|Software Development     |agile task, defect lifecycle with severity and reproduction steps, sprint, repository, pipeline, specification (form-rendered review cycle), documentation, release notes
+|Configuration Database   |**ITIL service configuration management**: configuration item (asset lifecycle, business criticality), typed relationship, change request, vulnerability (remediation deadline by severity), compliance control, policy, approval
+|Finance                  |budget cycle, invoice processing, cost center, contract, forecast, monetary approval
+|Human Resources          |employee lifecycle, organization unit, position (recruiting), onboarding (ready before the first day), absence request, training
+|Product Management       |feature (RICE, MoSCoW), requirement, roadmap (now / next / later), release plan, use case, stakeholder map
+|Procurement              |purchase-to-pay: supplier qualification, tender, purchase order, goods receipt, invoice with three-way match, contract
 
 **The defaults per object type live in the plugin** (`TemplateStructure.Resolve`), because deciding what a class has is the templates' job, not the core's. Whatever a template leaves open (`null`) is taken from the kind; an empty list means "none" and is kept:
 
-| Kind                          | Fields                                                    | Priorities    | Lifecycle        | Calendars / SLA
-|-------------------------------|-----------------------------------------------------------|---------------|------------------|-------------------------------
-| issue                         | description, status, priority, assignee, due date, labels | general scale | standard         | business hours, one standard agreement pausing in every waiting state
-| asset                         | description, status, criticality, owner, location, labels | general scale | asset lifecycle  | none - an asset keeps no service clock
-| document rendered as a form   | status, priority, owner, version, next review, labels     | general scale | review cycle     | none
-| prose (document, blog)        | none                                                      | none          | none             | none
+|Kind                        |Fields                                                    |Priorities    |Lifecycle        |Calendars / SLA
+|----------------------------|----------------------------------------------------------|--------------|-----------------|------------------------------
+|issue                       |description, status, priority, assignee, due date, labels |general scale |standard         |business hours, one standard agreement pausing in every waiting state
+|asset                       |description, status, criticality, owner, location, labels |general scale |asset lifecycle  |none - an asset keeps no service clock
+|document rendered as a form |status, priority, owner, version, next review, labels     |general scale |review cycle     |none
+|prose (document, blog)      |none                                                      |none          |none             |none
 
 A template names only what is particular to a class: its fields are **merged** into the kind's base fields (a declared field of the same name takes the base field's place), the status field exists exactly when there is a lifecycle, and the priority field exactly when there is a scale. An agreement whose target measures an approval names its pause states itself - the default would stop its clock in the very state the approval is awaited in, and a test holds that.
 The templates are **written in English and shipped as keys**. Hundreds of names and sentences written as keys would be unreviewable, and written as English they would give a German service desk English states. `TemplateText.Key` derives the key from the text, gettext-style (`kleenestar.templates:text.in_progress`; a long sentence keeps its first words and a hash), as the last step of `TemplateStructure.Resolve`. The plugin's English language file carries the text as its own translation and the German one the translation; the tests hold code and English file in step, require both files to carry every key, and refuse two different texts folding into one key and two names of one class translating to the same word.
@@ -150,23 +152,23 @@ The name and the key are marked required, and for a long time nothing checked ei
 
 ## Where the Pieces Live
 
-| Concern                         | Where
-|---------------------------------|--------------------------------------------------
-| What a template is              | `IWorkspaceTemplate`, `WorkspaceTemplateClass` (`KleeneStar.Core/WebWorkspaceTemplate`)
-| What a class's structure is     | `WorkspaceTemplateField`, `…Priority`, `…Workflow` / `…Status` / `…Transition`, `…Calendar`, `…Sla`
-| Writing the structure           | `WorkspaceTemplateStructure` (called by `WorkspaceTemplateManager.ApplyClasses`)
-| Silencing the per-record toasts | `CoreHub.BeginSilentNotifications`
-| One registration                | `IWorkspaceTemplateContext`
-| Discovery and application       | `IWorkspaceTemplateManager` / `WorkspaceTemplateManager`
-| What an application produced    | `WorkspaceTemplateResult`
-| What the two pages say          | `WorkspaceTemplateContent`
-| The wizard                      | `WorkspaceAddFormFragment`
-| Applying on create              | `/api/1/workspaces` — `ApplyTemplate` in its `Create`
-| Refusing a nameless workspace   | `/api/1/workspaces` — `Validate`
-| The templates shipped           | the `KleeneStar.Templates` plugin
-| The defaults per object type    | `TemplateStructure` (plugin)
-| Structures shared by templates  | `SharedStructures` (plugin): ITIL change, approval, invoice, contract
-| English text → key              | `TemplateText` (plugin), language files `Internationalization/de`, `en`
+|Concern                         |Where
+|--------------------------------|--------------------------------------------------
+|What a template is              |`IWorkspaceTemplate`, `WorkspaceTemplateClass` (`KleeneStar.Core/WebWorkspaceTemplate`)
+|What a class's structure is     |`WorkspaceTemplateField`, `…Priority`, `…Workflow` / `…Status` / `…Transition`, `…Calendar`, `…Sla`
+|Writing the structure           |`WorkspaceTemplateStructure` (called by `WorkspaceTemplateManager.ApplyClasses`)
+|Silencing the per-record toasts |`CoreHub.BeginSilentNotifications`
+|One registration                |`IWorkspaceTemplateContext`
+|Discovery and application       |`IWorkspaceTemplateManager` / `WorkspaceTemplateManager`
+|What an application produced    |`WorkspaceTemplateResult`
+|What the two pages say          |`WorkspaceTemplateContent`
+|The wizard                      |`WorkspaceAddFormFragment`
+|Applying on create              |`/api/1/workspaces` — `ApplyTemplate` in its `Create`
+|Refusing a nameless workspace   |`/api/1/workspaces` — `Validate`
+|The templates shipped           |the `KleeneStar.Templates` plugin
+|The defaults per object type    |`TemplateStructure` (plugin)
+|Structures shared by templates  |`SharedStructures` (plugin): ITIL change, approval, invoice, contract
+|English text → key              |`TemplateText` (plugin), language files `Internationalization/de`, `en`
 
 ## Writing a Template
 
@@ -211,10 +213,10 @@ Two placeholders bridge the template and the installation: `{creator}` becomes t
 
 The shipped templates use it:
 
-|Template            |Approvals                                                         |Rules
-|--------------------|------------------------------------------------------------------|------------------------------------------------
-|Service Desk        |*Change authorization* (Authorization → Scheduled / Rejected); *Release go-live* on the new **Release** class (Go-live approval → Deployment / back to Build) |escalate incidents at risk (`sla.atrisk`) and notify the assignee; note missed targets (`sla.breached`); acknowledge new service requests
-|Finance             |*Payment approval* of invoices (Approval → Approved for Payment / Rejected) |-
-|Software Development|-                                                                  |note failed pipelines and deployments reported by GitLab, Jenkins or Automic (`integration.received`)
+|Template             |Approvals                                                         |Rules
+|---------------------|------------------------------------------------------------------|------------------------------------------------
+|Service Desk         |*Change authorization* (Authorization → Scheduled / Rejected); *Release go-live* on the new **Release** class (Go-live approval → Deployment / back to Build) |escalate incidents at risk (`sla.atrisk`) and notify the assignee; note missed targets (`sla.breached`); acknowledge new service requests
+|Finance              |*Payment approval* of invoices (Approval → Approved for Payment / Rejected) |-
+|Software Development |-                                                                  |note failed pipelines and deployments reported by GitLab, Jenkins or Automic (`integration.received`)
 
 The Service Desk's **Release** class (ITIL release management) runs Planned → Build → Test → Go-live approval → Deployment → Deployed, with Rolled back and Cancelled, and carries version, release type, planned date and rollback plan.

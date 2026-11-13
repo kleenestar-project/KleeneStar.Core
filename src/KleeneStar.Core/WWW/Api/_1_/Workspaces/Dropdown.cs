@@ -190,7 +190,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         private static IUri GetUri(Workspace item, IRequest request)
         {
-            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()?
+            // a workspace opens on the document overview, which shows its home page
+            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>()?
                 .BindParameters(new WorkspaceKeyParameter(item?.Key));
         }
     }

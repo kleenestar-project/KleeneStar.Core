@@ -113,8 +113,7 @@ by more people than its original would be a leak dressed up as a convenience.
 
 **In its own dialog** — `WWW/Issue/{objectkey}/SecurityLevel`, opened from the entry in the
 overflow menu where the object's permission dialog used to sit. `ObjectSecurityLevelFormFragment`
-is a one-field edit form over the object CRUD endpoint (no endpoint of its own, the same
-arrangement `DocumentHomeFormFragment` uses for the workspace home page), and
+is a one-field edit form over the object CRUD endpoint (no endpoint of its own), and
 `ObjectFormLayout.CreateSecurityLevelInput` builds the selection, fed by
 `/api/1/securitylevels/{classid}/selection`, which offers only the levels the caller may assign
 plus an entry standing for *unclassified* (the empty guid, which the form binder reads as "clear
