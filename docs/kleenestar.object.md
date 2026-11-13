@@ -837,45 +837,82 @@ After the move, the object is displayed in the new class and/or workspace. Only 
 
 ### Object Management - Export (Modal)
 
-The "Export" function enables exporting objects from the system to an external format, for example for further processing, documentation, or sharing with third parties. The function is available in the object overview and may support different formats such as CSV, Excel, or PDF, depending on context.
+The entry *Export* of the overflow menu (`ObjectItemExportMoreFragment`) on the issue, asset,
+document and blog pages and in the preview pane opens `WWW/Issue/{objectkey}/Export`. The dialog
+(`ObjectExportFormFragment`, a REST add form) offers the formats as a tile selection
+(`ControlFormItemInputTile` named `Format`, two columns, search field, empty text) of the formats
+of `CoreHub.ObjectExportManager`, in their order; the first is preselected
+(`WebControl/PresetInputTile`). *Export* posts `Format` to `/api/1/exports/{objectkey}`, which
+answers `{ uri }`; the form follows it (`TypeRestFormSuccess.FollowUri`), the browser downloads the
+attachment, the dialog closes and the page stays.
 
-The export includes all fields and content that are visible to the user according to their permissions. The structure of the export follows the current view. That is, filters, column selection, and sorting directly affect the exported data. Linked objects such as subobjects or parent references can optionally be included, if configured.
+**Content.** `ObjectExport.Collect` reads the object through `IObjectManager.GetObjectByKey`, so
+content visibility and security levels apply. It exports the system attributes (key, summary,
+object type, workspace, class, record state, security level, creator, assignee, created, updated),
+the description and the values of the active fields of the class (`ClassFields.Active`). Fields
+named `Summary` or `Description` alias system attributes and are not exported as fields. Display
+texts follow `ObjectValueFormat` in the request culture; a password field exports no value, only
+the mask. Attributes carry a machine value (dates in ISO 8601 UTC) and a display text (dates in the
+request culture). The description text of a workbook is `SpreadsheetWorkbook.ToPlainText()`, every
+cell without the preview limit of `WorkbookText.ToPlainText` (`ObjectExport.DescriptionText`).
 
-The export function is read-only and does not alter any data in the system. It is especially suitable for handing off information to external parties, for archiving completed processes, or for analyzing object data outside the application. For complex objects with nested relationships, the export can be rendered as a structured report, for example with section logic or a hierarchy tree in PDF format.
+**Formats are registrable classes.** `IObjectExportFormat` (`WebReport/IObjectExportFormat.cs`)
+declares key, extension, tile texts (i18n keys), badge, colour, icon, order, the download
+parameters (`Parameters`, default none) and `Write(record, request)`, which answers the attachment
+(`ObjectExport.Attachment`, `ObjectExport.FileName`). `WebManager/ObjectExportManager` collects
+every `public sealed` implementation with a public parameterless constructor from the core and the
+plugins through WebExpress's `PluginTypeCatalog`; a plugin adds a format by declaring such a class.
+`Register`/`Unregister` take a format that is no plugin type. Without a host `CoreHub` answers from
+a detached manager that knows the core's formats. The core ships `WebReport/Formats`:
+
+| Key | Class | Order |
+|-----|-------|-------|
+| `pdf` | `PdfObjectExportFormat` | 10 |
+| `json` | `JsonObjectExportFormat` | 20 |
+| `csv` | `CsvObjectExportFormat` (`Parameters`: `delimiter=semicolon` for a culture with a decimal comma) | 30 |
+
+**Relations and comments** (`WebReport/ObjectExport.Activity.cs`); revisions are not exported:
+
+- Relations: `IObjectRelationManager.GetRelations`; the other end is read again through
+  `IObjectManager.GetObject`, so a relation to an object the caller may not read is not exported.
+  The label is the inverse label when the object is the target of an asymmetric type; an external
+  address exports caption and address.
+- Comments: `ICommentManager.GetComments` narrowed by `CommentAudience.Filter` (internal notes only
+  for the service team), deleted comments omitted, in thread order (a reply follows the comment it
+  answers).
+
+| Format | Content |
+|--------|---------|
+| PDF | `PdfDocument` (WebExpress `WebPdf`): heading `{key} {summary}`, attribute table, description (`EditorContent.ConvertToPdf`; a workbook as one table per visible sheet, at most `PdfObjectExportFormat.MaxSheetRows` 500 rows and `MaxSheetColumns` 26 columns, a formula without stored result as the formula), field table, a section each for relations (table) and comments (author, date, internal note and reply markers, content through `EditorContent.ConvertToPdf`), footer `object.export.pdf.footer` |
+| JSON | UTF-8, indented, camel case: the attributes as machine values, `description` as plain text, `fields` with `name`, `type`, `value` (stored value) and `text` (display text), `relations`, `comments`, `exported` |
+| CSV | `CsvDocument`: one header row (attribute labels, description, field names) and one value row, then a table block each for relations and comments (empty row, title row, header row, entries); the dialog address carries `delimiter=semicolon` when the request culture uses a comma as decimal separator |
+
+The file is named `{key}.{extension}`.
 
 ```
-╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
-║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
-║└─────╔ObjectExportModal═══════════════════════════════════════════════════════╗─────┘║
-║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
-║│ / Se║│ Export Object                                                        │║     │║
-║└─────║├──────────────────────────────────────────────────────────────────────┤║─────┘║
-║┌Works║│ Select the desired export format and the content to be exported.     │║─────┐║
-║│[Name║│                                                                      │║     │║
-║│     ║│ Export format:                                                       │║rch] │║
-║│     ║│   ● Excel (.xlsx)                                                    │║     │║
-║│     ║│   ○ CSV (.csv)                                                       │║-----│║
-║│ Issu║│   ○ PDF report                                                       │║ […] │║
-║│ ├─ I║│                                                                      │║ […] │║
-║│ ├─ P║│                                                                      │║ […] │║
-║│ └─ S║│ Content:                                                             │║ […] │║
-║│     ║│   [ ] Linked subobjects                                              │║ […] │║
-║│     ║│   [ ] Comments                                                       │║ […] │║
-║│     ║│   [ ] History / change log                                           │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│    Note: Exported data only includes fields you are allowed to see.  │║ […] │║
-║│     ║│                                                                      │║     │║
-║│     ║└──────────────────────────────────────────────────────────────────────┘║xt › │║
-║├─────║                                                                        ║     │║
-║│ [+] ║                                                     [Export] [Cancel]  ║     │║
-║└─────║                                                                        ║─────┘║
-║┌Foote╚════════════════════════════════════════════════════════════════════════╝─────┐║
-║│ [Documentation]        |        KleeneStar v1.2.3        |      [Report a problem] │║
-║└────────────────────────────────────────────────────────────────────────────────────┘║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
+╔ObjectExportModal═══════════════════════════════════════════════════════╗
+║ Export object                                                          ║
+╟────────────────────────────────────────────────────────────────────────╢
+║ Format*:                                                               ║
+║ ┌Search────────────────────────────────────────────────────────────┐   ║
+║ │ Search format...                                                 │   ║
+║ └──────────────────────────────────────────────────────────────────┘   ║
+║ ┌Tile (selected)───────────────┐ ┌Tile─────────────────────────────┐   ║
+║ │ ● PDF                        │ │ ● JSON                          │   ║
+║ │ PDF document                 │ │ JSON file                       │   ║
+║ │ A print ready document ...   │ │ Structured data for ...         │   ║
+║ │ Attributes, description, ... │ │ Attributes, description, ...    │   ║
+║ └──────────────────────────────┘ └─────────────────────────────────┘   ║
+║ ┌Tile──────────────────────────┐                                       ║
+║ │ ● CSV                        │                                       ║
+║ │ CSV file                     │                                       ║
+║ │ One table row with all ...   │                                       ║
+║ │ Header row and one data row  │                                       ║
+║ └──────────────────────────────┘                                       ║
+║ The export contains the attributes, the description and the values ... ║
+╟────────────────────────────────────────────────────────────────────────╢
+║                                                    [Export] [Close]    ║
+╚════════════════════════════════════════════════════════════════════════╝
 ```
 
 ### Object Management - Delete Object (Modal)
@@ -1012,6 +1049,8 @@ For programmatic interaction with object management, **KleeneStar** provides a R
 |`/api/1/objects/{workspaceKey}/{objectKey}/restore`                     |POST        |Restores a previously archived object.
 |`/api/1/objects/{workspaceKey}/{objectKey}/transitions`                 |GET         |Lists all available workflow transitions for the object.
 |`/api/1/objects/{workspaceKey}/{objectKey}/transitions/{transitionKey}` |POST        |Executes a workflow transition for the object. May include field values in the body.
+|`/api/1/exports/{objectKey}?format={key}`                               |GET         |Exports the object in a format of `IObjectExportManager` (core: `pdf`, `json`, `csv`) as an attachment `{objectKey}.{extension}`; CSV takes `delimiter=semicolon`. Without `format`: `{ "format": "<first key>" }`, the starting values of the export dialog. Unknown format `400`, unreadable object `404`.
+|`/api/1/exports/{objectKey}`                                            |POST        |Body `Format` (form data or JSON). Answers `{ "uri": … }`, the address of the matching `GET` with the parameters of the format.
 |`/api/1/hierarchy/{objectKey}`                                          |GET         |Returns the hierarchy of the object: the ancestor chain (nearest first), the parent, the object itself, the immediate children (with their resolved workflow status), and the siblings.
 |`/api/1/hierarchy/{objectKey}`                                          |PUT         |Sets or clears the parent. Body: `{ "parent": "KEY" }` (object key or id) or `{ "parent": null }`. Validates against self-parenting, cycles, cross-workspace links, and the allowed-children declaration of the parent's class.
 

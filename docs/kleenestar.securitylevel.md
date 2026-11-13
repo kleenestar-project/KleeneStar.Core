@@ -121,7 +121,7 @@ binder reads as "clear this property"), then the active levels the caller may as
 description, the badge `securitylevel.isdefault.label` or `Rank n`, and the cleared groups
 (`securitylevel.object.clearance`). The tile of the current classification carries the chip
 `securitylevel.object.current` and is preselected: `ControlDataForm` does not call the initialize
-hook of its items, so `PreselectedInputTile` writes the value into the render context before the
+hook of its items, so `WebControl/PresetInputTile` writes the value into the render context before the
 tile renders (`data-value`). A level the object carries and the caller cannot assign is added as a
 tile with the footer `securitylevel.object.kept`, so the posted value keeps it. The selection
 offers a search field (`securitylevel.object.search`) that narrows the tiles by their text; without a match it shows

@@ -36,6 +36,8 @@ namespace KleeneStar.Core
         private static AuthenticationSourceManager _authenticationSourceManagerDetached;
         private static InsightViewTypeManager _insightViewTypeManager;
         private static InsightViewTypeManager _insightViewTypeManagerDetached;
+        private static ObjectExportManager _objectExportManager;
+        private static ObjectExportManager _objectExportManagerDetached;
         private static FormManager _formManager;
         private static PriorityManager _priorityManager;
         private static WorkflowManager _workflowManager;
@@ -157,6 +159,11 @@ namespace KleeneStar.Core
         /// Gets the tab types an insight can show.
         /// </summary>
         public static IInsightViewTypeManager InsightViewTypeManager => _insightViewTypeManager ?? (_insightViewTypeManager = ComponentHub?.GetComponentManager<InsightViewTypeManager>()) ?? (_insightViewTypeManagerDetached ??= WebManager.InsightViewTypeManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the file formats a single object is exported in.
+        /// </summary>
+        public static IObjectExportManager ObjectExportManager => _objectExportManager ?? (_objectExportManager = ComponentHub?.GetComponentManager<ObjectExportManager>()) ?? (_objectExportManagerDetached ??= WebManager.ObjectExportManager.CreateDetached());
 
         /// <summary>
         /// Gets the form manager responsible for managing forms within the class.

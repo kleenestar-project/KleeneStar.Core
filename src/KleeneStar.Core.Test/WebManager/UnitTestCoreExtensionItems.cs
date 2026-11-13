@@ -1,6 +1,7 @@
 using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebIdentity;
 using KleeneStar.Core.WebInsight;
+using KleeneStar.Core.WebReport;
 
 namespace KleeneStar.Core.Test.WebManager
 {
@@ -19,14 +20,14 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void EveryShippedItemIsFindable()
         {
-            var contracts = new[] { typeof(IObjectKind), typeof(IObjectRenderer), typeof(IAuthenticationSource), typeof(IInsightViewType) };
+            var contracts = new[] { typeof(IObjectKind), typeof(IObjectRenderer), typeof(IAuthenticationSource), typeof(IInsightViewType), typeof(IObjectExportFormat) };
             var items = typeof(CoreHub).Assembly.GetTypes()
                 .Where(x => x.IsClass && !x.IsAbstract && contracts.Any(c => c.IsAssignableFrom(x)))
                 // a source per configuration entry is registered, not found
                 .Where(x => x != typeof(OpenIdConnectAuthenticationSource))
                 .ToList();
 
-            Assert.Equal(15, items.Count);
+            Assert.Equal(18, items.Count);
             Assert.All(items, x =>
             {
                 Assert.True(x.IsPublic && x.IsSealed, $"{x.FullName} must be public sealed, or no manager finds it.");
@@ -48,6 +49,7 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.IsType<LocalAuthenticationSource>(CoreHub.AuthenticationSourceManager.GetSource(null));
             Assert.Equal(7, CoreHub.InsightViewTypeManager.Types.Count(x => x.GetType().Assembly == typeof(CoreHub).Assembly));
             Assert.NotNull(CoreHub.InsightViewTypeManager.Get(global::KleeneStar.Core.WebManager.InsightViewTypeManager.Default));
+            Assert.Subset(CoreHub.ObjectExportManager.Formats.Select(x => x.Key).ToHashSet(), new HashSet<string> { "pdf", "json", "csv" });
         }
     }
 }

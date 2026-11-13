@@ -42,7 +42,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// accepts an unchanged classification. Each level tile shows icon, name, description, rank,
     /// the default marker and the cleared groups (<see cref="SecurityLevelEntity.PermittedGroupIds"/>).
     /// The tile of the current classification carries the chip <c>securitylevel.object.current</c>
-    /// and is preselected (<c>PreselectedInputTile</c>). The search field narrows the tiles by
+    /// and is preselected (<see cref="PresetInputTile"/>). The search field narrows the tiles by
     /// their text.
     /// </para>
     /// <para>
@@ -55,33 +55,6 @@ namespace KleeneStar.Core.WebFragment.Object
     [Cache]
     public sealed class ObjectSecurityLevelFormFragment : FragmentControlDataFormEdit
     {
-        /// <summary>
-        /// A tile selection rendered with a preset value.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="ControlDataForm"/> does not call <see cref="ControlFormItemInput{TValue}.Initialize(IRenderControlFormContext)"/>
-        /// on its items, so the initialize hook of the input never runs. The value is written into
-        /// the render context before the tile renders and reaches the client as <c>data-value</c>.
-        /// The form load overwrites it with the stored <see cref="ObjectEntity.SecurityLevelId"/>
-        /// when that names a tile; <c>null</c> names none and keeps the preset.
-        /// </remarks>
-        /// <param name="value">The preset value.</param>
-        private sealed class PreselectedInputTile(string value) : ControlFormItemInputTile
-        {
-            /// <summary>
-            /// Renders the tile selection with the preset value.
-            /// </summary>
-            /// <param name="renderContext">The context in which the control is rendered.</param>
-            /// <param name="visualTree">The visual tree representing the control's structure.</param>
-            /// <returns>An HTML node representing the rendered control.</returns>
-            public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
-            {
-                renderContext.SetValue(this, new ControlFormInputValueStringList(value));
-
-                return base.Render(renderContext, visualTree);
-            }
-        }
-
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -191,7 +164,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 .ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(x => CreateLevelCard(renderContext, x, x.Id == currentId, assignable.Any(a => a.Id == x.Id), groupNames)));
 
-            var selection = new PreselectedInputTile(currentId.ToString())
+            var selection = new PresetInputTile(currentId.ToString())
             {
                 Name = _ => nameof(ObjectEntity.SecurityLevelId),
                 Label = _ => "kleenestar.core:securitylevel.object.label",

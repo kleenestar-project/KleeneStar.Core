@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using WebExpress.WebCore.Internationalization;
+using WebExpress.WebCore.WebMessage;
 using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebControl
@@ -47,17 +48,31 @@ namespace KleeneStar.Core.WebControl
         /// <returns>The display text.</returns>
         public static string Format(IRenderControlContext renderContext, Field field, string data)
         {
+            return Format(renderContext?.Request, field, data);
+        }
+
+        /// <summary>
+        /// Formats a persisted value for reading in the culture of a request, the overload for
+        /// callers without a render context (endpoints, exports).
+        /// </summary>
+        /// <param name="request">The request, carrying the culture. May be null (invariant).</param>
+        /// <param name="field">The field being formatted.</param>
+        /// <param name="data">The persisted payload. May be null or blank, which formats
+        /// as <see cref="Empty"/>.</param>
+        /// <returns>The display text.</returns>
+        public static string Format(IRequest request, Field field, string data)
+        {
             if (string.IsNullOrWhiteSpace(data))
             {
                 return Empty;
             }
 
-            var culture = renderContext?.Request?.Culture ?? CultureInfo.InvariantCulture;
+            var culture = request?.Culture ?? CultureInfo.InvariantCulture;
 
             switch (field?.FieldType)
             {
                 case FieldType.Boolean:
-                    return I18N.Translate(renderContext, bool.TryParse(data, out var flag) && flag
+                    return I18N.Translate(request, bool.TryParse(data, out var flag) && flag
                         ? "kleenestar.core:object.property.yes"
                         : "kleenestar.core:object.property.no");
 
