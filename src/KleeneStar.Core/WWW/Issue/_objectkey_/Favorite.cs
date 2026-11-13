@@ -56,10 +56,16 @@ namespace KleeneStar.Core.WWW.Issue._objectkey_
                 _objectManager.SetFavorite(ownerId, objectEntity.Id, !isFavorite);
             }
 
+            // back to the page the link was clicked on (detail page or the overview hosting the
+            // preview pane); without a usable referrer, the detail page
             throw new RedirectException
             (
-                CoreHub.GetUri<Index>()
-                    .BindParameters(new ObjectKeyParameter(keyParameter?.Value))
+                global::KleeneStar.Core.WebRestApi.ReturnAddress.Resolve
+                (
+                    renderContext.Request,
+                    CoreHub.GetUri<Index>()
+                        .BindParameters(new ObjectKeyParameter(keyParameter?.Value))
+                )
             );
         }
     }

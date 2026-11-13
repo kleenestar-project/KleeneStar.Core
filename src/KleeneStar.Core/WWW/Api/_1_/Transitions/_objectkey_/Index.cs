@@ -60,10 +60,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
                 global::KleeneStar.Core.WebWorkflow.WorkflowTransitionNotice.Report(result);
             }
 
-            // dispatch to the detail view matching the object's kind (/issue, /document, …)
-            var target = global::KleeneStar.Core.CoreHub.ObjectKindManager
-                .ResolveDetailUri(@object)?
-                .BindParameters(request);
+            // back to the page the link was clicked on (detail page or the overview hosting the
+            // preview pane); without a usable referrer, the detail view of the object's kind
+            var target = global::KleeneStar.Core.WebRestApi.ReturnAddress.Resolve
+            (
+                request,
+                global::KleeneStar.Core.CoreHub.ObjectKindManager
+                    .ResolveDetailUri(@object)?
+                    .BindParameters(request)
+            );
 
             return new ResponseMovedTemporarily(target);
         }

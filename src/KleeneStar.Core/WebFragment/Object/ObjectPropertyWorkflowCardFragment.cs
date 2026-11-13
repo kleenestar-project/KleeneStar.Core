@@ -266,9 +266,7 @@ namespace KleeneStar.Core.WebFragment.Object
             // what this person may move this object to, not what the state machine allows: a
             // transition whose guards refuse is not offered, so the refusal never arrives after
             // the click
-            var targets = _workflowManager
-                .GetOfferedStatuses(workflow, current, @object, field, CoreHub.SessionManager.GetCurrentIdentityId(null))
-                .ToList();
+            var targets = ObjectWorkflowTargets.Offered(@object, field, workflow, current);
 
             if (targets.Count == 0)
             {
@@ -281,27 +279,15 @@ namespace KleeneStar.Core.WebFragment.Object
                 return;
             }
 
-            foreach (var status in targets)
+            foreach (var (status, transition) in targets)
             {
-                // the transition is only looked up for its label; the endpoint resolves the
-                // state change itself, so a target reachable through several transitions still
-                // appears once
-                var transition = (workflow.Transitions ?? [])
-                    .FirstOrDefault(t => t.State == TransitionState.Active
-                        && current is not null
-                        && t.SourceId == current.Id
-                        && t.TargetId == status.Id);
-
                 split.Add(new ControlSplitButtonItemLink("object-workflow-status-" + status.Id.ToString("N"))
                 {
                     Text = _ => status.Name,
                     Icon = _ => ResolveIcon(status),
                     Tooltip = _ => transition?.Name,
                     TextColor = _ => new PropertyColorText(status.Category?.Color),
-                    Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_.Index>()?
-                        .BindParameters(new ObjectKeyParameter(@object.Key))
-                        .Add(new UriQuery(FieldIdParameter.Key, field.Id.ToString()))
-                        .Add(new UriQuery(WorkflowStateIdParameter.Key, status.Id.ToString()))
+                    Uri = _ => ObjectWorkflowTargets.TransitionUri(@object, field, status)
                 });
             }
         }
@@ -345,7 +331,7 @@ namespace KleeneStar.Core.WebFragment.Object
         /// </remarks>
         /// <param name="status">The state, or <c>null</c> when the object carries none.</param>
         /// <returns>The icon to render.</returns>
-        private static IIcon ResolveIcon(Status status)
+        internal static IIcon ResolveIcon(Status status)
         {
             return Normalize(status?.Category?.Name) switch
             {

@@ -25,6 +25,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionHeadlineMorePreferences>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Cache]
     public sealed class ObjectItemSubtaskMoreFragment : FragmentControlDropdownItemLink
     {
