@@ -244,7 +244,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             var newItem = new Model.Entities.Object()
             {
                 Summary = data.Summary + " (Copy)",
-                Description = data.Description,
+
+                // the prose editor of the clone wizard throws on null while the form fills its
+                // fields, and every field after it would stay empty
+                Description = data.Description ?? string.Empty,
                 Icon = data.Icon,
                 State = WorkspaceState.Active,
                 WorkspaceId = data.WorkspaceId,
@@ -258,7 +261,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             };
 
             var result = RetrieveForClone(request, newItem);
-            MergeFieldValues(result, data.Id, data.ClassId);
+            MergeFieldValues(result, data.Id, data.ClassId, request);
             return result;
         }
 
@@ -291,7 +294,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
             if (data is not null)
             {
-                MergeFieldValues(result, data.Id, data.ClassId);
+                MergeFieldValues(result, data.Id, data.ClassId, request);
             }
 
             return result;
@@ -310,7 +313,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="objectId">The id of the object whose values to merge.</param>
         /// <param name="classId">The id of the object's class, used to look up the
         /// field definitions for name + filtering.</param>
-        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId)
+        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
         {
             if (result?.Data is not IDictionary<string, object> data)
             {
@@ -329,7 +332,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                data[field.Name] = value.Data;
+                // the dialog inputs load what they submit (FieldValueForm): a boolean as a JSON
+                // boolean, a date in the short date pattern of the request culture
+                data[field.Name] = field.FieldType switch
+                {
+                    FieldType.Boolean => FieldValueForm.IsTrue(value.Data),
+                    FieldType.Date => FieldValueForm.ToDateInput(value.Data, request?.Culture),
+                    _ => value.Data
+                };
             }
         }
 
@@ -573,9 +583,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     CoreHub.ObjectManager.Add(newItem);
                     run.TrackObject(newItem.Id);
 
-                    UpsertFieldValues(newItem, fieldMap);
+                    UpsertFieldValues(newItem, fieldMap, request);
 
                     ApplyPresetValues(newItem, presets, fieldMap);
+
+                    // a new record starts in the entry state of every workflow it has no state of
+                    StartWorkflows(newItem);
                 }
 
                 if (template is not null)
@@ -750,8 +763,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             newItem.WorkspaceId = existingItem?.WorkspaceId ?? newItem.WorkspaceId;
 
             // a copy keeps the classification of its original when the payload names none; see
-            // RetrieveForClone for why it is not allowed to come out more visible
-            newItem.SecurityLevelId ??= existingItem?.SecurityLevelId;
+            // RetrieveForClone for why it is not allowed to come out more visible. The empty guid
+            // the clone wizard submits for its unclassified tile is a decision and declassifies
+            if (fieldMap.TryGetGuidReference(nameof(Model.Entities.Object.SecurityLevelId), out var securityLevelId))
+            {
+                newItem.SecurityLevelId = securityLevelId;
+            }
+            else
+            {
+                newItem.SecurityLevelId ??= existingItem?.SecurityLevelId;
+            }
 
             DeriveReferences(fieldMap, newItem);
             EnsureKey(newItem);
@@ -760,7 +781,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             {
                 CoreHub.ObjectManager.Add(newItem);
 
-                UpsertFieldValues(newItem, fieldMap);
+                // a date input carries no time: a copy whose date equals the original's keeps the
+                // original value with its time
+                UpsertFieldValues(newItem, fieldMap, request, existingItem is null
+                    ? null
+                    : CoreHub.ValueManager.GetValues(existingItem.Id)
+                        .GroupBy(x => x.FieldId)
+                        .ToDictionary(x => x.Key, x => x.First().Data));
+
+                // a field the dialog has no input for (avatar, a field off the edit form) is
+                // copied as the original holds it
+                if (existingItem is not null)
+                {
+                    CopyUnsentValues(existingItem, newItem, fieldMap);
+                }
+
+                // a copy is a new record of the process: the payload of the wizard carries no
+                // state and the original's is not copied, so it starts in the entry state
+                StartWorkflows(newItem);
             }
 
             return Created(newItem);
@@ -806,7 +844,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             {
                 CoreHub.ObjectManager.Update(existingItem);
 
-                UpsertFieldValues(existingItem, payload);
+                UpsertFieldValues(existingItem, payload, request);
 
                 if (parentSent && requestedParentId != previousParentId)
                 {
@@ -1287,7 +1325,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </remarks>
         /// <param name="object">The object whose field values are written.</param>
         /// <param name="payload">The payload carrying the values.</param>
-        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload)
+        /// <param name="request">The request, for the culture of submitted dates; may be null.</param>
+        /// <param name="baseline">The values a submitted date is compared with when the object
+        /// has none yet (the original of a clone), keyed by field id; may be null.</param>
+        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
         {
             if (@object is null || payload is null || payload.Count == 0)
             {
@@ -1325,8 +1366,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                var raw = Normalize(SerializePayloadValue(kv.Value), field.FieldType);
                 existingByField.TryGetValue(field.Id, out var existing);
+                var previous = existing?.Data ?? (baseline is not null && baseline.TryGetValue(field.Id, out var source) ? source : null);
+                var raw = Normalize(SerializePayloadValue(kv.Value), field.FieldType, previous, request?.Culture);
 
                 if (existing is null)
                 {
@@ -1354,6 +1396,90 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Copies the field values of the original a clone payload does not carry onto the copy,
+        /// except workflow fields (the copy starts in the entry state) and attachments (file
+        /// references of the original).
+        /// </summary>
+        /// <param name="original">The original.</param>
+        /// <param name="copy">The copy.</param>
+        /// <param name="payload">The clone payload; its keys arrive in lower case.</param>
+        private static void CopyUnsentValues(Model.Entities.Object original, Model.Entities.Object copy, RestApiCrudFormData payload)
+        {
+            var sent = payload.Select(x => x.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var fields = CoreHub.FieldManager
+                .GetFields(new WebParameter.ClassIdParameter(original.ClassId))
+                .Where(f => !f.Deprecated && f.State == FieldState.Active && f.FieldType is not (FieldType.Workflow or FieldType.Attachment))
+                .ToDictionary(f => f.Id);
+            var present = CoreHub.ValueManager.GetValues(copy.Id).Select(x => x.FieldId).ToHashSet();
+
+            foreach (var value in CoreHub.ValueManager.GetValues(original.Id))
+            {
+                if (!fields.TryGetValue(value.FieldId, out var field)
+                    || sent.Contains(field.Name)
+                    || present.Contains(field.Id)
+                    || string.IsNullOrEmpty(value.Data))
+                {
+                    continue;
+                }
+
+                CoreHub.ValueManager.Add(new Model.Entities.Value
+                {
+                    ObjectId = copy.Id,
+                    FieldId = field.Id,
+                    Data = value.Data,
+                    Created = DateTime.UtcNow,
+                    Updated = DateTime.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Places every workflow field of an object that holds no state on the first entry state
+        /// of its workflow (<see cref="WebManager.IWorkflowManager.GetTargetStatuses"/> with no
+        /// current state), stored as the state name like a transition stores it. A field with a
+        /// state (a template preset, an API payload) and a workflow without entry state keep what
+        /// they have.
+        /// </summary>
+        /// <param name="object">The object.</param>
+        private static void StartWorkflows(Model.Entities.Object @object)
+        {
+            var fields = CoreHub.FieldManager
+                .GetFields(new WebParameter.ClassIdParameter(@object.ClassId))
+                .Where(f => !f.Deprecated && f.State == FieldState.Active && f.FieldType == FieldType.Workflow && f.WorkflowId.HasValue);
+
+            foreach (var field in fields)
+            {
+                var workflow = CoreHub.WorkflowManager.GetWorkflowWithStructure(field.WorkflowId.Value);
+                var entry = workflow is null ? null : CoreHub.WorkflowManager.GetTargetStatuses(workflow, null).FirstOrDefault();
+
+                if (entry is null)
+                {
+                    continue;
+                }
+
+                var existing = CoreHub.ValueManager.GetValue(@object.Id, field.Id);
+
+                if (existing is null)
+                {
+                    CoreHub.ValueManager.Add(new Model.Entities.Value
+                    {
+                        ObjectId = @object.Id,
+                        FieldId = field.Id,
+                        Data = entry.Name,
+                        Created = DateTime.UtcNow,
+                        Updated = DateTime.UtcNow
+                    });
+                }
+                else if (string.IsNullOrWhiteSpace(existing.Data))
+                {
+                    existing.Data = entry.Name;
+                    existing.Updated = DateTime.UtcNow;
+                    CoreHub.ValueManager.Update(existing);
+                }
+            }
+        }
+
+        /// <summary>
         /// Brings a serialized payload into the canonical storage form of its field type.
         /// </summary>
         /// <remarks>
@@ -1364,16 +1490,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </remarks>
         /// <param name="raw">The serialized payload.</param>
         /// <param name="fieldType">The type of the field being written.</param>
+        /// <param name="previous">The previous stored value, or <see langword="null"/>.</param>
+        /// <param name="culture">The culture of the submit, or <see langword="null"/>.</param>
         /// <returns>The payload in storage form.</returns>
-        private static string Normalize(string raw, FieldType fieldType)
+        private static string Normalize(string raw, FieldType fieldType, string previous, System.Globalization.CultureInfo culture)
         {
-            if (fieldType != FieldType.Tag || string.IsNullOrEmpty(raw))
+            if (string.IsNullOrEmpty(raw))
             {
                 return raw;
             }
 
-            return string.Join(",", raw
-                .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return fieldType switch
+            {
+                FieldType.Tag => string.Join(",", raw
+                    .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)),
+                FieldType.Boolean => FieldValueForm.StoreBoolean(raw),
+                FieldType.Date => FieldValueForm.StoreDate(raw, previous, culture),
+                _ => raw
+            };
         }
 
         /// <summary>

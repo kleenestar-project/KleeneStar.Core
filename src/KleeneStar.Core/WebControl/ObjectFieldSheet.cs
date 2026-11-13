@@ -377,7 +377,7 @@ namespace KleeneStar.Core.WebControl
                 ? null
                 : CreateInputValue(input, field, data);
 
-            if (initial is null && filled && field.FieldType != FieldType.Password)
+            if ((initial is null || !CanHold(field, data)) && filled && field.FieldType != FieldType.Password)
             {
                 // a stored value the typed control cannot hold - a date that is no date, a range
                 // that is no range - would read as unset there; it is shown, and edited, as the
@@ -433,7 +433,7 @@ namespace KleeneStar.Core.WebControl
             {
                 case FieldType.Boolean:
                     {
-                        var yes = bool.TryParse(data, out var flag) && flag;
+                        var yes = FieldValueForm.IsTrue(data);
                         return Chip(ObjectValueFormat.Format(renderContext, field, data), yes ? "success" : "secondary", null);
                     }
 
@@ -606,9 +606,129 @@ namespace KleeneStar.Core.WebControl
                 case FieldType.MultiSelection:
                     return CreateSelection(field, WithStored(OptionsOf(field), data), multi: true);
 
+                case FieldType.User:
+                    return CreateUserSelection(field, data);
+
                 default:
                     return ObjectFormLayout.CreateInputForField(field) as IControlFormItemInput;
             }
+        }
+
+        /// <summary>
+        /// Creates the input a dialog edits a value of the field with, or <see langword="null"/>
+        /// for a workflow field (a state changes through a transition, a new object starts in
+        /// the entry state).
+        /// </summary>
+        /// <remarks>
+        /// The inputs of <see cref="CreateInlineInput"/>, with these differences: a boolean is the
+        /// checkbox of <see cref="ObjectFormLayout.CreateInputForField"/>, which loads the JSON
+        /// boolean <c>/api/1/objects</c> answers for the dialogs (<see cref="FieldValueForm"/>);
+        /// avatar and attachment fields get the avatar and file input; a stored value the typed
+        /// control cannot hold falls back to a text input, so a save that changes nothing keeps it.
+        /// </remarks>
+        /// <param name="field">The field.</param>
+        /// <param name="data">The stored value the dialog starts from, or <see langword="null"/>.</param>
+        /// <returns>The input, or <see langword="null"/>.</returns>
+        public static IControlFormItemInput CreateDialogInput(FieldEntity field, string data)
+        {
+            if (field.FieldType is FieldType.Boolean or FieldType.Avatar or FieldType.Attachment)
+            {
+                return ObjectFormLayout.CreateInputForField(field) as IControlFormItemInput;
+            }
+
+            var input = CreateInlineInput(field, data);
+
+            if (input is null
+                || IsEmpty(field, data)
+                || field.FieldType is FieldType.Password or FieldType.Date
+                || CreateInputValue(input, field, data) is not null && CanHold(field, data))
+            {
+                return input;
+            }
+
+            return CreateTextInput(field);
+        }
+
+        /// <summary>
+        /// Determines whether a typed control of the field can show a stored value as it is: a
+        /// colour is <c>#rgb</c> or <c>#rrggbb</c>, a traffic light names a lamp (<c>red</c>,
+        /// <c>yellow</c>, <c>green</c>), a move or cascading control names only configured
+        /// options. Other types are judged by <see cref="CreateInputValue"/> alone.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <param name="data">The stored value, not blank.</param>
+        /// <returns><see langword="true"/> when the typed control holds the value.</returns>
+        private static bool CanHold(FieldEntity field, string data)
+        {
+            var value = data.Trim();
+            var options = (field.Options ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            return field.FieldType switch
+            {
+                FieldType.Color => System.Text.RegularExpressions.Regex.IsMatch(value, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"),
+                FieldType.TrafficLight => value.ToLowerInvariant() is "red" or "yellow" or "green",
+                FieldType.Move or FieldType.Cascading => SplitList(value).All(options.Contains),
+                _ => true
+            };
+        }
+
+        /// <summary>
+        /// Creates the person selection of a user field: the active accounts by display name, each
+        /// with its portrait (<see cref="WebRestApi.ObjectBoardProjection.AvatarImage"/>) or the user glyph,
+        /// and a stored name that names no active account as an entry of its own.
+        /// </summary>
+        /// <remarks>
+        /// A user field stores the display name of the person; the option ids are display names,
+        /// so a selection writes what the readers (<see cref="ObjectValueFormat"/>, WQL, export)
+        /// read.
+        /// </remarks>
+        /// <param name="field">The field.</param>
+        /// <param name="data">The stored value, or <see langword="null"/>.</param>
+        /// <returns>The selection.</returns>
+        private static ControlFormItemInputSelection CreateUserSelection(FieldEntity field, string data)
+        {
+            var selection = new ControlFormItemInputSelection()
+            {
+                Name = _ => field.Name,
+                Label = _ => field.Name,
+                Placeholder = _ => field.Placeholder,
+                Help = _ => field.HelpText,
+                Required = _ => field.Required
+            };
+
+            var identities = CoreHub.IdentityManager
+                .GetIdentities(new WebExpress.WebIndex.Queries.Query<Identity>())
+                .Where(x => x.State == IdentityState.Active && !string.IsNullOrWhiteSpace(x.Name))
+                .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            foreach (var identity in identities)
+            {
+                var image = WebRestApi.ObjectBoardProjection.AvatarImage(identity);
+
+                selection.Add(new ControlFormItemInputSelectionItem(identity.Name)
+                {
+                    Text = _ => identity.Name,
+                    Image = _ => image is null ? null : new UriEndpoint(image),
+                    Icon = _ => image is null ? new IconUser() : null
+                });
+            }
+
+            var stored = data?.Trim();
+
+            if (!string.IsNullOrEmpty(stored) && !identities.Any(x => string.Equals(x.Name, stored, StringComparison.OrdinalIgnoreCase)))
+            {
+                selection.Add(new ControlFormItemInputSelectionItem(stored)
+                {
+                    Text = _ => stored,
+                    Icon = _ => new IconUser(),
+                    Color = _ => TypeColorSelection.Secondary
+                });
+            }
+
+            return selection;
         }
 
         /// <summary>
@@ -725,7 +845,7 @@ namespace KleeneStar.Core.WebControl
                     // a boolean is stored as the parser wrote it
                     if (field.FieldType == FieldType.Boolean)
                     {
-                        return new ControlFormInputValueString(bool.TryParse(data, out var flag) && flag ? "true" : "false");
+                        return new ControlFormInputValueString(FieldValueForm.IsTrue(data) ? "true" : "false");
                     }
 
                     return new ControlFormInputValueString(string.Join(";", SplitList(data)));
@@ -734,7 +854,7 @@ namespace KleeneStar.Core.WebControl
                     return new ControlFormInputValueString(data);
 
                 case ControlFormItemInput<ControlFormInputValueBool>:
-                    return new ControlFormInputValueBool(bool.TryParse(data, out var b) && b);
+                    return new ControlFormInputValueBool(FieldValueForm.IsTrue(data));
 
                 case ControlFormItemInput<ControlFormInputValueDate>:
                     return DateTime.TryParse(data, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)

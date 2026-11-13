@@ -72,14 +72,14 @@ namespace KleeneStar.Core.WebControl
             switch (field?.FieldType)
             {
                 case FieldType.Boolean:
-                    return I18N.Translate(request, bool.TryParse(data, out var flag) && flag
+                    return I18N.Translate(request, FieldValueForm.IsTrue(data)
                         ? "kleenestar.core:object.property.yes"
                         : "kleenestar.core:object.property.no");
 
                 case FieldType.Date:
                     // the value is stored round-trippable; it is read in the visitor's language,
                     // so it is written in the visitor's culture as well
-                    return DateTime.TryParse(data, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date)
+                    return FieldValueForm.TryParseDate(data, culture, out var date)
                         ? date.ToString("g", culture)
                         : data;
 

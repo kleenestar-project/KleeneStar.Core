@@ -159,8 +159,11 @@ namespace KleeneStar.Core.WebFragment.Object
                 ? ObjectFormLayout.ResolveStandardForm(@object.ClassId, FormType.Edit)
                 : null;
 
+            // the stored values choose the inputs: a value the typed control cannot hold is edited
+            // as text, a person or option no longer offered stays selectable
             var structure = @object is not null
-                ? ObjectFormLayout.BuildItems(form, @object.ClassId).ToList()
+                ? ObjectFormLayout.BuildItems(form, @object.ClassId, values: ObjectFieldSheet.LoadValues(@object.Id)
+                    .ToDictionary(x => x.Key, x => x.Value.Data)).ToList()
                 : [];
 
             if (structure.Count == 0)

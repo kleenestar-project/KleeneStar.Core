@@ -6,45 +6,66 @@ using System.Collections.Generic;
 using System.Linq;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
-using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
-    /// Provides a form fragment for cloning objects, dynamically building the form 
-    /// structure from the configured edit form of the object's class.
+    /// The clone wizard of an object (<see cref="ControlDataWizard"/> in mode
+    /// <see cref="TypeRestFormMode.Clone"/> over <c>/api/1/objects</c>).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Steps, built per request from the object's class:
+    /// <list type="number">
+    ///   <item><c>object</c>: the summary of the copy (required) and the description in the prose
+    ///   editor (<see cref="TypeEditTextFormat.Wysiwyg"/>).</item>
+    ///   <item><c>details</c>: the create form of the class (<see cref="FormType.Create"/>, else the
+    ///   edit form) through <see cref="ObjectFormLayout.BuildItems"/>, its tabs as a tab group like
+    ///   the view form, the dialog inputs preset from the original. A workflow field has no input
+    ///   (the copy starts in the entry state); fields named <c>Summary</c> or <c>Description</c>
+    ///   alias the attributes of the first step and attachment fields belong to the original,
+    ///   both are left out. Without inputs there is no such step.</item>
+    ///   <item><c>securitylevel</c>: <see cref="ObjectFormLayout.CreateSecurityLevelNotice"/> and the
+    ///   tiles of <see cref="SecurityLevelTiles"/>, preset with the classification of the original;
+    ///   present when the class has a level the caller may assign or the notice applies.</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// The wizard loads the clone values (<c>mode=clone</c>: summary with the copy suffix,
+    /// description, field values, security level) and posts all steps at once with the id of the
+    /// original. The endpoint answers <c>{ created, id, key, uri }</c>, which
+    /// <c>objectcreated.js</c> follows to the copy.
+    /// </para>
+    /// </remarks>
     [Title("kleenestar.core:object.clone.title")]
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Clone>]
     [Cache]
-    public sealed class ObjectCloneFormFragment : FragmentControlDataFormClone
+    public sealed class ObjectCloneFormFragment : FragmentControlDataWizard
     {
         /// <summary>
-        /// Gets the input text control for specifying the summary of the object. This
-        /// system field is always rendered first because every object carries a summary,
-        /// regardless of the form configuration.
+        /// Gets the summary input of the copy.
         /// </summary>
-        public ControlDataFormItemInputUnique Summary { get; } = new()
+        public ControlFormItemInputText Summary { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Object.Summary),
             Label = _ => "kleenestar.core:object.summary.label",
             Placeholder = _ => "kleenestar.core:object.summary.placeholder",
             Help = _ => "kleenestar.core:object.summary.help",
-            Required = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.UniqueName>().ToString())};
+            Required = _ => true
+        };
 
         /// <summary>
-        /// Gets the input text control for specifying the description of the object. This
-        /// system field is rendered after the summary when no edit form structure is
-        /// configured on the class.
+        /// Gets the description input of the first step.
         /// </summary>
         public ControlFormItemInputText Description { get; } = new ControlFormItemInputText()
         {
@@ -64,322 +85,111 @@ namespace KleeneStar.Core.WebFragment.Object
             : base(fragmentContext)
         {
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Objects.Index>();
-            ItemId = renderContext =>
+
+            Mode = _ => TypeRestFormMode.Clone;
+            FinishLabel = _ => "webexpress.webapp:clone.label";
+            FinishIcon = _ => new IconClone();
+            ItemId = renderContext => CoreHub.ObjectManager
+                .GetObjectByKey(renderContext.Request.GetParameter<ObjectKeyParameter>())?
+                .Id.ToString();
+        }
+
+        /// <summary>
+        /// Renders the wizard with the steps of the object's class.
+        /// </summary>
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="visualTree">The visual tree representing the control's structure.</param>
+        /// <returns>An HTML node representing the rendered control, or <c>null</c>.</returns>
+        public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
+        {
+            if (!FragmentContext.Check(renderContext?.Request))
             {
-                var objectKey = renderContext.Request.GetParameter<ObjectKeyParameter>();
-                var @object = CoreHub.ObjectManager.GetObjectByKey(objectKey);
-                return @object?.Id.ToString();
-            };
-        }
+                return null;
+            }
 
-        /// <summary>
-        /// Renders the control as an HTML node.
-        /// </summary>
-        /// <param name="renderContext">
-        /// The context in which the control is rendered.
-        /// </param>
-        /// <param name="visualTree">
-        /// The visual tree representing the control's structure.
-        /// </param>
-        /// <returns>
-        /// An HTML node representing the rendered control.
-        /// </returns>
-        public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
-        {
-            var keyParam = renderContext.Request.GetParameter<ObjectKeyParameter>();
-            var @object = CoreHub.ObjectManager.GetObjectByKey(keyParam);
+            var @object = CoreHub.ObjectManager.GetObjectByKey(renderContext.Request.GetParameter<ObjectKeyParameter>());
+
+            if (@object is null)
+            {
+                return null;
+            }
+
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext.Request);
-            var items = BuildItems(@object, identityId);
 
-            return base.Render(renderContext, visualTree, items);
+            return Render(renderContext, visualTree, BuildPages(renderContext, @object, identityId));
         }
 
         /// <summary>
-        /// Builds the form items from the configured edit form. The system field
-        /// <see cref="Summary"/> is always emitted first; the rest of the structure
-        /// is reproduced from the form's tabs, groups, and field references. When no
-        /// active edit form exists, only the system fields are rendered.
+        /// Builds the steps of the wizard.
         /// </summary>
-        private IEnumerable<IControlFormItem> BuildItems(Model.Entities.Object @object, Guid identityId)
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="object">The original.</param>
+        /// <param name="identityId">The identity the wizard is rendered for.</param>
+        /// <returns>The steps.</returns>
+        private IEnumerable<IControlDataWizardPage> BuildPages(IRenderControlContext renderContext, Model.Entities.Object @object, Guid identityId)
         {
-            yield return Summary;
+            var first = new ControlDataWizardPage("object")
+            {
+                Title = _ => "kleenestar.core:object.clone.step.object.title",
+                Subtitle = _ => "kleenestar.core:object.clone.step.object.subtitle",
+                SummarySource = _ => nameof(Model.Entities.Object.Summary)
+            };
+            first.Add(Summary, Description);
 
-            // a copy inherits the classification of its original, which the notice says out
-            // loud. Changing it is not this form's business - see the edit form
-            var notice = @object is not null
-                ? ObjectFormLayout.CreateSecurityLevelNotice(@object.ClassId, identityId, @object.SecurityLevelId)
-                : null;
+            yield return first;
+
+            // the copy is a new record and is filed through the create form; a class without one
+            // uses its edit form. A field named after a system attribute (Summary, Description)
+            // holds no value row and is edited on the first step; an attachment belongs to the
+            // original
+            var form = ObjectFormLayout.ResolveStandardForm(@object.ClassId, FormType.Create) is { Tabs.Count: > 0 } create
+                ? create
+                : ObjectFormLayout.ResolveStandardForm(@object.ClassId, FormType.Edit);
+            var values = ObjectFieldSheet.LoadValues(@object.Id).ToDictionary(x => x.Key, x => x.Value.Data);
+            var details = ObjectFormLayout.BuildItems(form, @object.ClassId, values: values, include: f =>
+                    !ObjectFieldSheet.IsDescriptionAlias(f)
+                    && !string.Equals(f.Name, nameof(Model.Entities.Object.Summary), StringComparison.OrdinalIgnoreCase)
+                    && f.FieldType != FieldType.Attachment)
+                .ToList();
+
+            if (details.Count > 0)
+            {
+                var page = new ControlDataWizardPage("details")
+                {
+                    Title = _ => "kleenestar.core:object.clone.step.details.title",
+                    Subtitle = _ => "kleenestar.core:object.clone.step.fields.subtitle"
+                };
+
+                page.Add(details);
+
+                yield return page;
+            }
+
+            var notice = ObjectFormLayout.CreateSecurityLevelNotice(@object.ClassId, identityId, @object.SecurityLevelId);
+            var tiles = SecurityLevelTiles.Create(renderContext, @object, identityId);
+
+            if (notice is null && tiles is null)
+            {
+                yield break;
+            }
+
+            var security = new ControlDataWizardPage("securitylevel")
+            {
+                Title = _ => "kleenestar.core:object.clone.step.securitylevel.title",
+                Subtitle = _ => "kleenestar.core:object.clone.step.securitylevel.subtitle"
+            };
 
             if (notice is not null)
             {
-                yield return notice;
+                security.Add(notice);
             }
 
-            var form = @object is not null ? ResolveStandardForm(@object.ClassId, FormType.Edit) : null;
-
-            if (form is null || form.Tabs is null || form.Tabs.Count == 0)
+            if (tiles is not null)
             {
-                yield return Description;
-                yield break;
+                security.Add(tiles);
             }
 
-            var fields = CoreHub.FieldManager
-                .GetFields(new ClassIdParameter(@object.ClassId))
-                .Where(f => !f.Deprecated && f.State == FieldState.Active)
-                .ToDictionary(f => f.Id);
-
-            var orderedTabs = form.Tabs.OrderBy(t => t.Position).ToList();
-
-            if (orderedTabs.Count == 1)
-            {
-                // Single-tab forms do not need a tab bar; emit the tab elements
-                // directly so the form reads naturally.
-                foreach (var element in orderedTabs[0].Elements.OrderBy(e => e.Position))
-                {
-                    var item = BuildElement(element, fields);
-                    if (item is not null)
-                    {
-                        yield return item;
-                    }
-                }
-                yield break;
-            }
-
-            var tabGroup = new ControlFormItemGroupTab()
-            {
-                Layout = _ => TypeLayoutTab.Underline
-            };
-
-            foreach (var t in orderedTabs)
-            {
-                var view = new ControlFormItemGroupTabView("tab-" + t.Id.ToString("N"))
-                {
-                    Title = _ => t.Name
-                };
-
-                foreach (var element in t.Elements.OrderBy(e => e.Position))
-                {
-                    var item = BuildElement(element, fields);
-                    if (item is not null)
-                    {
-                        view.Add(item);
-                    }
-                }
-
-                tabGroup.AddView(view);
-            }
-
-            yield return tabGroup;
-        }
-
-        /// <summary>
-        /// Resolves the active standard form of the requested type for the given class.
-        /// </summary>
-        /// <param name="classId">The unique identifier of the class.</param>
-        /// <param name="type">The desired form type (typically <see cref="FormType.Edit"/>).</param>
-        /// <returns>
-        /// The form together with its full structural tree, or <c>null</c> when no
-        /// matching active form exists.
-        /// </returns>
-        private static Model.Entities.Form ResolveStandardForm(Guid classId, FormType type)
-        {
-            var form = CoreHub.FormManager
-                .GetForms(new ClassIdParameter(classId))
-                .FirstOrDefault(f => f.FormType == type && f.State == FormState.Active);
-
-            return form is null ? null : CoreHub.FormManager.GetFormWithStructure(form.Id);
-        }
-
-        /// <summary>
-        /// Recursively maps a form element from the model to a form item control. Field
-        /// references resolve to a typed input matching the referenced
-        /// <see cref="Field.FieldType"/>; group elements map to the layout group control
-        /// matching <see cref="FormGroupElement.Layout"/> and recurse into their children.
-        /// </summary>
-        /// <param name="element">The form element to convert.</param>
-        /// <param name="fields">
-        /// Lookup of active fields of the class, used to decorate field references with
-        /// their display metadata. Inactive or deprecated fields are skipped.
-        /// </param>
-        /// <returns>
-        /// The corresponding form item, or <c>null</c> when the element type is not
-        /// supported or the referenced field is not visible on the form.
-        /// </returns>
-        private static IControlFormItem BuildElement(FormElement element, IDictionary<Guid, Model.Entities.Field> fields)
-        {
-            if (element is FormFieldRefElement fieldRef)
-            {
-                return fields.TryGetValue(fieldRef.FieldId, out var field)
-                    ? CreateInputForField(field)
-                    : null;
-            }
-
-            if (element is FormGroupElement group)
-            {
-                var groupControl = CreateGroupForLayout(group.Layout);
-
-                foreach (var child in group.Children.OrderBy(c => c.Position))
-                {
-                    var childItem = BuildElement(child, fields);
-                    if (childItem is not null)
-                    {
-                        groupControl.Add(childItem);
-                    }
-                }
-
-                return groupControl;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Creates an empty layout group matching the requested <see cref="FormGroupLayout"/>.
-        /// </summary>
-        private static ControlFormItemGroup CreateGroupForLayout(FormGroupLayout layout)
-        {
-            return layout switch
-            {
-                FormGroupLayout.Horizontal => new ControlFormItemGroupHorizontal(),
-                FormGroupLayout.Mix => new ControlFormItemGroupMix(),
-                FormGroupLayout.ColumnVertical => new ControlFormItemGroupColumnVertical(),
-                FormGroupLayout.ColumnHorizontal => new ControlFormItemGroupColumnHorizontal(),
-                FormGroupLayout.ColumnMix => new ControlFormItemGroupColumnMix(),
-                _ => new ControlFormItemGroupVertical(),
-            };
-        }
-
-        /// <summary>
-        /// Creates a typed input control for the given field, mapping
-        /// <see cref="Field.FieldType"/> to the matching WebUI form item.
-        /// </summary>
-        private static IControlFormItem CreateInputForField(Model.Entities.Field field)
-        {
-            switch (field.FieldType)
-            {
-                case FieldType.Boolean:
-                    return new ControlFormItemInputCheck()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-
-                case FieldType.Date:
-                    return new ControlFormItemInputDate()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-
-                case FieldType.Selection:
-                    var combo = new ControlFormItemInputCombo()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-                    foreach (var option in field.Options ?? [])
-                    {
-                        combo.Add(new ControlFormItemInputComboItem()
-                        {
-                            Text = _ => option,
-                            Value = _ => option
-                        });
-                    }
-                    return combo;
-
-                case FieldType.Priority:
-                    var priorityCombo = new ControlFormItemInputCombo()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-                    foreach (var priority in ResolveFieldPriorities(field))
-                    {
-                        priorityCombo.Add(new ControlFormItemInputComboItem()
-                        {
-                            Text = _ => priority.Name,
-                            Value = _ => priority.Name
-                        });
-                    }
-                    return priorityCombo;
-
-                case FieldType.Tag:
-                    return new ControlFormItemInputTag()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-
-                case FieldType.Attachment:
-                    return new ControlFormItemInputFile()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-
-                case FieldType.Number:
-                case FieldType.Reference:
-                case FieldType.Workflow:
-                case FieldType.User:
-                case FieldType.Text:
-                default:
-                    return new ControlFormItemInputText()
-                    {
-                        Name = _ => field.Name,
-                        Label = _ => field.Name,
-                        Placeholder = _ => field.Placeholder,
-                        Help = _ => field.HelpText,
-                        Required = _ => field.Required
-                    };
-            }
-        }
-
-        /// <summary>
-        /// Resolves the priorities offered for a priority-typed field. When the field
-        /// configuration restricts the field to a specific set of priorities
-        /// (<see cref="Model.Entities.Field.SelectedPriorityIds"/>), only those are returned;
-        /// otherwise every active priority of the field's class is offered. The result is
-        /// ordered by the priority display order.
-        /// </summary>
-        /// <param name="field">The priority-typed field whose options are resolved.</param>
-        /// <returns>The priorities to present, in display order.</returns>
-        private static IEnumerable<Model.Entities.Priority> ResolveFieldPriorities(Model.Entities.Field field)
-        {
-            // Load the field's class priorities in a single round-trip and filter in memory.
-            // The previous per-id GetPriority(id) loop opened a fresh DbContext and ran one
-            // query for every selected id; priorities are class-scoped, so the selected ids
-            // are a subset of the class priorities loaded here.
-            var priorities = CoreHub.PriorityManager
-                .GetPriorities(new ClassIdParameter(field.ClassId));
-
-            if (field.SelectedPriorityIds is { Count: > 0 })
-            {
-                var selected = field.SelectedPriorityIds.ToHashSet();
-                return priorities
-                    .Where(p => selected.Contains(p.Id))
-                    .OrderBy(p => p.Order);
-            }
-
-            return priorities
-                .Where(p => p.State == PriorityState.Active)
-                .OrderBy(p => p.Order);
+            yield return security;
         }
     }
 }

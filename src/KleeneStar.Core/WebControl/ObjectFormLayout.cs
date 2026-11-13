@@ -65,50 +65,6 @@ namespace KleeneStar.Core.WebControl
         }
 
         /// <summary>
-        /// Creates the input for the security level of an object, or <c>null</c> when the
-        /// class classifies nothing or the caller is cleared for no level of it.
-        /// </summary>
-        /// <remarks>
-        /// Like the title, the classification is a system property rather than a configured
-        /// field, so it is emitted alongside the form structure rather than being part of it.
-        /// The options come from the class-scoped selection endpoint, which offers only the
-        /// levels the caller may assign.
-        /// </remarks>
-        /// <param name="classId">The class the object belongs to.</param>
-        /// <param name="identityId">The identity filling the form in.</param>
-        /// <returns>The input control, or <c>null</c> when there is nothing to choose.</returns>
-        public static ControlDataFormItemInputSelection CreateSecurityLevelInput(Guid classId, Guid identityId)
-        {
-            if (classId == Guid.Empty || !HasSecurityLevels(classId))
-            {
-                return null;
-            }
-
-            // a caller cleared for none of the class's levels is offered no input at all; the
-            // notice beside it says why, and the only value they could pick is "unclassified",
-            // which is what the object gets anyway
-            if (CoreHub.SecurityLevelManager.GetAssignableSecurityLevels(classId, identityId).Count == 0)
-            {
-                return null;
-            }
-
-            return new ControlDataFormItemInputSelection()
-            {
-                Name = _ => nameof(ObjectEntity.SecurityLevelId),
-                Label = _ => "kleenestar.core:securitylevel.object.label",
-                Placeholder = _ => "kleenestar.core:securitylevel.object.placeholder",
-                Help = _ => "kleenestar.core:securitylevel.object.help",
-                StickySelection = _ => true,
-                ServiceFactory = _ => DataServiceDescriptor.QueryData
-                (
-                    CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.SecurityLevels._classid_.Selection>()
-                        .BindParameters(new ClassIdParameter(classId))
-                        .ToString()
-                )
-            };
-        }
-
-        /// <summary>
         /// Creates the notice the form shows when the caller and the classification of the
         /// object do not agree, or <c>null</c> when there is nothing to say.
         /// </summary>
@@ -207,8 +163,16 @@ namespace KleeneStar.Core.WebControl
         /// reached from the built tree; a caller that has to address the inputs — to seed
         /// their values, for instance — collects them here instead.
         /// </param>
+        /// <param name="values">The stored values the dialog starts from (the object's on edit, the
+        /// original's on clone, the template presets on create), keyed by field id; they choose
+        /// the input (<see cref="ObjectFieldSheet.CreateDialogInput"/>). May be null.</param>
+        /// <param name="include">Decides which fields of the class the dialog offers; null offers all.</param>
         /// <returns>The form items, which are empty when the form is null or has no tabs.</returns>
-        public static IEnumerable<IControlFormItem> BuildItems(FormEntity form, Guid classId, ICollection<IControlFormItemInput> inputs = null)
+        /// <remarks>
+        /// A form with several tabs is reproduced as a tab group like the view form
+        /// (<see cref="ObjectFieldSheet"/>); a tab or group without inputs is left out.
+        /// </remarks>
+        public static IEnumerable<IControlFormItem> BuildItems(FormEntity form, Guid classId, ICollection<IControlFormItemInput> inputs = null, IReadOnlyDictionary<Guid, string> values = null, Func<FieldEntity, bool> include = null)
         {
             if (form?.Tabs is null || form.Tabs.Count == 0)
             {
@@ -218,20 +182,31 @@ namespace KleeneStar.Core.WebControl
             var fields = CoreHub.FieldManager
                 .GetFields(new ClassIdParameter(classId))
                 .Where(f => !f.Deprecated && f.State == FieldState.Active)
+                .Where(f => include is null || include(f))
                 .ToDictionary(f => f.Id);
 
-            var orderedTabs = form.Tabs.OrderBy(t => t.Position).ToList();
+            var tabs = form.Tabs
+                .OrderBy(t => t.Position)
+                .Select(t => (Tab: t, Items: t.Elements
+                    .OrderBy(e => e.Position)
+                    .Select(e => BuildElement(e, fields, inputs, values))
+                    .Where(x => x is not null)
+                    .ToList()))
+                .Where(x => x.Items.Count > 0)
+                .ToList();
 
-            if (orderedTabs.Count == 1)
+            if (tabs.Count == 0)
             {
-                foreach (var element in orderedTabs[0].Elements.OrderBy(e => e.Position))
+                yield break;
+            }
+
+            if (tabs.Count == 1)
+            {
+                foreach (var item in tabs[0].Items)
                 {
-                    var item = BuildElement(element, fields, inputs);
-                    if (item is not null)
-                    {
-                        yield return item;
-                    }
+                    yield return item;
                 }
+
                 yield break;
             }
 
@@ -240,20 +215,16 @@ namespace KleeneStar.Core.WebControl
                 Layout = _ => TypeLayoutTab.Underline
             };
 
-            foreach (var t in orderedTabs)
+            foreach (var (tab, items) in tabs)
             {
-                var view = new ControlFormItemGroupTabView("tab-" + t.Id.ToString("N"))
+                var view = new ControlFormItemGroupTabView("tab-" + tab.Id.ToString("N"))
                 {
-                    Title = _ => t.Name
+                    Title = _ => tab.Name
                 };
 
-                foreach (var element in t.Elements.OrderBy(e => e.Position))
+                foreach (var item in items)
                 {
-                    var item = BuildElement(element, fields, inputs);
-                    if (item is not null)
-                    {
-                        view.Add(item);
-                    }
+                    view.Add(item);
                 }
 
                 tabGroup.AddView(view);
@@ -264,8 +235,8 @@ namespace KleeneStar.Core.WebControl
 
         /// <summary>
         /// Recursively maps a form element from the model to a form item control. Field
-        /// references resolve to a typed input matching the referenced
-        /// <see cref="FieldEntity.FieldType"/>; group elements map to the layout group control
+        /// references resolve to the dialog input of their type
+        /// (<see cref="ObjectFieldSheet.CreateDialogInput"/>); group elements map to the layout group control
         /// matching <see cref="FormGroupElement.Layout"/> and recurse into their children.
         /// </summary>
         /// <param name="element">The form element to convert.</param>
@@ -274,11 +245,12 @@ namespace KleeneStar.Core.WebControl
         /// their display metadata. Inactive or deprecated fields are skipped.
         /// </param>
         /// <param name="inputs">Receives the inputs the element contains, or null.</param>
+        /// <param name="values">The stored values the dialog starts from, keyed by field id, or null.</param>
         /// <returns>
-        /// The corresponding form item, or <c>null</c> when the element type is not
-        /// supported or the referenced field is not visible on the form.
+        /// The corresponding form item, or <c>null</c> when the element type is not supported,
+        /// the referenced field is not offered or has no dialog input, or a group holds no input.
         /// </returns>
-        public static IControlFormItem BuildElement(FormElement element, IDictionary<Guid, FieldEntity> fields, ICollection<IControlFormItemInput> inputs = null)
+        public static IControlFormItem BuildElement(FormElement element, IDictionary<Guid, FieldEntity> fields, ICollection<IControlFormItemInput> inputs = null, IReadOnlyDictionary<Guid, string> values = null)
         {
             if (element is FormFieldRefElement fieldRef)
             {
@@ -287,7 +259,7 @@ namespace KleeneStar.Core.WebControl
                     return null;
                 }
 
-                var input = CreateInputForField(field);
+                var input = ObjectFieldSheet.CreateDialogInput(field, values is not null && values.TryGetValue(field.Id, out var data) ? data : null);
 
                 if (input is IControlFormItemInput typed)
                 {
@@ -303,14 +275,14 @@ namespace KleeneStar.Core.WebControl
 
                 foreach (var child in group.Children.OrderBy(c => c.Position))
                 {
-                    var childItem = BuildElement(child, fields, inputs);
+                    var childItem = BuildElement(child, fields, inputs, values);
                     if (childItem is not null)
                     {
                         groupControl.Add(childItem);
                     }
                 }
 
-                return groupControl;
+                return groupControl.Items.Any() ? groupControl : null;
             }
 
             return null;

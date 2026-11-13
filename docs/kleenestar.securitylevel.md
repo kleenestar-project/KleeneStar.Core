@@ -1,3 +1,6 @@
+
+![KleeneStar](https://raw.githubusercontent.com/kleenestar-project/.github/main/docs/assets/img/banner.png)
+
 # Security levels
 
 A **security level** is a classification an object may carry, together with the groups whose
@@ -14,11 +17,11 @@ otherwise.
 permission dialog any more, and no grant is stored against a record. The two halves of the
 access model now divide cleanly:
 
-| Question | Answered by | Administered on |
-| --- | --- | --- |
-| Who may see *this record*? | its security level | the record, in its classification dialog |
-| Who may read and change *the records of this data structure*? | the `object_…` policies | the **class** |
-| Who may change the data structure itself? | the `class_…` policies | the class |
+|Question                                                      |Answered by             |Administered on |
+|--------------------------------------------------------------|------------------------|-----------------------------------------
+|Who may see *this record*?                                    |its security level      |the record, in its classification dialog
+|Who may read and change *the records of this data structure*? |the `object_…` policies |the **class**
+|Who may change the data structure itself?                     |the `class_…` policies  |the class
 
 `PermissionScope.Object` survives only as the prefix those `object_…` policies carry;
 `PolicyCatalog.Administered` is what makes the class dialog offer them, and `GetLabel` keeps the
@@ -78,13 +81,13 @@ using (CoreHub.SecurityLevelManager.BeginUnrestricted())
 The scope is ambient to the logical call and nests, the way `CommitManager.BeginCommit` does.
 The callers that open one today, and why:
 
-| Caller | Why it must see everything |
-| --- | --- |
-| `ObjectManager.NextObjectKey` | A key derived from what the caller happens to be cleared for would be handed out twice. |
-| `WorkflowManager.ExecuteTransition` | A transition also runs on the follower a relation closes, which is somebody else's record. |
-| `ObjectRelationWorkflowRules.FindClosingTarget` | Same: the follower has to move whether or not the caller is cleared for it. |
-| `CommitManager.Build` / `Hydrate` | Resolving the object of a chain already reached is plumbing; whether the reader may see it was decided upstream. |
-| The usage counts on the level table and its delete dialog | A level guarding twenty records must not report three because that is all the reader may open. |
+|Caller                                                    |Why it must see everything
+|----------------------------------------------------------|-------------------------------------
+|`ObjectManager.NextObjectKey`                             |A key derived from what the caller happens to be cleared for would be handed out twice.
+|`WorkflowManager.ExecuteTransition`                       |A transition also runs on the follower a relation closes, which is somebody else's record.
+|`ObjectRelationWorkflowRules.FindClosingTarget`           |Same: the follower has to move whether or not the caller is cleared for it.
+|`CommitManager.Build` / `Hydrate`                         |Resolving the object of a chain already reached is plumbing; whether the reader may see it was decided upstream.
+|The usage counts on the level table and its delete dialog |A level guarding twenty records must not report three because that is all the reader may open.
 
 **A read that is not on this list should not lift the filter.** The user-facing paths — the
 detail page, the history, the drafts, the attachments, the relations — all resolve their object
@@ -106,8 +109,12 @@ template, an import — would silently come out unclassified. The default is onl
 caller is cleared for it; where they are not, the object stays unclassified rather than
 disappearing from the list of the person who just created it.
 
-A **clone keeps the classification of its original**. A duplicate that quietly came out readable
-by more people than its original would be a leak dressed up as a convenience.
+A **clone starts with the classification of its original**. `RetrieveForClone` loads it, and
+`/api/1/objects` `Clone` keeps it when the payload carries no `SecurityLevelId`. The last step of
+the clone wizard (`ObjectCloneFormFragment`, step `securitylevel`) shows the tiles of
+`WebControl/SecurityLevelTiles` preset with that level; a payload with `SecurityLevelId` sets the
+level of the copy (`TryGetGuidReference`: the empty guid declassifies), validated like a create
+(only assignable levels, an unchanged level is accepted).
 
 ## What the user sees
 
@@ -128,18 +135,18 @@ offers a search field (`securitylevel.object.search`) that narrows the tiles by 
 `securitylevel.object.empty`, and the dialog keeps its size (WebExpress tile picker). Without an assignable level the selection is omitted and
 `CreateSecurityLevelNotice` states the reason.
 
-**In the create wizard** (since 2026-10-22). Who may see a record is decided when it is
-filed: a request about a person must not be readable by everyone for the moments between
-creating and reclassifying it. The last step of the wizard (`/api/1/objects/form`) carries the
-selection of `ObjectFormLayout.CreateSecurityLevelInput`, fed by
-`/api/1/securitylevels/{classid}/selection` (assignable levels plus *unclassified*), below the title, preset with the class default when the caller is
-cleared for it. A **blank** answer is no answer and gets the default (`IsAnswered` in
+**In the create wizard.** Who may see a record is decided when it is filed: a request about
+a person must not be readable by everyone for the moments between creating and reclassifying
+it. The last step of the wizard (`/api/1/objects/form?part=securitylevel`) shows the notice and
+the tiles of `WebControl/SecurityLevelTiles` (assignable levels plus *unclassified*, no current
+chip), preset with the template's `SecurityLevelId` or the class default when the caller is
+cleared for it; without anything to decide the step answers 204 and is skipped. A **blank** answer is no answer and gets the default (`IsAnswered` in
 `/api/1/objects`) - a selection that did not take its preset must not leave a classified class's
 record unclassified; the explicit *unclassified* entry (the empty guid) still declassifies.
 
-**The classification is not a field on the edit and clone forms.** They write what a record
-*says*; who may see it is changed where the permissions it replaced were set, and a clone keeps
-the classification of its original.
+**The classification is not a field on the edit form.** It writes what a record *says*; who may
+see it is changed in the classification dialog. The create wizard and the clone wizard choose it
+in a step of their own.
 
 **Every change of the classification is recorded** in the object's history: `securitylevel`
 (and the portal's `portalrestricted`) are system properties of `ObjectProperty`, so the commit
@@ -147,7 +154,7 @@ chain and the audit log say who changed who may see the record, and when. A rest
 write them back - a restore of the content must not widen the audience as a side effect, and
 the dialog is where the clearance to assign a level is checked.
 
-The two forms that *create* a record — the wizard and the clone dialog — also *report* it:
+The two forms that *create* a record (the create wizard and the clone wizard) also *report* it:
 `ObjectFormLayout.CreateSecurityLevelNotice` puts a **warning** on them, and on the
 classification dialog itself, in exactly two situations — both ones the form would otherwise
 leave to be discovered by the record disappearing:
@@ -183,15 +190,15 @@ class sidebar, and follow the field administration one-for-one: an overview with
 *add* modal, and *edit* / *clone* / *delete* modals per row under
 `WWW/SecurityLevel/{securitylevelid}/`. The endpoints sit under `/api/1/securitylevels`:
 
-| Route | Purpose |
-| --- | --- |
-| `/api/1/securitylevels` | CRUD over the levels (`RestApiCrud<SecurityLevel>`) |
-| `/api/1/securitylevels/{classid}/table` | The overview table, including the usage count per level |
-| `/api/1/securitylevels/{classid}/quickfilter` | *Active* and *Closed* — the levels nobody is cleared for are the ones worth finding |
-| `/api/1/securitylevels/{classid}/selection` | The levels an object form may offer |
-| `/api/1/securitylevels/groups` | The groups a clearance can name |
-| `/api/1/securitylevels/state` | Active / Archived |
-| `/api/1/securitylevels/wql` | The advanced-search prompt |
+|Route                                         |Purpose 
+|----------------------------------------------|-------------------------------------
+|`/api/1/securitylevels`                       |CRUD over the levels (`RestApiCrud<SecurityLevel>`) 
+|`/api/1/securitylevels/{classid}/table`       |The overview table, including the usage count per level 
+|`/api/1/securitylevels/{classid}/quickfilter` |*Active* and *Closed* — the levels nobody is cleared for are the ones worth finding 
+|`/api/1/securitylevels/{classid}/selection`   |The levels an object form may offer 
+|`/api/1/securitylevels/groups`                |The groups a clearance can name 
+|`/api/1/securitylevels/state`                 |Active / Archived 
+|`/api/1/securitylevels/wql`                   |The advanced-search prompt 
 
 **Deleting a level declassifies what it guarded**, so the confirmation dialog states how many
 objects that is — the one consequence the list it was opened from cannot show.

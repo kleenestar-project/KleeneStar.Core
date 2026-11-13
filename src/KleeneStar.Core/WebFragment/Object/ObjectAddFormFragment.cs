@@ -14,6 +14,7 @@ using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
@@ -57,7 +58,9 @@ namespace KleeneStar.Core.WebFragment.Object
         private const string StepWorkspace = "step-workspace";
         private const string StepClass = "step-class";
         private const string StepTemplate = "step-template";
+        private const string StepObject = "step-object";
         private const string StepValues = "step-values";
+        private const string StepSecurityLevel = "step-securitylevel";
 
         /// <summary>
         /// The value the "no template" card of the template step carries. It is not a
@@ -235,18 +238,36 @@ namespace KleeneStar.Core.WebFragment.Object
             };
             step3.Add(TemplateSelection);
 
-            // the last step is rendered by the server rather than upfront: it shows the
-            // create form of the class, which is only known once the second step has been
-            // answered. The endpoint receives the answers collected so far and replies with
-            // the form of that class, pre-filled from the presets of the chosen template.
-            var step4 = new ControlDataWizardPage(StepValues)
+            // the last three steps are rendered by the server rather than upfront: they depend on
+            // the class, which is only known once the second step has been answered, and on the
+            // presets of the template chosen in the third. The endpoint receives the answers
+            // collected so far; a step without items answers 204 and is skipped
+            IUri Part(string part) => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Form>()?
+                .Add(new UriQuery("part", part));
+
+            var step4 = new ControlDataWizardPage(StepObject)
+            {
+                Title = _ => "kleenestar.core:object.add.step.object.title",
+                Subtitle = _ => "kleenestar.core:object.add.step.object.subtitle",
+                SummarySource = _ => nameof(ObjectEntity.Summary),
+                Uri = _ => Part(global::KleeneStar.Core.WWW.Api._1_.Objects.Form.PartObject)
+            };
+
+            var step5 = new ControlDataWizardPage(StepValues)
             {
                 Title = _ => "kleenestar.core:object.add.step.values.title",
                 Subtitle = _ => "kleenestar.core:object.add.step.values.subtitle",
-                Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Form>()
+                Uri = _ => Part(global::KleeneStar.Core.WWW.Api._1_.Objects.Form.PartValues)
             };
 
-            Add(step1, step2, step3, step4);
+            var step6 = new ControlDataWizardPage(StepSecurityLevel)
+            {
+                Title = _ => "kleenestar.core:object.add.step.securitylevel.title",
+                Subtitle = _ => "kleenestar.core:object.add.step.securitylevel.subtitle",
+                Uri = _ => Part(global::KleeneStar.Core.WWW.Api._1_.Objects.Form.PartSecurityLevel)
+            };
+
+            Add(step1, step2, step3, step4, step5, step6);
 
             Mode = _ => TypeRestFormMode.Add;
             FinishLabel = _ => "kleenestar.core:object.add.submit.label";
