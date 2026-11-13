@@ -113,16 +113,26 @@ by more people than its original would be a leak dressed up as a convenience.
 
 **In its own dialog** — `WWW/Issue/{objectkey}/SecurityLevel`, opened from the entry in the
 overflow menu where the object's permission dialog used to sit. `ObjectSecurityLevelFormFragment`
-is a one-field edit form over the object CRUD endpoint (no endpoint of its own), and
-`ObjectFormLayout.CreateSecurityLevelInput` builds the selection, fed by
-`/api/1/securitylevels/{classid}/selection`, which offers only the levels the caller may assign
-plus an entry standing for *unclassified* (the empty guid, which the form binder reads as "clear
-this property").
+is an edit form over the object CRUD endpoint (no endpoint of its own) with one
+`ControlFormItemInputTile` named `SecurityLevelId`, two columns, laid out like the tiles of the
+create wizard. Tiles: *unclassified* (`securitylevel.none.label`, the empty guid, which the form
+binder reads as "clear this property"), then the active levels the caller may assign
+(`GetAssignableSecurityLevels`), ordered by `Rank` and name. A level tile shows icon, name,
+description, the badge `securitylevel.isdefault.label` or `Rank n`, and the cleared groups
+(`securitylevel.object.clearance`). The tile of the current classification carries the chip
+`securitylevel.object.current` and is preselected: `ControlDataForm` does not call the initialize
+hook of its items, so `PreselectedInputTile` writes the value into the render context before the
+tile renders (`data-value`). A level the object carries and the caller cannot assign is added as a
+tile with the footer `securitylevel.object.kept`, so the posted value keeps it. The selection
+offers a search field (`securitylevel.object.search`) that narrows the tiles by their text; without a match it shows
+`securitylevel.object.empty`, and the dialog keeps its size (WebExpress tile picker). Without an assignable level the selection is omitted and
+`CreateSecurityLevelNotice` states the reason.
 
 **In the create wizard** (since 2026-10-22). Who may see a record is decided when it is
 filed: a request about a person must not be readable by everyone for the moments between
 creating and reclassifying it. The last step of the wizard (`/api/1/objects/form`) carries the
-same selection as the dialog, below the title, preset with the class default when the caller is
+selection of `ObjectFormLayout.CreateSecurityLevelInput`, fed by
+`/api/1/securitylevels/{classid}/selection` (assignable levels plus *unclassified*), below the title, preset with the class default when the caller is
 cleared for it. A **blank** answer is no answer and gets the default (`IsAnswered` in
 `/api/1/objects`) - a selection that did not take its preset must not leave a classified class's
 record unclassified; the explicit *unclassified* entry (the empty guid) still declassifies.
