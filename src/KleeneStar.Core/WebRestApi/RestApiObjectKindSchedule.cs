@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -102,16 +102,22 @@ namespace KleeneStar.Core.WebRestApi
             var categoriesById = categories.ToDictionary(x => x.Id, x => x);
             var contextByClass = new Dictionary<Guid, ObjectBoardClassContext>();
 
-            foreach (var entity in GetActiveObjects(scope, request))
-            {
-                if (!contextByClass.TryGetValue(entity.ClassId, out var classContext))
-                {
-                    var cls = CoreHub.ClassManager.GetClass(entity.ClassId);
-                    classContext = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
-                    contextByClass[entity.ClassId] = classContext;
-                }
+            var objects = GetActiveObjects(scope, request).ToList();
 
-                var (start, end) = ObjectBoardProjection.ResolvePlan(entity, classContext);
+            foreach (var classId in objects.Select(x => x.ClassId).Distinct())
+            {
+                var cls = CoreHub.ClassManager.GetClass(classId);
+                contextByClass[classId] = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
+            }
+
+            // the dates and states of every entry in one read instead of three per entry
+            var read = ObjectBoardProjection.ReadValues(objects, contextByClass.Values);
+
+            foreach (var entity in objects)
+            {
+                var classContext = contextByClass[entity.ClassId];
+
+                var (start, end) = ObjectBoardProjection.ResolvePlan(entity, classContext, read);
 
                 // an entry that merely touches the shown period still belongs on it, so the
                 // test is an overlap rather than a containment
@@ -125,7 +131,7 @@ namespace KleeneStar.Core.WebRestApi
                     continue;
                 }
 
-                var category = ObjectBoardProjection.ResolveCategory(entity.Id, classContext, categoriesById);
+                var category = ObjectBoardProjection.ResolveCategory(read(entity.Id, classContext?.WorkflowField), classContext, categoriesById);
 
                 yield return new RestApiScheduleItem
                 {

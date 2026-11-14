@@ -109,18 +109,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             return CoreHub.ObjectManager.GetObjects(query, context)
                 .Select(x =>
                 {
-                    var cells = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    // a cell is computed only for a column that is shown; the description is parsed
+                    // as a document, which is the expensive one
+                    object Cell(string id) => id?.ToLowerInvariant() switch
                     {
-                        ["key"] = x.Key,
-                        ["summary"] = x.Summary,
-                        ["workspace"] = workspaceNames.TryGetValue(x.WorkspaceId, out var name) ? name : string.Empty,
-                        ["description"] = ProseText.ToPlainText(x.Description)
+                        "key" => x.Key,
+                        "summary" => x.Summary,
+                        "workspace" => workspaceNames.TryGetValue(x.WorkspaceId, out var name) ? name : string.Empty,
+                        "description" => ProseText.ToPlainText(x.Description),
+                        _ => null
                     };
 
                     return new
                     {
                         Object = x,
-                        Cells = order.Select(id => new RestApiTableCell() { Content = cells.GetValueOrDefault(id) }).ToList()
+                        Cells = order.Select(id => new RestApiTableCell() { Content = Cell(id) }).ToList()
                     };
                 })
                 .Select(x => new RestApiTableRow

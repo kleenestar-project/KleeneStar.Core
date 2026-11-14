@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -157,17 +157,22 @@ namespace KleeneStar.Core.WebRestApi
                 };
             }
 
+            foreach (var classId in objects.Select(x => x.ClassId).Distinct())
+            {
+                var cls = CoreHub.ClassManager.GetClass(classId);
+                contextByClass[classId] = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
+            }
+
+            // the dates, states and rollups of every bar in a few reads instead of several per bar
+            var read = ObjectBoardProjection.ReadValues(objects, contextByClass.Values);
+            var progressById = CoreHub.ObjectProgressManager.GetProgress(objects);
+
             foreach (var entity in objects)
             {
-                if (!contextByClass.TryGetValue(entity.ClassId, out var classContext))
-                {
-                    var cls = CoreHub.ClassManager.GetClass(entity.ClassId);
-                    classContext = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
-                    contextByClass[entity.ClassId] = classContext;
-                }
+                var classContext = contextByClass[entity.ClassId];
 
-                var (start, end) = ObjectBoardProjection.ResolvePlan(entity, classContext);
-                var category = ObjectBoardProjection.ResolveCategory(entity.Id, classContext, categoriesById);
+                var (start, end) = ObjectBoardProjection.ResolvePlan(entity, classContext, read);
+                var category = ObjectBoardProjection.ResolveCategory(read(entity.Id, classContext?.WorkflowField), classContext, categoriesById);
                 var assignee = ResolveIdentity(entity.AssigneeId, identityById);
 
                 yield return new RestApiGanttTask
@@ -185,7 +190,7 @@ namespace KleeneStar.Core.WebRestApi
                     // an object that aggregates others reports what they have come to rather
                     // than what its own state says: a container is never itself "in progress",
                     // and a bar over a plan is where that difference is read
-                    Progress = CoreHub.ObjectProgressManager.GetProgress(entity.Id).Percent,
+                    Progress = progressById.TryGetValue(entity.Id, out var progress) ? progress.Percent : 0,
                     Resources = assignee is null ? null : [assignee.Name],
 
                     // the model's own hierarchy, then the aggregating order (see ResolveParents);

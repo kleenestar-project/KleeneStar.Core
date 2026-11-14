@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -77,6 +77,28 @@ namespace KleeneStar.Core.WebManager
                 .Where(x => ids.Contains(x.SourceObjectId) && x.TargetObjectId != null && ids.Contains(x.TargetObjectId.Value));
 
             return ModelHub.GetObjectRelations(query);
+        }
+
+        /// <summary>
+        /// Returns every relation one of the supplied objects is the source of.
+        /// </summary>
+        /// <param name="sourceIds">The ids of the source objects.</param>
+        /// <returns>The relations whose source is among the objects.</returns>
+        public IEnumerable<ObjectRelation> GetRelationsFrom(IEnumerable<Guid> sourceIds)
+        {
+            var result = new List<ObjectRelation>();
+
+            // a parameterized list may be sent as one parameter per element, and SQL Server
+            // accepts at most 2100 of them in a statement
+            foreach (var chunk in (sourceIds ?? []).Distinct().Chunk(500))
+            {
+                var query = new Query<ObjectRelation>()
+                    .Where(x => chunk.Contains(x.SourceObjectId));
+
+                result.AddRange(ModelHub.GetObjectRelations(query));
+            }
+
+            return result;
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Model;
@@ -443,33 +443,50 @@ namespace KleeneStar.Core.WebRestApi
 
             query = scope.Apply(query);
 
-            var cards = Narrow(CoreHub.ObjectManager.GetObjects(query, context), sprintId, request);
+            var cards = Narrow(CoreHub.ObjectManager.GetObjects(query, context), sprintId, request).ToList();
+
+            foreach (var classId in cards.Select(x => x.ClassId).Distinct())
+            {
+                var cls = CoreHub.ClassManager.GetClass(classId);
+                contextByClass[classId] = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
+            }
+
+            // the workflow and priority values of every card in one read instead of three reads
+            // per card
+            var fieldIds = contextByClass.Values
+                .Where(x => x is not null)
+                .SelectMany(x => new[] { x.WorkflowField?.Id, x.PriorityField?.Id })
+                .Concat(contextByClass.Keys.Select(x => catalog.WorkflowOf(x).Field?.Id))
+                .OfType<Guid>();
+            var values = CoreHub.ValueManager.GetData(cards.Select(x => x.Id), fieldIds);
+
+            string Data(Guid objectId, Field field)
+            {
+                return field is not null && values.TryGetValue((objectId, field.Id), out var data) ? data : null;
+            }
 
             foreach (var entity in cards)
             {
-                if (!contextByClass.TryGetValue(entity.ClassId, out var classContext))
-                {
-                    var cls = CoreHub.ClassManager.GetClass(entity.ClassId);
-                    classContext = cls is null ? null : ObjectBoardProjection.BuildClassContext(cls);
-                    contextByClass[entity.ClassId] = classContext;
-                }
+                var classContext = contextByClass[entity.ClassId];
 
-                var category = ObjectBoardProjection.ResolveCategory(entity.Id, classContext, categoriesById)
+                var category = ObjectBoardProjection.ResolveCategory(Data(entity.Id, classContext?.WorkflowField), classContext, categoriesById)
                     ?? defaultCategory;
 
                 var columnId = ResolveColumnId(category, columnIdByCategoryId, fallbackColumnId);
                 var swimlaneId = ResolveSwimlaneId(entity.ClassId, swimlaneIdByClassId);
 
+                var priority = ObjectBoardProjection.ResolvePriorityCode(Data(entity.Id, classContext?.PriorityField));
+
                 if (catalog.IsEmpty)
                 {
-                    yield return BuildCard(entity, classContext, columnId, swimlaneId, identityById);
+                    yield return BuildCard(entity, priority, columnId, swimlaneId, identityById);
                     continue;
                 }
 
                 var (field, workflow) = catalog.WorkflowOf(entity.ClassId);
                 var current = workflow is null
                     ? null
-                    : CoreHub.WorkflowManager.ResolveStatus(workflow, CoreHub.ValueManager.GetValue(entity.Id, field.Id)?.Data);
+                    : CoreHub.WorkflowManager.ResolveStatus(workflow, Data(entity.Id, field));
                 var statusKey = current is null ? null : KanbanStatusCatalog.Key(current);
 
                 if (statusKey is not null && columnIdByStatusKey.TryGetValue(statusKey, out var assignedColumnId))
@@ -485,7 +502,7 @@ namespace KleeneStar.Core.WebRestApi
                     mayMoveByClass[entity.ClassId] = mayMove;
                 }
 
-                var card = BuildCard(entity, classContext, columnId, swimlaneId, identityById);
+                var card = BuildCard(entity, priority, columnId, swimlaneId, identityById);
 
                 card.StatusId = statusKey;
 
@@ -793,7 +810,7 @@ namespace KleeneStar.Core.WebRestApi
         /// and the priority/story-point footer chips.
         /// </summary>
         /// <param name="entity">The object to project.</param>
-        /// <param name="classContext">The board context of the object's class.</param>
+        /// <param name="priority">The priority display code of the object, or an empty string.</param>
         /// <param name="columnId">The resolved column id the card is placed in.</param>
         /// <param name="swimlaneId">The resolved swimlane id the card is placed in.</param>
         /// <param name="identityById">A request-scoped identity cache.</param>
@@ -801,7 +818,7 @@ namespace KleeneStar.Core.WebRestApi
         private static RestApiKanbanCard BuildCard
         (
             Model.Entities.Object entity,
-            ObjectBoardClassContext classContext,
+            string priority,
             string columnId,
             string swimlaneId,
             Dictionary<Guid, Identity> identityById
@@ -823,7 +840,7 @@ namespace KleeneStar.Core.WebRestApi
                 AssigneeInitials = assignee is null ? null : ObjectBoardProjection.Initials(assignee.Name),
                 AssigneeColor = assignee is null ? null : ObjectBoardProjection.AvatarColor(assignee.Id),
                 AssigneeImage = ObjectBoardProjection.AvatarImage(assignee),
-                Footer = BuildFooter(entity, classContext).ToList()
+                Footer = BuildFooter(entity, priority).ToList()
             };
 
             return card;
@@ -834,12 +851,10 @@ namespace KleeneStar.Core.WebRestApi
         /// a priority value) and the story-point estimate (when estimated).
         /// </summary>
         /// <param name="entity">The object to project.</param>
-        /// <param name="classContext">The board context of the object's class.</param>
+        /// <param name="priority">The priority display code of the object, or an empty string.</param>
         /// <returns>The footer chips.</returns>
-        private static IEnumerable<RestApiKanbanCardChip> BuildFooter(Model.Entities.Object entity, ObjectBoardClassContext classContext)
+        private static IEnumerable<RestApiKanbanCardChip> BuildFooter(Model.Entities.Object entity, string priority)
         {
-            var priority = ObjectBoardProjection.ResolvePriorityCode(entity.Id, classContext);
-
             if (!string.IsNullOrWhiteSpace(priority))
             {
                 yield return new RestApiKanbanCardChip

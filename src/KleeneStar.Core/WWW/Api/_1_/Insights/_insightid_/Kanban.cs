@@ -1,7 +1,10 @@
-using KleeneStar.Core.WebInsight;
+﻿using KleeneStar.Core.WebInsight;
 using KleeneStar.Core.WebRestApi;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 
@@ -70,6 +73,32 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
         /// <returns>The scope, or <see langword="null"/> when there is no readable insight.</returns>
         public static KanbanBoardScope Resolve(IRequest request, string viewType = Model.Entities.InsightViewTypes.Kanban)
         {
+            // the board asks for its scope once per hook (columns, cards, lanes, statuses), and
+            // the answer is the same for every one of them within a request
+            if (request is null)
+            {
+                return Build(null, viewType);
+            }
+
+            var scopes = _scopes.GetValue(request, _ => new ConcurrentDictionary<string, KanbanBoardScope>(StringComparer.OrdinalIgnoreCase));
+
+            return scopes.GetOrAdd(viewType ?? string.Empty, _ => Build(request, viewType));
+        }
+
+        /// <summary>
+        /// The scopes resolved for a request, by view type. An entry lives as long as its
+        /// request.
+        /// </summary>
+        private static readonly ConditionalWeakTable<IRequest, ConcurrentDictionary<string, KanbanBoardScope>> _scopes = [];
+
+        /// <summary>
+        /// Builds the scope of the insight the request addresses.
+        /// </summary>
+        /// <param name="request">The request naming the insight.</param>
+        /// <param name="viewType">The type of the view the board belongs to.</param>
+        /// <returns>The scope, or <see langword="null"/> when the caller may not read the insight.</returns>
+        private static KanbanBoardScope Build(IRequest request, string viewType)
+        {
             var insight = InsightScope.ResolveReadable(request);
 
             if (insight is null)
@@ -80,7 +109,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Insights._insightid_
             // the classes and the statuses come from the objects the insight selects, so they
             // are read once per request and shared by the lanes and the status catalog
             IReadOnlyList<Model.Entities.Class> classes = null;
-            IReadOnlyList<Model.Entities.Class> Classes() => classes ??= InsightScope.GetClasses(InsightScope.GetObjects(insight));
+            IReadOnlyList<Model.Entities.Class> Classes() => classes ??= InsightScope.GetClasses(insight);
 
             return new KanbanBoardScope
             {

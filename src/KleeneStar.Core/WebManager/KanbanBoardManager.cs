@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -47,7 +47,13 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The board, or <see langword="null"/> when none is persisted.</returns>
         public KanbanBoard GetBoard(Guid workspaceId, string kind, Guid viewId = default)
         {
-            return ModelHub.GetKanbanBoard(workspaceId, kind, viewId);
+            return RequestReadCache.Get
+            (
+                nameof(GetBoard),
+                (workspaceId, kind, viewId),
+                () => ModelHub.GetKanbanBoard(workspaceId, kind, viewId),
+                typeof(KanbanBoard), typeof(KanbanBoardColumn), typeof(KanbanBoardSwimlane)
+            );
         }
 
         /// <summary>

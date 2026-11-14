@@ -1,4 +1,4 @@
-using WebExpress.WebCore.WebIcon;
+﻿using WebExpress.WebCore.WebIcon;
 
 namespace KleeneStar.Core.WebWorkflow
 {
@@ -60,6 +60,14 @@ namespace KleeneStar.Core.WebWorkflow
         /// <param name="context">What is known about the move.</param>
         /// <returns><see langword="true"/> when this guard holds.</returns>
         bool Evaluate(WorkflowRuleContext context);
+
+        /// <summary>
+        /// Returns whether the answer depends on the move itself: the target state or the
+        /// transition. A guard that judges only the object and the acting identity answers
+        /// <see langword="false"/>, and the offer of an object's next states then asks it once
+        /// for all targets instead of once per target.
+        /// </summary>
+        bool DependsOnTarget => true;
     }
 
     /// <summary>

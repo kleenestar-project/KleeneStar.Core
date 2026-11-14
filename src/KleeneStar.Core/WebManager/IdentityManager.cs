@@ -63,12 +63,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The identity.</returns>
         public Identity GetIdentity(Guid identityId)
         {
-            var query = new Query<Identity>()
-                .Where(x => x.Id == identityId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetIdentity), identityId, () =>
+            {
+                var query = new Query<Identity>()
+                    .Where(x => x.Id == identityId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetIdentities(query)
-                .FirstOrDefault();
+                return ModelHub.GetIdentities(query)
+                    .FirstOrDefault();
+            }, typeof(Identity), typeof(IdentityGroupMembership), typeof(Group), typeof(GroupPolicy));
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using System;
 using System.Linq;
 using WebExpress.WebCore.WebIcon;
@@ -17,6 +17,9 @@ namespace KleeneStar.Core.WebWorkflow.Guards
     {
         /// <inheritdoc/>
         public string Key => "assignee.set";
+
+        /// <inheritdoc/>
+        public bool DependsOnTarget => false;
 
         /// <inheritdoc/>
         public string Label => "kleenestar.core:workflow.rule.assignee.set.label";
@@ -49,6 +52,9 @@ namespace KleeneStar.Core.WebWorkflow.Guards
     {
         /// <inheritdoc/>
         public string Key => "actor.is.assignee";
+
+        /// <inheritdoc/>
+        public bool DependsOnTarget => false;
 
         /// <inheritdoc/>
         public string Label => "kleenestar.core:workflow.rule.actor.is.assignee.label";
@@ -84,6 +90,9 @@ namespace KleeneStar.Core.WebWorkflow.Guards
     {
         /// <inheritdoc/>
         public string Key => "actor.is.creator";
+
+        /// <inheritdoc/>
+        public bool DependsOnTarget => false;
 
         /// <inheritdoc/>
         public string Label => "kleenestar.core:workflow.rule.actor.is.creator.label";
@@ -158,6 +167,9 @@ namespace KleeneStar.Core.WebWorkflow.Guards
     {
         /// <inheritdoc/>
         public string Key => "children.completed";
+
+        /// <inheritdoc/>
+        public bool DependsOnTarget => false;
 
         /// <inheritdoc/>
         public string Label => "kleenestar.core:workflow.rule.children.completed.label";

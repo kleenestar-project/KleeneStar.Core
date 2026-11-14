@@ -72,12 +72,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The class.</returns>
         public Class GetClass(Guid classId)
         {
-            var query = new Query<Class>()
-                .Where(x => x.Id == classId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetClass), classId, () =>
+            {
+                var query = new Query<Class>()
+                    .Where(x => x.Id == classId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetClasses(query)
-                .FirstOrDefault();
+                return ModelHub.GetClasses(query)
+                    .FirstOrDefault();
+            }, typeof(Class), typeof(Workspace));
         }
 
         /// <summary>

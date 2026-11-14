@@ -1,3 +1,4 @@
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System;
@@ -164,8 +165,22 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The start and end of the object's bar, start never after end.</returns>
         public static (DateTime Start, DateTime End) ResolvePlan(Model.Entities.Object entity, ObjectBoardClassContext context)
         {
-            var start = ReadDate(entity.Id, context?.StartDateField);
-            var end = ReadDate(entity.Id, context?.EndDateField);
+            return ResolvePlan(entity, context, ReadValue);
+        }
+
+        /// <summary>
+        /// Reads the planned span of an object from values a caller already read, the half of
+        /// <see cref="ResolvePlan(Model.Entities.Object, ObjectBoardClassContext)"/> a view
+        /// over many objects uses together with <see cref="ReadValues"/>.
+        /// </summary>
+        /// <param name="entity">The object to place.</param>
+        /// <param name="context">The board context of the object's class.</param>
+        /// <param name="read">Answers the stored value of a field of an object.</param>
+        /// <returns>The start and end of the object's bar, start never after end.</returns>
+        public static (DateTime Start, DateTime End) ResolvePlan(Model.Entities.Object entity, ObjectBoardClassContext context, Func<Guid, Field, string> read)
+        {
+            var start = ParseDate(read(entity.Id, context?.StartDateField));
+            var end = ParseDate(read(entity.Id, context?.EndDateField));
 
             if (start is null && end is not null)
             {
@@ -186,16 +201,49 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The stamped date, or <see langword="null"/> when unset or unparsable.</returns>
         public static DateTime? ReadDate(Guid objectId, Field field)
         {
-            if (field is null)
-            {
-                return null;
-            }
+            return ParseDate(ReadValue(objectId, field));
+        }
 
-            var data = CoreHub.ValueManager.GetValue(objectId, field.Id)?.Data;
-
+        /// <summary>
+        /// Parses a stored date value.
+        /// </summary>
+        /// <param name="data">The stored value, or <see langword="null"/>.</param>
+        /// <returns>The date, or <see langword="null"/> when unset or unparsable.</returns>
+        public static DateTime? ParseDate(string data)
+        {
             return DateTime.TryParse(data, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var value)
                 ? value
                 : null;
+        }
+
+        /// <summary>
+        /// Reads the stored value of one field of one object.
+        /// </summary>
+        /// <param name="objectId">The object id.</param>
+        /// <param name="field">The field, or <see langword="null"/>.</param>
+        /// <returns>The stored value, or <see langword="null"/>.</returns>
+        private static string ReadValue(Guid objectId, Field field)
+        {
+            return field is null ? null : CoreHub.ValueManager.GetValue(objectId, field.Id)?.Data;
+        }
+
+        /// <summary>
+        /// Reads the values a board or plan view projects of each object (workflow, priority,
+        /// start and end date) for many objects in one read.
+        /// </summary>
+        /// <param name="objects">The objects of the view.</param>
+        /// <param name="contexts">The board contexts of their classes.</param>
+        /// <returns>Answers the stored value of a field of one of the objects.</returns>
+        public static Func<Guid, Field, string> ReadValues(IEnumerable<Model.Entities.Object> objects, IEnumerable<ObjectBoardClassContext> contexts)
+        {
+            var fieldIds = (contexts ?? [])
+                .Where(x => x is not null)
+                .SelectMany(x => new[] { x.WorkflowField?.Id, x.PriorityField?.Id, x.StartDateField?.Id, x.EndDateField?.Id })
+                .OfType<Guid>();
+
+            var values = CoreHub.ValueManager.GetData((objects ?? []).Select(x => x.Id), fieldIds);
+
+            return (objectId, field) => field is not null && values.TryGetValue((objectId, field.Id), out var data) ? data : null;
         }
 
         /// <summary>
@@ -246,10 +294,13 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The ordered categories.</returns>
         public static IReadOnlyList<StatusCategory> GetOrderedCategories()
         {
-            return [.. CoreHub.StatusManager
-                .GetStatusCategories(new Query<StatusCategory>())
-                .OrderBy(CategoryRank)
-                .ThenBy(x => x.Name)];
+            return RequestReadCache.Get<IReadOnlyList<StatusCategory>>(nameof(GetOrderedCategories), string.Empty, () =>
+            [
+                .. CoreHub.StatusManager
+                    .GetStatusCategories(new Query<StatusCategory>())
+                    .OrderBy(CategoryRank)
+                    .ThenBy(x => x.Name)
+            ], typeof(StatusCategory));
         }
 
         /// <summary>
@@ -318,7 +369,18 @@ namespace KleeneStar.Core.WebRestApi
                 return string.Empty;
             }
 
-            var data = CoreHub.ValueManager.GetValue(objectId, context.PriorityField.Id)?.Data;
+            return ResolvePriorityCode(CoreHub.ValueManager.GetValue(objectId, context.PriorityField.Id)?.Data);
+        }
+
+        /// <summary>
+        /// Resolves the priority display code a stored priority value stands for, the half of
+        /// <see cref="ResolvePriorityCode(Guid, ObjectBoardClassContext)"/> a caller that read
+        /// the values of many objects at once uses.
+        /// </summary>
+        /// <param name="data">The stored value of the priority field.</param>
+        /// <returns>The priority display code, or an empty string.</returns>
+        public static string ResolvePriorityCode(string data)
+        {
             if (string.IsNullOrWhiteSpace(data))
             {
                 return string.Empty;

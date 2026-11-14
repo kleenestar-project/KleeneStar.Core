@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -93,6 +93,51 @@ namespace KleeneStar.Core.WebManager
                 .WithPaging(0, 1);
 
             return ModelHub.GetValues(query).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Returns the payloads of the supplied fields for every supplied object in one read.
+        /// </summary>
+        /// <param name="objectIds">The ids of the objects.</param>
+        /// <param name="fieldIds">The ids of the fields.</param>
+        /// <returns>
+        /// The payload per (object, field) pair. A pair without a value is not in the map.
+        /// </returns>
+        public IReadOnlyDictionary<(Guid ObjectId, Guid FieldId), string> GetData(IEnumerable<Guid> objectIds, IEnumerable<Guid> fieldIds)
+        {
+            var objects = objectIds?.Distinct().ToList() ?? [];
+            var fields = fieldIds?.Distinct().ToList() ?? [];
+            var result = new Dictionary<(Guid ObjectId, Guid FieldId), string>();
+
+            foreach (var (objectId, fieldId, data) in ModelHub.GetValueData(objects, fields))
+            {
+                result.TryAdd((objectId, fieldId), data);
+            }
+
+            // a write made inside an open commit scope is not in the store yet, but the code that
+            // made it must still read it back as its own
+            if (CoreHub.CommitManager is CommitManager commitManager)
+            {
+                foreach (var objectId in objects)
+                {
+                    foreach (var fieldId in fields)
+                    {
+                        if (commitManager.TryGetStagedValue(objectId, fieldId, out var staged))
+                        {
+                            if (staged is null)
+                            {
+                                result.Remove((objectId, fieldId));
+                            }
+                            else
+                            {
+                                result[(objectId, fieldId)] = staged.Data;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>

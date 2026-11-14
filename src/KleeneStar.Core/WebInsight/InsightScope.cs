@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebQuickfilter;
 using KleeneStar.Core.WebRestApi;
 using System;
@@ -182,6 +182,21 @@ namespace KleeneStar.Core.WebInsight
             // the object was read through the manager, with its workspace attached, so a query
             // naming the workspace is answered the way the store answers it
             return WqlFilter.Apply(insight.Query, [entity]).Any();
+        }
+
+        /// <summary>
+        /// Returns the classes of the objects the insight selects for the caller, without
+        /// loading the objects.
+        /// </summary>
+        /// <param name="insight">The insight.</param>
+        /// <returns>The classes, each once.</returns>
+        public static IReadOnlyList<Model.Entities.Class> GetClasses(Model.Entities.Insight insight)
+        {
+            return insight is null
+                ? []
+                : [.. CoreHub.ObjectManager.GetClassIds(Query(insight))
+                    .Select(CoreHub.ClassManager.GetClass)
+                    .Where(x => x is not null)];
         }
 
         /// <summary>

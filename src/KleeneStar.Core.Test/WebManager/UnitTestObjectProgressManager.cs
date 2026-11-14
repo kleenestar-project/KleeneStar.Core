@@ -1,4 +1,4 @@
-using KleeneStar.Model.Entities;
+﻿using KleeneStar.Model.Entities;
 using WebExpress.WebApp.WebRelation;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
 
@@ -207,6 +207,47 @@ namespace KleeneStar.Core.Test.WebManager
             // the branch is (100 + 0) / 2 = 50, so the root is (50 + 100) / 2
             Assert.Equal(50, CoreHub.ObjectProgressManager.GetProgress(branch).Percent);
             Assert.Equal(75, CoreHub.ObjectProgressManager.GetProgress(root).Percent);
+        }
+
+        /// <summary>
+        /// Verifies that measuring many objects together answers for each what measuring it on
+        /// its own answers: roots, inner nodes and leaves of one tree, and an object outside it.
+        /// </summary>
+        [Fact]
+        public void GetProgress_ForManyObjects_AnswersLikeOneByOne()
+        {
+            Seed(nameof(GetProgress_ForManyObjects_AnswersLikeOneByOne));
+
+            var root = Object("PRG-ROOT", TodoId);
+            var branch = Object("PRG-BRANCH", TodoId);
+            var leafDone = Object("PRG-LEAF-1", DoneId);
+            var leafOpen = Object("PRG-LEAF-2", ProgressId);
+            var sibling = Object("PRG-SIBLING", DoneId);
+            var single = Object("PRG-SINGLE", ProgressId);
+
+            Aggregate(root, branch);
+            Aggregate(root, sibling);
+            Aggregate(branch, leafDone);
+            Aggregate(branch, leafOpen);
+
+            var ids = new[] { root, branch, leafDone, leafOpen, sibling, single };
+            var objects = ids.Select(x => CoreHub.ObjectManager.GetObject(x)).ToList();
+
+            var together = CoreHub.ObjectProgressManager.GetProgress(objects);
+
+            Assert.Equal(ids.Length, together.Count);
+
+            foreach (var id in ids)
+            {
+                var alone = CoreHub.ObjectProgressManager.GetProgress(id);
+
+                Assert.Equal(alone.Percent, together[id].Percent);
+                Assert.Equal(alone.Aggregated, together[id].Aggregated);
+                Assert.Equal(alone.Contributions, together[id].Contributions);
+            }
+
+            // the branch is (100 + 50) / 2 = 75, so the root is (75 + 100) / 2, rounded
+            Assert.Equal(88, together[root].Percent);
         }
 
         /// <summary>

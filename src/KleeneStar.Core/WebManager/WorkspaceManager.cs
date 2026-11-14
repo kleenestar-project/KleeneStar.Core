@@ -73,12 +73,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The workspace.</returns>
         public Workspace GetWorkspace(Guid workspaceId)
         {
-            var query = new Query<Workspace>()
-                .Where(x => x.Id == workspaceId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetWorkspace), workspaceId, () =>
+            {
+                var query = new Query<Workspace>()
+                    .Where(x => x.Id == workspaceId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetWorkspaces(query)
-                .FirstOrDefault();
+                return ModelHub.GetWorkspaces(query)
+                    .FirstOrDefault();
+            }, typeof(Workspace), typeof(Category), typeof(Tenant));
         }
 
         /// <summary>
@@ -98,12 +101,15 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
-            var query = new Query<Workspace>()
-                .WhereEqualsIgnoreCase(x => x.Key, key)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetWorkspaceByKey), key.ToLowerInvariant(), () =>
+            {
+                var query = new Query<Workspace>()
+                    .WhereEqualsIgnoreCase(x => x.Key, key)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetWorkspaces(query)
-                .FirstOrDefault();
+                return ModelHub.GetWorkspaces(query)
+                    .FirstOrDefault();
+            }, typeof(Workspace), typeof(Category), typeof(Tenant));
         }
 
         /// <summary>

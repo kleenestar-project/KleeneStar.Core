@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using WebExpress.WebCore.WebComponent;
 
 namespace KleeneStar.Core.WebManager
@@ -33,5 +34,17 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The progress. An object that cannot be read - it is gone, or the caller is
         /// not cleared for it - answers zero rather than an error.</returns>
         ObjectProgress GetProgress(Guid objectId);
+
+        /// <summary>
+        /// Returns how far each of the supplied objects has come, reading the trees below them
+        /// together instead of once per object. A view that shows the progress of many objects
+        /// asks this.
+        /// </summary>
+        /// <param name="objects">
+        /// The objects to measure, already read the caller's way. A caller who may not see an
+        /// object must not hand it in.
+        /// </param>
+        /// <returns>The progress per object id.</returns>
+        IReadOnlyDictionary<Guid, ObjectProgress> GetProgress(IEnumerable<Model.Entities.Object> objects);
     }
 }

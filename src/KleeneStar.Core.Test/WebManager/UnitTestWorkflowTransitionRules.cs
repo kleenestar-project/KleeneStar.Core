@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebWorkflow;
 using KleeneStar.Model.Entities;
 using System.Collections.Generic;
@@ -208,6 +208,75 @@ namespace KleeneStar.Core.Test.WebManager
             // not the row behind it, which is what lets a caller ask the question about a state
             // the object is not in yet
             Assert.Single(CoreHub.WorkflowManager.GetOfferedStatuses(workflow, current, CoreHub.ObjectManager.GetObject(ObjectId), field, IdentityId));
+        }
+
+        /// <summary>
+        /// A guard that counts how often it is asked and lets every move through.
+        /// </summary>
+        /// <param name="key">The key of the guard.</param>
+        /// <param name="dependsOnTarget">Whether the answer depends on the target.</param>
+        private sealed class CountingGuard(string key, bool dependsOnTarget) : IWorkflowGuard
+        {
+            public int Calls { get; private set; }
+
+            public string Key => key;
+
+            public string Label => key;
+
+            public string Description => key;
+
+            public bool DependsOnTarget => dependsOnTarget;
+
+            public bool Evaluate(WorkflowRuleContext context)
+            {
+                Calls++;
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Verifies that the offer asks a guard whose answer does not depend on the target once
+        /// for all targets, and a guard whose answer does once per target.
+        /// </summary>
+        [Fact]
+        public void GetOfferedStatuses_AsksTargetIndependentGuardsOnce()
+        {
+            var independent = new CountingGuard("test.counting.independent", false);
+            var dependent = new CountingGuard("test.counting.dependent", true);
+            var guards = $"{independent.Key};{dependent.Key}";
+            var closedId = Guid.NewGuid();
+
+            Seed(nameof(GetOfferedStatuses_AsksTargetIndependentGuardsOnce), guards: guards);
+
+            using (var db = CoreHubFixture.CreateDbContext(nameof(GetOfferedStatuses_AsksTargetIndependentGuardsOnce)))
+            {
+                db.Statuses.Add(new Status { Id = closedId, Name = "Closed", ClassId = ClassId, CategoryId = CategoryDoneId, State = StatusState.Active });
+                db.Set<WorkflowStatus>().Add(new WorkflowStatus { WorkflowId = WorkflowId, StatusId = closedId });
+                db.Transitions.Add(new Transition
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Close",
+                    WorkflowId = WorkflowId,
+                    SourceId = NewId,
+                    TargetId = closedId,
+                    State = TransitionState.Active,
+                    GuardExpression = guards
+                });
+                db.SaveChanges();
+            }
+
+            CoreHub.WorkflowGuardManager.Register(independent);
+            CoreHub.WorkflowGuardManager.Register(dependent);
+
+            var workflow = CoreHub.WorkflowManager.GetWorkflowWithStructure(WorkflowId);
+            var current = workflow.Statuses.First(x => x.Id == NewId);
+
+            var offered = CoreHub.WorkflowManager.GetOfferedStatuses(workflow, current, CoreHub.ObjectManager.GetObject(ObjectId), CoreHub.FieldManager.GetField(FieldId), IdentityId);
+
+            Assert.Equal(2, offered.Count());
+            Assert.Equal(1, independent.Calls);
+            Assert.Equal(2, dependent.Calls);
         }
 
         /// <summary>

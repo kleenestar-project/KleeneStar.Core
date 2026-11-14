@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebControl;
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
@@ -451,7 +451,19 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                 }
             }
 
-            var category = ObjectBoardProjection.ResolveCategory(item.Id, classContext, categories);
+            // the workflow and the priority value in one read
+            var values = CoreHub.ValueManager.GetData
+            (
+                [item.Id],
+                new[] { classContext?.WorkflowField?.Id, classContext?.PriorityField?.Id }.OfType<Guid>()
+            );
+
+            string Data(Model.Entities.Field field)
+            {
+                return field is not null && values.TryGetValue((item.Id, field.Id), out var data) ? data : null;
+            }
+
+            var category = ObjectBoardProjection.ResolveCategory(Data(classContext?.WorkflowField), classContext, categories);
             var assignee = item.AssigneeId is Guid assigneeId ? CoreHub.IdentityManager.GetIdentity(assigneeId) : null;
 
             return new RestApiScrumItem
@@ -461,7 +473,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                 Icon = ObjectIcon.Uri(item),
                 Key = item.Key,
                 Title = string.IsNullOrWhiteSpace(item.Summary) ? item.Key : item.Summary,
-                Priority = ObjectBoardProjection.ResolvePriorityCode(item.Id, classContext),
+                Priority = ObjectBoardProjection.ResolvePriorityCode(Data(classContext?.PriorityField)),
                 Points = item.StoryPoints ?? 0,
                 SprintId = item.SprintId?.ToString(),
                 Status = item.SprintId is null ? "backlog" : ObjectBoardProjection.CategoryItemStatus(category),

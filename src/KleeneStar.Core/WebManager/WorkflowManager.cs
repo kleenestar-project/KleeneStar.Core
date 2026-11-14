@@ -107,7 +107,13 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The workflow including states and transitions, or <c>null</c>.</returns>
         public Workflow GetWorkflowWithStructure(Guid workflowId)
         {
-            return ModelHub.GetWorkflowWithStructure(workflowId);
+            return RequestReadCache.Get
+            (
+                nameof(GetWorkflowWithStructure),
+                workflowId,
+                () => ModelHub.GetWorkflowWithStructure(workflowId),
+                typeof(Workflow), typeof(WorkflowStatus), typeof(Status), typeof(StatusCategory), typeof(Transition), typeof(Class)
+            );
         }
 
         /// <summary>
@@ -250,11 +256,14 @@ namespace KleeneStar.Core.WebManager
                 .Where(x => x.State == TransitionState.Active && x.SourceId == currentStatus.Id)
                 .ToList();
 
+            // a guard that judges only the object and the caller gives the same answer for
+            // every target, so it is asked once for all of them
+            var independent = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
             return [.. reachable.Where(target =>
             {
                 var transition = transitions.FirstOrDefault(x => x.TargetId == target.Id);
-
-                return Guarded(transition, new WorkflowRuleContext
+                var context = new WorkflowRuleContext
                 {
                     Object = objectEntity,
                     Field = field,
@@ -262,6 +271,29 @@ namespace KleeneStar.Core.WebManager
                     Target = target,
                     Transition = transition,
                     IdentityId = identityId
+                };
+
+                return WorkflowExpression.Evaluate(transition?.GuardExpression, key =>
+                {
+                    var guard = CoreHub.WorkflowGuardManager?.Get(key);
+
+                    if (guard is null)
+                    {
+                        return false;
+                    }
+
+                    if (guard.DependsOnTarget)
+                    {
+                        return guard.Evaluate(context);
+                    }
+
+                    if (!independent.TryGetValue(key, out var answer))
+                    {
+                        answer = guard.Evaluate(context);
+                        independent[key] = answer;
+                    }
+
+                    return answer;
                 });
             })];
         }

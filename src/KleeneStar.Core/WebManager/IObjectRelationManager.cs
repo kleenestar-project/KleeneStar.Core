@@ -1,4 +1,4 @@
-using KleeneStar.Model.Entities;
+﻿using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using WebExpress.WebCore.WebComponent;
@@ -43,6 +43,15 @@ namespace KleeneStar.Core.WebManager
         /// <param name="objectIds">The ids of the objects.</param>
         /// <returns>The relations whose source and target are both among the objects.</returns>
         IEnumerable<ObjectRelation> GetRelationsAmong(IEnumerable<Guid> objectIds);
+
+        /// <summary>
+        /// Returns every relation one of the supplied objects is the source of, in as few reads
+        /// as the number of ids allows. A walk over many objects asks this once per level rather
+        /// than <see cref="GetRelations(Guid)"/> once per object.
+        /// </summary>
+        /// <param name="sourceIds">The ids of the source objects.</param>
+        /// <returns>The relations whose source is among the objects.</returns>
+        IEnumerable<ObjectRelation> GetRelationsFrom(IEnumerable<Guid> sourceIds);
 
         /// <summary>
         /// Returns a single relation by its unique identifier.

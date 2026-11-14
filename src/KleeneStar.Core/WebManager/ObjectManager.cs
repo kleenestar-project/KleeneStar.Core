@@ -195,6 +195,17 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the ids of the classes the objects that satisfy the supplied filter criteria
+        /// belong to, without loading the objects.
+        /// </summary>
+        /// <param name="query">The query criteria. Paging must be left off.</param>
+        /// <returns>The distinct class ids.</returns>
+        public IReadOnlyList<Guid> GetClassIds(IQuery<Model.Entities.Object> query)
+        {
+            return ModelHub.GetObjectClassIds(Restrict(query));
+        }
+
+        /// <summary>
         /// Retrieves a collection of objects that satisfy the specified filter criteria.
         /// </summary>
         /// <param name="query">

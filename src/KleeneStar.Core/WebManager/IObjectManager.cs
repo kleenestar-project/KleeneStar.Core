@@ -136,6 +136,16 @@ namespace KleeneStar.Core.WebManager
         int CountObjects(IQuery<Object> query);
 
         /// <summary>
+        /// Returns the ids of the classes the objects that satisfy the supplied filter criteria
+        /// belong to, without loading the objects. Narrowed like
+        /// <see cref="GetObjects(IQuery{Object})"/>, so a class is answered only for objects the
+        /// caller may read.
+        /// </summary>
+        /// <param name="query">The query criteria. Paging must be left off.</param>
+        /// <returns>The distinct class ids.</returns>
+        IReadOnlyList<System.Guid> GetClassIds(IQuery<Object> query);
+
+        /// <summary>
         /// Returns the active objects the supplied identity has most recently opened, newest
         /// first, capped at <paramref name="count"/>. Backs the "recently used" section of the
         /// object dropdown in the application header.
