@@ -134,6 +134,53 @@ namespace KleeneStar.Core.Test
         }
 
         /// <summary>
+        /// Tests that the plugin seeds run in the given order after the base seed, that a seed
+        /// that throws is logged and skipped, and that the next seed still runs.
+        /// </summary>
+        [Fact]
+        public void PluginSeedsRunInOrderAndSurviveAFailure()
+        {
+            using var db = ModelHub.CreateDbContext();
+
+            DatabaseStartup.Run(db, null, null);
+
+            var calls = new List<string>();
+
+            DatabaseStartup.RunSeeds
+            (
+                db,
+                [
+                    new RecordingSeed("first", calls, null),
+                    new RecordingSeed("failing", calls, new InvalidOperationException("seed failed")),
+                    new RecordingSeed("last", calls, null)
+                ],
+                null,
+                null
+            );
+
+            Assert.Equal(["first", "failing", "last"], calls);
+            Assert.Equal(1, db.Identities.Count());
+            Assert.Equal(2, db.Tenants.Count());
+        }
+
+        /// <summary>
+        /// Tests that the plugin seeds fail like the base seed when the startup lock is held, and
+        /// that no seed runs.
+        /// </summary>
+        [Fact]
+        public void PluginSeedsWaitForTheClusterLock()
+        {
+            using var db = ModelHub.CreateDbContext();
+
+            DatabaseStartup.Run(db, null, null);
+
+            var calls = new List<string>();
+
+            Assert.Throws<TimeoutException>(() => DatabaseStartup.RunSeeds(db, [new RecordingSeed("seed", calls, null)], new HeldClusterManager(), null));
+            Assert.Empty(calls);
+        }
+
+        /// <summary>
         /// Runs sql against the test database outside of any context.
         /// </summary>
         /// <param name="sql">The statements.</param>
@@ -159,6 +206,33 @@ namespace KleeneStar.Core.Test
             command.CommandText = sql;
 
             return command.ExecuteScalar();
+        }
+
+        /// <summary>
+        /// A seed that records its call, adds one tenant and then throws the given exception.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="calls">The list the call is recorded in.</param>
+        /// <param name="failure">The exception to throw after the change, or null.</param>
+        private sealed class RecordingSeed(string key, List<string> calls, Exception failure) : WebSeed.IDatabaseSeed
+        {
+            public string Key => key;
+
+            public int Order => 0;
+
+            public async Task SeedAsync(KleeneStarDbContext db)
+            {
+                calls.Add(key);
+
+                db.Tenants.Add(new Model.Entities.Tenant { Id = Guid.NewGuid(), Name = key });
+
+                if (failure is not null)
+                {
+                    throw failure;
+                }
+
+                await db.SaveChangesAsync();
+            }
         }
 
         /// <summary>

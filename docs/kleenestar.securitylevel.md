@@ -232,7 +232,7 @@ reaches the log through `CommitManager.CommitAdded` like any other property.
 
 ## The seed
 
-`KleeneStarDbSeeder.SecurityLevels` gives every concrete class three levels — *Public* (the
+`DemoSeeder.SecurityLevels` (plugin `KleeneStar.Seeder`) gives every concrete class three levels — *Public* (the
 default, all groups), *Internal* (Admin, Engineering, Support) and *Confidential* (Admin) — and
 `SeedObjectSecurityLevels` classifies a share of the seeded objects with them, by position
 rather than at random so the same checkout always produces the same classified records. A fresh

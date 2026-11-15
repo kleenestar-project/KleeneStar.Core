@@ -1,8 +1,10 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebSeed;
+using KleeneStar.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using WebExpress.WebCore.WebCluster;
@@ -75,6 +77,53 @@ namespace KleeneStar.Core
             using (AcquireDatabaseLock(db))
             {
                 KleeneStarDbSeeder.SeedAsync(db).GetAwaiter().GetResult();
+            }
+        }
+
+        /// <summary>
+        /// Runs the database seeds of the plugins (<see cref="IDatabaseSeed"/>) in the given order,
+        /// under the cluster lock <see cref="LockName"/> and the database lock the base seed runs
+        /// under.
+        /// </summary>
+        /// <remarks>
+        /// A seed that throws is logged and the next one runs; the seeds are idempotent and the next
+        /// start completes what a failed one left.
+        /// </remarks>
+        /// <param name="db">The database context, migrated and holding the base data.</param>
+        /// <param name="seeds">The seeds in execution order.</param>
+        /// <param name="cluster">The cluster manager, or null where none exists (tests).</param>
+        /// <param name="log">The log, or null.</param>
+        /// <exception cref="TimeoutException">Another replica held the startup lock past <see cref="LockTimeout"/>.</exception>
+        public static void RunSeeds(KleeneStarDbContext db, IEnumerable<IDatabaseSeed> seeds, IClusterManager cluster, ILog log)
+        {
+            ArgumentNullException.ThrowIfNull(db);
+
+            var pending = seeds?.Where(x => x is not null).ToList() ?? [];
+
+            if (pending.Count == 0)
+            {
+                return;
+            }
+
+            using var startup = AcquireClusterLock(cluster, log);
+            using var databaseLock = AcquireDatabaseLock(db);
+
+            foreach (var seed in pending)
+            {
+                try
+                {
+                    log?.Info($"Running the database seed '{seed.Key}'.");
+
+                    seed.SeedAsync(db).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    log?.Error($"The database seed '{seed.Key}' failed.");
+                    log?.Exception(ex);
+
+                    // entities the failed seed left tracked would be written by the next one
+                    db.ChangeTracker.Clear();
+                }
             }
         }
 

@@ -38,6 +38,7 @@ namespace KleeneStar.Core
         private static InsightViewTypeManager _insightViewTypeManagerDetached;
         private static ObjectExportManager _objectExportManager;
         private static ObjectExportManager _objectExportManagerDetached;
+        private static DatabaseSeedManager _databaseSeedManager;
         private static FormManager _formManager;
         private static PriorityManager _priorityManager;
         private static WorkflowManager _workflowManager;
@@ -164,6 +165,11 @@ namespace KleeneStar.Core
         /// Gets the file formats a single object is exported in.
         /// </summary>
         public static IObjectExportManager ObjectExportManager => _objectExportManager ?? (_objectExportManager = ComponentHub?.GetComponentManager<ObjectExportManager>()) ?? (_objectExportManagerDetached ??= WebManager.ObjectExportManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the database seeds the plugins contribute.
+        /// </summary>
+        public static IDatabaseSeedManager DatabaseSeedManager => _databaseSeedManager ??= ComponentHub.GetComponentManager<DatabaseSeedManager>();
 
         /// <summary>
         /// Gets the form manager responsible for managing forms within the class.

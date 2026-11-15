@@ -87,6 +87,8 @@ namespace KleeneStar.Core
         /// </remarks>
         public void Run()
         {
+            RunPluginSeeds();
+
             CoreHub.BrandingManager.Apply();
 
             PublishRelationTypes();
@@ -102,6 +104,36 @@ namespace KleeneStar.Core
             ConnectBlueprints();
 
             StartAutomation();
+        }
+
+        /// <summary>
+        /// Runs the database seeds the plugins contribute (<see cref="WebSeed.IDatabaseSeed"/>,
+        /// <see cref="DatabaseStartup.RunSeeds"/>).
+        /// </summary>
+        /// <remarks>
+        /// Runs here and not in the constructor: the constructor is called while the core plugin is
+        /// registered, before the other plugins are; <see cref="Run"/> is called once all plugins
+        /// are registered. It runs first, so the hierarchy verifier, the path index rebuild and the
+        /// home page check see the seeded objects. A failure is logged and the start continues.
+        /// </remarks>
+        private static void RunPluginSeeds()
+        {
+            try
+            {
+                using var db = ModelHub.CreateDbContext();
+
+                DatabaseStartup.RunSeeds
+                (
+                    db,
+                    CoreHub.DatabaseSeedManager.Seeds,
+                    CoreHub.ComponentHub?.ClusterManager,
+                    CoreHub.ComponentHub?.LogManager?.DefaultLog
+                );
+            }
+            catch (Exception ex)
+            {
+                CoreHub.HttpServerContext?.Log?.Exception(ex);
+            }
         }
 
         /// <summary>
