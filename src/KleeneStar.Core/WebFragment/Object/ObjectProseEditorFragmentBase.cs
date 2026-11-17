@@ -78,6 +78,10 @@ namespace KleeneStar.Core.WebFragment.Object
             Collaborative = _ => true;
             CollaborationId = renderContext => "prose-" + ResolveObject(renderContext)?.Id.ToString("N");
 
+            // the shared document is the object as well: scoped by the page, the reading view and
+            // the /edit page would share the channel but transform against two different texts
+            Document = CollaborationId;
+
             MoreItems.Add(new ControlDropdownItemLink("prose-editor-changes")
             {
                 Text = _ => "kleenestar.core:object.draft.changes.label",

@@ -65,6 +65,9 @@ namespace KleeneStar.Core.WebFragment.Object
             Collaborative = _ => true;
             CollaborationId = renderContext => "spreadsheet-" + ResolveObject(renderContext)?.Id.ToString("N");
 
+            // one document per object, for the same reason as the prose editor's
+            Document = CollaborationId;
+
             MoreItems.Add(new ControlDropdownItemLink("spreadsheet-editor-changes")
             {
                 Text = _ => "kleenestar.core:object.draft.changes.label",
