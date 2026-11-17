@@ -23,11 +23,9 @@ namespace KleeneStar.Core.WebFragment.Insight
     /// </summary>
     /// <remarks>
     /// The list is the one the header menu offers: the active insights the caller may read
-    /// (<see cref="ContentVisibility.Restrict(IQuery{Model.Entities.Insight})"/>), by name. It
-    /// used to list every insight of the installation - names the caller was refused included -
-    /// as filter entries that did nothing on this page. Each entry is now a link to its insight
-    /// page, the open one marked. The links are unbound: a bound link would have its
-    /// <c>{insightid}</c> replaced by the one of the page being shown.
+    /// (<see cref="ContentVisibility.Restrict(IQuery{Model.Entities.Insight})"/>), by name. Each
+    /// entry is a <see cref="ControlSidebarItemLink"/> to its insight page, the open one marked;
+    /// the link keeps the bound <c>{insightid}</c> of its insight when the request is bound onto it.
     /// </remarks>
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]
@@ -69,7 +67,7 @@ namespace KleeneStar.Core.WebFragment.Insight
                 var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Insight._insightid_.Index>()?
                     .BindParameters(new InsightIdParameter(insight.Id));
 
-                list.Add(new UnboundSidebarItemLink($"insight-{insight.Id}")
+                list.Add(new ControlSidebarItemLink($"insight-{insight.Id}")
                 {
                     Text = _ => insight.Name,
                     Uri = _ => uri,

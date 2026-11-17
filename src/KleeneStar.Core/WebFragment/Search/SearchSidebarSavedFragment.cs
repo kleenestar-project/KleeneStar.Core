@@ -120,9 +120,8 @@ namespace KleeneStar.Core.WebFragment.Search
             var description = ProseText.ToPlainText(savedSearch.Description);
             var tooltip = string.IsNullOrWhiteSpace(description) ? savedSearch.Query : description;
 
-            // the link must not be bound against the request: on a page running a saved search
-            // that would turn its `use` into the running one's
-            return new UnboundSidebarItemLink($"ss-{savedSearch.Id}")
+            // the framework link binds path variables only, so the `use` query of the entry stays its own
+            return new ControlSidebarItemLink($"ss-{savedSearch.Id}")
             {
                 Text = _ => (starred ? "★ " : string.Empty) + savedSearch.Name,
                 Tooltip = _ => tooltip,

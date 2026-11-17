@@ -16,27 +16,31 @@ namespace KleeneStar.Core.WebIdentity
     /// <remarks>
     /// WebExpress answers <em>who</em>; KleeneStar also needs <em>by what</em>, because two
     /// questions are asked of the token itself. A sign-in (<see cref="Personal"/> false) is a
-    /// grant, and the grant is what the session list shows and what revoking a session ends -
-    /// the framework revokes grants in its token store but does not check an access token
-    /// against the store, so <see cref="WebManager.SessionManager"/> does. A personal access
-    /// token is matched to the row the profile issued it as, for its scopes and its
+    /// grant, and the grant is what the session list shows and what revoking a session ends; the
+    /// framework revokes grants in its token store and checks the store on a refresh, and
+    /// <see cref="WebManager.ISessionManager.Accepts"/> checks it on every request. A personal
+    /// access token is matched to the row the profile issued it as, for its scopes and its
     /// revocation.
     /// <para>
-    /// <b>One sign-in serves every KleeneStar application.</b> A WebExpress token is bound to the
-    /// application it was issued for, and the portal is an application of its own - so the
-    /// token the core's sign-in issues was refused on every portal page and the portal was
-    /// anonymous for everybody. A request of another <c>kleenestar.*</c> application that the
-    /// framework answers with nobody is therefore asked again against the core application.
-    /// The trust is deliberate and bounded: the applications are one product of one
-    /// installation, and an application of another plugin is not given the core's credential.
+    /// Core and portal form the application group <c>kleenestar</c>
+    /// (<c>WebExpress:Authentication:ApplicationGroups</c>), so the framework accepts the
+    /// sign-in of either application in both. Every KleeneStar sign-in is a grant of the core
+    /// application; <see cref="Application"/> is therefore the core application, whose token
+    /// store holds the revocations.
     /// </para>
     /// </remarks>
     /// <param name="Identity">The identity the token names.</param>
-    /// <param name="Token">The verified token, or <see langword="null"/> when none could be read.</param>
+    /// <param name="Token">The verified token, or <see langword="null"/> when none could be read
+    /// or the credential was built from the framework's validation context (<see cref="From"/>).</param>
     /// <param name="Personal">Whether the token is a personal access token rather than a sign-in.</param>
-    /// <param name="Application">The application the token was issued for.</param>
+    /// <param name="Application">The application whose token store holds the grant.</param>
     public sealed record SessionCredential(IIdentity Identity, JsonWebToken Token, bool Personal, IApplicationContext Application)
     {
+        /// <summary>
+        /// The token use of a personal access token.
+        /// </summary>
+        private const string PersonalTokenUse = "pat";
+
         /// <summary>
         /// The name of the access cookie over https (and the framework's protected prefix).
         /// </summary>
@@ -50,24 +54,25 @@ namespace KleeneStar.Core.WebIdentity
         /// <summary>
         /// Gets the grant a sign-in belongs to, or <see langword="null"/> for a personal token.
         /// </summary>
-        public string GrantId => !Personal && Token is not null && Token.TryGetPayloadValue<string>("grant", out var grant) ? grant : null;
+        public string GrantId { get; init; } = Personal ? null : Claim(Token, "grant");
 
         /// <summary>
-        /// Gets the point in time the grant ends however often it is refreshed.
+        /// Gets the point in time the grant ends however often it is refreshed, which is how
+        /// long the session is listed and how long revoking it must last.
         /// </summary>
-        public DateTime? GrantExpires => !Personal && Token is not null && Token.TryGetPayloadValue<long>("grant_exp", out var expires)
+        public DateTime? GrantExpires { get; init; } = !Personal && Token is not null && Token.TryGetPayloadValue<long>("grant_exp", out var expires)
             ? DateTimeOffset.FromUnixTimeSeconds(expires).UtcDateTime
             : null;
 
         /// <summary>
         /// Gets the point in time the token itself stops being accepted.
         /// </summary>
-        public DateTime? Expires => Token is null ? null : Token.ValidTo;
+        public DateTime? Expires { get; init; } = Token?.ValidTo;
 
         /// <summary>
         /// Gets the id (<c>jti</c>) of the token.
         /// </summary>
-        public string TokenId => Token?.Id;
+        public string TokenId { get; init; } = string.IsNullOrEmpty(Token?.Id) ? null : Token.Id;
 
         /// <summary>
         /// Reads the credential of a request.
@@ -85,42 +90,47 @@ namespace KleeneStar.Core.WebIdentity
                 return null;
             }
 
-            var application = request.ApplicationContext;
-            var bearer = Bearer(request);
-            var raw = bearer ?? AccessCookie(request);
             var identity = identityManager.GetCurrentIdentity(request);
-
-            // another KleeneStar application shares the core's sign-in (see remarks)
-            var core = CoreHub.ApplicationContext;
-
-            if (identity is null && raw is not null && core is not null && IsSibling(application, core)
-                && identityManager is IdentityManager concrete)
-            {
-                identity = bearer is not null
-                    ? concrete.ValidatePersonalAccessToken(bearer, core)
-                    : concrete.ValidateAccessToken(raw, core);
-                application = core;
-            }
 
             if (identity is null)
             {
                 return null;
             }
 
-            return new SessionCredential(identity, Parse(raw), bearer is not null, application);
+            var bearer = Bearer(request);
+            var raw = bearer ?? AccessCookie(request);
+
+            return new SessionCredential(identity, Parse(raw), bearer is not null, CoreHub.ApplicationContext ?? request.ApplicationContext);
         }
 
         /// <summary>
-        /// Determines whether an application is another application of KleeneStar than the core.
+        /// Builds the credential the framework asks an <see cref="IIdentityValidator"/> about.
         /// </summary>
-        /// <param name="application">The application the request is served by.</param>
-        /// <param name="core">The core application.</param>
-        /// <returns><see langword="true"/> for a sibling application.</returns>
-        private static bool IsSibling(IApplicationContext application, IApplicationContext core)
+        /// <remarks>
+        /// Everything the credential knows of the token comes from the context, which the
+        /// framework read from the token it verified. The request is not consulted: on a refresh
+        /// it still carries the previous access cookie, which nobody verified, and a forged one
+        /// would otherwise set the end of the grant - how long the session is listed and how long
+        /// revoking it lasts. <see cref="Token"/> is therefore <see langword="null"/>.
+        /// </remarks>
+        /// <param name="context">The validation context.</param>
+        /// <returns>The credential, or <see langword="null"/> when the context names no identity.</returns>
+        public static SessionCredential From(IdentityValidationContext context)
         {
-            return application is not null
-                && !string.Equals(application.ApplicationId, core.ApplicationId, StringComparison.Ordinal)
-                && (application.PluginContext?.PluginId?.ToString()?.StartsWith("kleenestar.", StringComparison.OrdinalIgnoreCase) ?? false);
+            if (context?.Identity is null)
+            {
+                return null;
+            }
+
+            var personal = string.Equals(context.TokenUse, PersonalTokenUse, StringComparison.Ordinal);
+
+            return new SessionCredential(context.Identity, null, personal, CoreHub.ApplicationContext ?? context.ApplicationContext)
+            {
+                GrantId = personal ? null : context.Grant,
+                GrantExpires = personal ? null : context.GrantExpiresAt?.UtcDateTime,
+                Expires = context.ExpiresAt == default ? null : context.ExpiresAt.UtcDateTime,
+                TokenId = context.TokenId
+            };
         }
 
         /// <summary>
@@ -151,6 +161,17 @@ namespace KleeneStar.Core.WebIdentity
             var cookies = request.Header?.Cookies?.Where(x => x.Name == name).ToArray() ?? [];
 
             return cookies.Length == 1 && !string.IsNullOrEmpty(cookies[0].Value) ? cookies[0].Value : null;
+        }
+
+        /// <summary>
+        /// Reads a text claim of a token.
+        /// </summary>
+        /// <param name="token">The token, or <see langword="null"/>.</param>
+        /// <param name="name">The claim.</param>
+        /// <returns>The value, or <see langword="null"/> when the token carries none.</returns>
+        private static string Claim(JsonWebToken token, string name)
+        {
+            return token is not null && token.TryGetPayloadValue<string>(name, out var value) ? value : null;
         }
 
         /// <summary>

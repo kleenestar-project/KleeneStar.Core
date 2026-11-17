@@ -69,6 +69,13 @@ namespace KleeneStar.Core.WebManager
         IWorkspaceTemplateContext GetWorkspaceTemplate(string key);
 
         /// <summary>
+        /// Registers a template that is no plugin type, such as a test's stand-in; no plugin
+        /// removal takes it away.
+        /// </summary>
+        /// <param name="template">The template; it must carry a key.</param>
+        void Register(IWorkspaceTemplate template);
+
+        /// <summary>
         /// Sets a workspace up from the supplied template: its classes, the starting views of
         /// its issue and asset overviews, its home page and the post announcing it.
         /// </summary>

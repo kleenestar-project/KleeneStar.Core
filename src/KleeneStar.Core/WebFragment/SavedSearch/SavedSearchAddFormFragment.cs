@@ -68,6 +68,9 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
             // opened from the search page, the dialog names the expression on screen, which
             // the endpoint answers as the query the new saved search starts with
             ServiceFactory = renderContext => DataServiceDescriptor.FormData(SavedSearchFormItems.ResolveService(renderContext));
+
+            // the endpoint answers the address that runs the new saved search as uri
+            SuccessAction = _ => TypeRestFormSuccess.FollowUri;
         }
 
         /// <summary>

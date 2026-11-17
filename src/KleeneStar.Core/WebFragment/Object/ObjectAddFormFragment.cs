@@ -214,6 +214,9 @@ namespace KleeneStar.Core.WebFragment.Object
         public ObjectAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            // the endpoint answers the detail page of the new object as uri
+            SuccessAction = _ => TypeRestFormSuccess.FollowUri;
+
             var step1 = new ControlDataWizardPage(StepWorkspace)
             {
                 Title = _ => "kleenestar.core:object.add.step.workspace.title",

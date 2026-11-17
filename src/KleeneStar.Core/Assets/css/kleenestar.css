@@ -693,15 +693,10 @@
 
 /* -------------------------------------------------- comment composer frame */
 
-/* The framework draws the composer as a card and tints its border with a primary ring while it
-   is expanded - an affordance for the moment a reader opens it. Ours is open from the start, so
-   the ring is never a response to anything and reduces to a blue frame that asks for attention
-   it has not earned. The card border goes with it: the section already frames this surface, the
-   same reason the relation view is rendered flat one section above. What is left to separate the
-   composer from the page are its own head and foot bars, which is enough.
-
-   Scoped to the opt-in class rather than to the control, because the ring is only wrong for a
-   composer that is permanently expanded. */
+/* The comment dock's composer (ObjectCommentDockFragment) starts expanded and stands inside a
+   section that frames it. It is drawn without the framework's card border and without the primary
+   ring of .wx-comment-composer-expanded; its head and foot bars separate it from the page. Scoped
+   to .ks-comment-composer-open, so other composers keep the framework look. */
 .ks-comment-composer-open,
 .ks-comment-composer-open.wx-comment-composer-expanded {
     border: 0;
@@ -1431,22 +1426,19 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     margin-bottom: 0;
 }
 
+/* -------------------------------------------------------------- organize tree */
+
+/* The node icons of the framework's data tree (WorkspaceObjectsOrganizeFragment) keep the size of
+   img.wx-icon inside #wx-content, where .wx-content img { height: auto } of the content stylesheet
+   has the same specificity, comes later and draws a picture at its natural size. */
+.wx-tree-label-container > img.wx-icon {
+    height: 1.2em;
+}
+
 /* -------------------------------------------------------------- saved searches */
 
-/* the save and share buttons stand beside the search field of the search page, in one bar -
-   the framework's search control clears whatever is rendered inside it */
-.ks-savedsearch-bar {
-    display: flex;
-    align-items: flex-start;
-    gap: .5rem;
-    width: 100%;
-}
-
-.ks-savedsearch-bar > [data-ks-savedsearch-host] {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
+/* the save and share buttons of the search page (SavedSearchAdvancedSearch), placed by the
+   framework's search control in its extended content beside the input */
 .ks-savedsearch-actions {
     display: flex;
     flex: 0 0 auto;

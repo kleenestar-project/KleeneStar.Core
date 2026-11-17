@@ -93,6 +93,8 @@ namespace KleeneStar.Core
 
             PublishRelationTypes();
 
+            RegisterWqlPredicates();
+
             RecordStartup();
 
             RecoverInterruptedCreations();
@@ -314,6 +316,26 @@ namespace KleeneStar.Core
                 // an installation whose relation catalog cannot be read still starts; the
                 // surfaces then offer the framework defaults, which is a smaller catalog
                 // rather than a broken page
+                CoreHub.ComponentHub?.LogManager?.DefaultLog?.Exception(ex);
+            }
+        }
+
+        /// <summary>
+        /// Registers the WQL predicates of KleeneStar with the index manager
+        /// (<see cref="WebQuickfilter.WqlWithin.Register"/>), so the REST endpoints and the WQL
+        /// prompt over objects know <c>within("KEY")</c>. A failure is logged and the start
+        /// continues; the KleeneStar surfaces parse through
+        /// <see cref="WebQuickfilter.WqlWithin.CreateParser{TIndexItem}"/>, which knows the
+        /// predicate in any case.
+        /// </summary>
+        private static void RegisterWqlPredicates()
+        {
+            try
+            {
+                WebQuickfilter.WqlWithin.Register();
+            }
+            catch (Exception ex)
+            {
                 CoreHub.ComponentHub?.LogManager?.DefaultLog?.Exception(ex);
             }
         }

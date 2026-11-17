@@ -187,58 +187,12 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
-        /// Puts a template into the manager's registry.
+        /// Puts a template into the manager's registry (<see cref="IWorkspaceTemplateManager.Register"/>).
         /// </summary>
-        /// <remarks>
-        /// The registry is filled from the plugin manager, which the fixture has no instance of,
-        /// so the registration is written straight into the private dictionary. That is the seam
-        /// the tests need and the one place they may reach through it: everything else they
-        /// assert goes through the public surface.
-        /// </remarks>
         /// <param name="template">The template to register.</param>
         private static void Register(IWorkspaceTemplate template)
         {
-            var manager = CoreHub.WorkspaceTemplateManager;
-
-            var field = manager.GetType().GetField("_dictionary", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?? throw new InvalidOperationException("The registry field was renamed.");
-
-            var dictionary = field.GetValue(manager)
-                ?? throw new InvalidOperationException("The registry is null.");
-
-            var contextType = typeof(CoreHub).Assembly.GetType("KleeneStar.Core.WebWorkspaceTemplate.WorkspaceTemplateContext")
-                ?? throw new InvalidOperationException("The context type was renamed.");
-
-            var context = Activator.CreateInstance(contextType);
-            contextType.GetProperty("Template")!.SetValue(context, template);
-            contextType.GetProperty("TemplateType")!.SetValue(context, template.GetType());
-
-            var listType = typeof(List<>).MakeGenericType(typeof(IWorkspaceTemplateContext));
-            var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
-            list.Add(context);
-
-            // the key of the registry is the plugin, and there is none in a unit test - a null
-            // key is refused by the concurrent dictionary, so a stand-in plugin context is used
-            var pluginContext = new StubPluginContext();
-
-            dictionary.GetType().GetMethod("TryAdd")!.Invoke(dictionary, [pluginContext, list]);
-        }
-
-        /// <summary>
-        /// The plugin a registered template is filed under in a test.
-        /// </summary>
-        private sealed class StubPluginContext : IPluginContext
-        {
-            public IComponentId PluginId => null;
-            public string PluginName => "test";
-            public string Description => null;
-            public string Manufacturer => null;
-            public string Copyright => null;
-            public string Version => null;
-            public string License => null;
-            public IRoute Icon => null;
-            public Assembly Assembly => typeof(UnitTestWorkspaceTemplateManager).Assembly;
-            public IConfiguration Settings => null;
+            CoreHub.WorkspaceTemplateManager.Register(template);
         }
 
         /// <summary>

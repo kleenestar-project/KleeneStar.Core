@@ -975,25 +975,27 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// Answers a create with what the page needs to open the new object.
         /// </summary>
         /// <remarks>
-        /// The pages around the create dialog are rendered once - the sidebar's page tree, the
-        /// recent lists - and nothing re-renders them, so a new object would appear only after a
-        /// reload. <c>objectcreated.js</c> reads this answer and opens the new object instead,
-        /// which renders the page anew with the object in its place. <c>created</c> marks the
-        /// answer as one of this endpoint; there is no <c>message</c>, which would keep the
-        /// dialog open to show it.
+        /// The answer is a <see cref="RestApiCreatedResult"/>: <c>uri</c> is the detail page of
+        /// the new object, which the create and clone wizards follow
+        /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>); <c>data</c> is
+        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>objectrefresh.js</c> not
+        /// to reload the page the wizard leaves.
         /// </remarks>
         /// <param name="object">The object that was created.</param>
         /// <returns>The create result.</returns>
-        private static RestApiCrudResultCreate Created(Model.Entities.Object @object)
+        private static RestApiCreatedResult Created(Model.Entities.Object @object)
         {
-            return new RestApiCrudResultCreate
+            var uri = global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString();
+
+            return new RestApiCreatedResult
             {
+                Uri = uri,
                 Data = new
                 {
                     created = true,
                     id = @object.Id,
                     key = @object.Key,
-                    uri = global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString()
+                    uri
                 }
             };
         }

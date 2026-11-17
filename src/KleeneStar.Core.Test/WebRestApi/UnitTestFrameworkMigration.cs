@@ -12,10 +12,11 @@ namespace KleeneStar.Core.Test.WebRestApi
     public class UnitTestFrameworkMigration
     {
         /// <summary>
-        /// Rejects malformed uploads without consuming fields before complete form validation.
+        /// Leaves an inline picture to the framework's image hooks and keeps the formats the
+        /// icon route accepts beyond the framework defaults.
         /// </summary>
         [Fact]
-        public void InvalidAvatarPreservesPayloadAndReportsField()
+        public void InlineAvatarIsLeftToTheFrameworkHooks()
         {
             // arrange
             var payload = new RestApiCrudFormData { ["Icon"] = "data:image/png;base64,invalid!" };
@@ -25,9 +26,10 @@ namespace KleeneStar.Core.Test.WebRestApi
             AvatarStorage.Validate(payload, "icon", result);
 
             // validation
-            Assert.False(result.IsValid);
-            Assert.Equal("icon", Assert.Single(result.Errors).Field);
+            Assert.True(result.IsValid);
             Assert.Equal("data:image/png;base64,invalid!", payload["ICON"]);
+            Assert.True(AvatarStorage.Options.Formats.ContainsKey("image/svg+xml"));
+            Assert.True(AvatarStorage.Options.Formats.ContainsKey("image/jpg"));
         }
 
         /// <summary>
@@ -44,13 +46,32 @@ namespace KleeneStar.Core.Test.WebRestApi
             // act
             var accepted = AvatarStorage.Validate(unchanged, "Icon", new RestApiValidationResult(), current);
             var rejected = AvatarStorage.Validate(replaced, "Icon", new RestApiValidationResult(), current);
-            var resolved = AvatarStorage.Resolve(Guid.NewGuid(), current.Uri.ToString(), current,
-                () => throw new InvalidOperationException("An unchanged picture must not invoke storage."));
 
             // validation
             Assert.True(accepted.IsValid);
             Assert.False(rejected.IsValid);
-            Assert.Same(current, resolved);
+        }
+
+        /// <summary>
+        /// Keeps the address of a new record, and gives one without a usable picture the fallback.
+        /// </summary>
+        [Fact]
+        public void AdoptKeepsAddressesAndFallsBack()
+        {
+            // arrange
+            var address = ImageIcon.FromString("https://example.test/icons/current.png");
+            var fallback = ImageIcon.FromString("https://example.test/icons/fallback.png");
+            var broken = ImageIcon.FromString("data:image/png;base64,invalid!");
+
+            // act
+            var kept = AvatarStorage.Adopt(Guid.NewGuid(), address, () => fallback);
+            var missing = AvatarStorage.Adopt(Guid.NewGuid(), null, () => fallback);
+            var undecodable = AvatarStorage.Adopt(Guid.NewGuid(), broken, () => fallback);
+
+            // validation
+            Assert.Same(address, kept);
+            Assert.Same(fallback, missing);
+            Assert.Same(fallback, undecodable);
         }
 
         /// <summary>

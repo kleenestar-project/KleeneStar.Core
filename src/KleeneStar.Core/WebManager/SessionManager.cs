@@ -49,6 +49,12 @@ namespace KleeneStar.Core.WebManager
         private static readonly AsyncLocal<Guid?> _actingIdentityId = new();
 
         /// <summary>
+        /// The requests whose credential <see cref="Accepts"/> accepted, so <see cref="Resolve"/>
+        /// does not ask a second time.
+        /// </summary>
+        private readonly ConditionalWeakTable<IRequest, WebIdentity.SessionCredential> _accepted = new();
+
+        /// <summary>
         /// The identity of a request, resolved once and kept beside it.
         /// </summary>
         /// <remarks>
@@ -203,23 +209,13 @@ namespace KleeneStar.Core.WebManager
         /// <remarks>
         /// The token is one of ours or it names nobody: the sign-in answers with the row it
         /// authenticated and an external source answers with the stored account its subject is
-        /// linked to, so the token's id is the answer and nothing is matched by name - a
-        /// directory entry calling itself <c>admin</c> would otherwise be handed the internal
-        /// administrator.
+        /// linked to, so the token's id is the answer and nothing is matched by name.
         /// <para>
-        /// A token is a snapshot, valid until it expires whatever happened since, so three
-        /// questions are asked of every request that the framework does not ask:
+        /// The framework asks <see cref="WebIdentity.SessionValidatorBase"/> for every
+        /// authenticated request, which asks <see cref="Accepts"/>; a refused credential reaches
+        /// this method as no identity. A request whose credential no validator accepted (a host
+        /// without the validator registered) is asked <see cref="Accepts"/> here.
         /// </para>
-        /// <list type="bullet">
-        /// <item>Is the account still <see cref="Model.Entities.IdentityState.Active"/>? A locked
-        /// or disabled account stops acting at once, not when its token runs out.</item>
-        /// <item>For a sign-in: has its grant been revoked - by signing out, or by ending the
-        /// session from the profile? The framework revokes grants in its token store but only
-        /// checks the store when a token is <em>refreshed</em>
-        /// (<see cref="IIdentitySessionManager.Accepts"/>).</item>
-        /// <item>For a personal access token: is it one the profile issued, not revoked, and does
-        /// its scope allow the request (<see cref="IAccessTokenManager.Accepts"/>)?</item>
-        /// </list>
         /// </remarks>
         /// <param name="request">The current HTTP request.</param>
         /// <returns>The resolved caller.</returns>
@@ -233,18 +229,60 @@ namespace KleeneStar.Core.WebManager
                 return ResolvedCaller.Nobody;
             }
 
+            // the accepted credential is the one the framework verified; on a refresh the one read
+            // from the request stems from the previous access cookie, which nobody verified
+            if (_accepted.TryGetValue(request, out var accepted))
+            {
+                return new ResolvedCaller(identityId, accepted);
+            }
+
+            return Accepts(credential, request) ? new ResolvedCaller(identityId, credential) : ResolvedCaller.Nobody;
+        }
+
+        /// <summary>
+        /// Decides whether a verified credential may still act.
+        /// </summary>
+        /// <remarks>
+        /// A token is a snapshot that stays valid until it expires, so three questions are asked:
+        /// <list type="bullet">
+        /// <item>The stored account is <see cref="Model.Entities.IdentityState.Active"/>.</item>
+        /// <item>For a sign-in, its grant is not revoked in the token store
+        /// (<see cref="IIdentitySessionManager.Accepts"/>, which also records the session).</item>
+        /// <item>For a personal access token, it is an active row of its owner and its scope
+        /// allows the request (<see cref="IAccessTokenManager.Accepts"/>).</item>
+        /// </list>
+        /// The method does not read the current identity of the request, because it runs inside
+        /// the framework's identity resolution.
+        /// </remarks>
+        /// <param name="credential">The verified credential.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the credential may act.</returns>
+        public bool Accepts(WebIdentity.SessionCredential credential, IRequest request)
+        {
+            var identityId = credential?.Identity?.Id ?? Guid.Empty;
+
+            if (identityId == Guid.Empty)
+            {
+                return false;
+            }
+
             var account = CoreHub.IdentityManager?.GetIdentity(identityId);
 
             if (account is null || account.State != Model.Entities.IdentityState.Active)
             {
-                return ResolvedCaller.Nobody;
+                return false;
             }
 
             var accepted = credential.Personal
                 ? CoreHub.AccessTokenManager?.Accepts(credential, request) ?? false
                 : CoreHub.IdentitySessionManager?.Accepts(credential, request) ?? false;
 
-            return accepted ? new ResolvedCaller(identityId, credential) : ResolvedCaller.Nobody;
+            if (accepted && request is not null)
+            {
+                _accepted.AddOrUpdate(request, credential);
+            }
+
+            return accepted;
         }
 
         /// <summary>

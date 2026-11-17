@@ -1,4 +1,6 @@
 using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
+using System.Collections.Generic;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebCore.WebParameter;
@@ -7,10 +9,15 @@ using WebExpress.WebCore.WebUri;
 namespace KleeneStar.Core.WebUri
 {
     /// <summary>
-    /// Variable path segment.
+    /// The variable path segment of an object key.
     /// </summary>
+    /// <remarks>
+    /// The segment is an <see cref="IUriPathSegmentTrail"/>: the breadcrumb shows the ancestors
+    /// of the object (<see cref="ObjectHierarchy.GetVisibleAncestry"/>) before the object itself,
+    /// each as a crumb with the key, the class icon and the detail page.
+    /// </remarks>
     /// <typeparam name="TParameter">The parameter type.</typeparam>
-    public class ObjectKeyUriPathSegmentVariable<TParameter> : UriPathSegmentVariableRegex<TParameter>
+    public class ObjectKeyUriPathSegmentVariable<TParameter> : UriPathSegmentVariableRegex<TParameter>, IUriPathSegmentTrail
         where TParameter : IParameterStatic, new()
     {
         /// <summary>
@@ -71,6 +78,36 @@ namespace KleeneStar.Core.WebUri
             var @object = CoreHub.ObjectManager.GetObjectByKey(Value);
 
             return ObjectIcon.Resolve(@object);
+        }
+
+        /// <summary>
+        /// Returns the crumbs of the object and its ancestors, from the root to the object.
+        /// </summary>
+        /// <param name="renderContext">The context of the page the breadcrumb is rendered on.</param>
+        /// <returns>The crumbs; a single crumb of the key when the key names no readable object.</returns>
+        public IEnumerable<UriTrailCrumb> GetTrail(IRenderContext renderContext)
+        {
+            var @object = CoreHub.ObjectManager.GetObjectByKey(Value);
+
+            if (@object is null)
+            {
+                return [new UriTrailCrumb { Text = Value, Uri = Uri }];
+            }
+
+            var chain = ObjectHierarchy.GetVisibleAncestry(@object);
+            var crumbs = new List<UriTrailCrumb>(chain.Count);
+
+            foreach (var item in chain)
+            {
+                crumbs.Add(new UriTrailCrumb
+                {
+                    Text = item.Key,
+                    Icon = ObjectIcon.Resolve(item),
+                    Uri = CoreHub.ObjectKindManager.ResolveDetailUri(item) ?? (item == @object ? Uri : null)
+                });
+            }
+
+            return crumbs;
         }
     }
 }

@@ -44,8 +44,9 @@ The page itself contributes nothing — not even the headline, which is hidden o
 
 A visitor who is not signed in sees none of the above. The figures, news and
 activity are nothing to show somebody the installation does not know yet, so every landing
-fragment - head, figures, both columns and the sidebar links - is gated on `SignedInCondition`,
-and `LandingWelcomeFragment` on its complement: the page shows exactly one of the two.
+fragment - head, figures, both columns and the sidebar links - is gated on WebExpress's
+`ConditionLogin`, and `LandingWelcomeFragment` on `ConditionLogout`: the page shows exactly one of
+the two.
 
 The signed-out page is the installation's greeting beside the sign-in, and nothing else:
 

@@ -66,9 +66,28 @@ notifications; a failing object stops the run as `Failed`, what is done stays do
 `DELETE /api/1/objects?id=…&mode=recursive|dissolve` starts a delete or dissolve run and answers the
 same way; without a mode an object with children is refused as before.
 
-**WQL `within("KEY")`** / `not within(…)` is expanded to `Id in (…)` over the subtree in
-`WebQuickfilter/WqlFilter` (`WqlWithin`), at every KleeneStar WQL site; the framework's own search
-table does not know it.
+**WQL `within("KEY")`** / `not within(…)` is the WebIndex predicate `WebQuickfilter/WqlWithin`, a
+`WqlIdPredicate<Object>`: the parser binds the call to the subtree ids of the key
+(`ObjectHierarchy.GetDescendantIds`); the key is read through `ObjectManager`, so an unknown or
+unreadable key binds the empty set and selects nothing; an argument that is no string is a parse
+error. `KleeneStarApplication.Run()` registers it with the index manager
+(`IndexManager.RegisterWqlPredicate`), so every WebApp REST endpoint over objects (search table,
+lists, quickfilters) and the WQL prompt know it; `WqlFilter` parses through
+`WqlWithin.CreateParser`, which knows it with or without a host.
+
+**Breadcrumb.** The object key segment (`ObjectKeyUriPathSegmentVariable`) is an
+`IUriPathSegmentTrail`: the breadcrumb of an object page shows the visible ancestry
+(`ObjectHierarchy.GetVisibleAncestry`, root first, read through `ObjectManager`, bounded by
+`Hierarchy:MaxDepth`) with key, class icon and detail page per crumb.
+
+**Organize dialog.** *Organize objects* (`Issues/{workspacekey}/organize`, opened as
+`modal-organize` from the overflow menu with `?select=<object id>`) is the framework's
+`ControlDataTree` over `/api/1/organize/{workspacekey}`, a `RestApiTree<Object>`: one level per
+expansion, node id = object id, label key and summary, class icon, no address. The roots are the
+objects without a parent and those whose parent the caller may not read; the home page is no node.
+A drop is `PUT { node, target, position }`: `child` puts the node under the target, `above`/`below`
+under the target's visible parent; the move runs through `ObjectMove.Attempt` (authorization,
+hierarchy rules, lock), and a refusal is a `RestApiRefusal` the tree takes back.
 
 **Live updates.** `WebManager/ObjectChangeNotices` announces every `ObjectManager.Add/Update/Remove`
 on the data change channel (domain of `Object`), so lists of other readers reload; bursts are folded

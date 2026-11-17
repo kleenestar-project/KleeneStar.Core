@@ -17,8 +17,8 @@ namespace KleeneStar.Core.WebRestApi
 
     /// <summary>
     /// The one implementation of "move this object below that one" behind the REST surfaces
-    /// that offer it - <c>/api/1/objects/move</c> (the drag-and-drop tree) and
-    /// <c>PUT /api/1/hierarchy/{objectkey}</c>.
+    /// that offer it: <c>/api/1/objects/move</c>, <c>PUT /api/1/hierarchy/{objectkey}</c> and
+    /// the organize tree <c>/api/1/organize/{workspacekey}</c>.
     /// </summary>
     /// <remarks>
     /// Both used to resolve the operands, ask only whether the caller may change the moved

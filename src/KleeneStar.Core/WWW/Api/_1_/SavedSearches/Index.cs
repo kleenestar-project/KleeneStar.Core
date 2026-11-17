@@ -237,7 +237,7 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
 
         /// <summary>
         /// Persists a newly created saved search owned by the calling identity and answers the
-        /// address that runs it, which <c>objectcreated.js</c> opens.
+        /// address that runs it, which the add dialog follows.
         /// </summary>
         /// <param name="fieldMap">The form payload (Name, Query, Description, Starred).</param>
         /// <param name="request">The HTTP request.</param>
@@ -370,22 +370,25 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         }
 
         /// <summary>
-        /// Answers a create with the address that runs the new saved search. The search page
-        /// around the dialog - its sidebar, its headline - is rendered once, and running the new
-        /// search renders it anew with the search in place. <c>created</c> marks the answer for
-        /// <c>objectcreated.js</c>; there is no <c>message</c>, which would keep the dialog open.
+        /// Answers a create with the address that runs the new saved search, as a
+        /// <see cref="RestApiCreatedResult"/>: the add dialog follows <c>uri</c>
+        /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>), and <c>data.created</c> tells
+        /// <c>savedsearch.js</c> not to reload the page the dialog leaves.
         /// </summary>
         /// <param name="savedSearch">The saved search that was created.</param>
         /// <returns>The create result.</returns>
-        private static RestApiCrudResultCreate Created(SavedSearch savedSearch)
+        private static RestApiCreatedResult Created(SavedSearch savedSearch)
         {
-            return new RestApiCrudResultCreate
+            var uri = SavedSearchRun.RunUri(savedSearch)?.ToString();
+
+            return new RestApiCreatedResult
             {
+                Uri = uri,
                 Data = new
                 {
                     created = true,
                     id = savedSearch.Id,
-                    uri = SavedSearchRun.RunUri(savedSearch)?.ToString()
+                    uri
                 }
             };
         }

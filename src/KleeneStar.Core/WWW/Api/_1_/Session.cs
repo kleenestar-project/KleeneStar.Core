@@ -38,6 +38,11 @@ namespace KleeneStar.Core.WWW.Api._1_
         private const string Agent = "kleenestar.session";
 
         /// <summary>
+        /// The reason recorded when the issuer answers no credentials; the cause is in the server log.
+        /// </summary>
+        private const string UnissuedReason = "Credentials could not be issued";
+
+        /// <summary>
         /// Validates the provided credentials.
         /// </summary>
         /// <remarks>
@@ -67,18 +72,15 @@ namespace KleeneStar.Core.WWW.Api._1_
         }
 
         /// <summary>
-        /// Issues the credentials a verified sign-in is carried by, and answers a failed
-        /// sign-in rather than a server error when none can be issued.
+        /// Issues the credentials a verified sign-in is carried by, and audits a sign-in that
+        /// ends without them.
         /// </summary>
         /// <remarks>
-        /// The credential is what a sign-in produces: since the framework signs tokens instead
-        /// of keeping a session, an installation whose <c>WebExpress:Authentication</c> section
-        /// is missing or unusable refuses every sign-in from inside the issuer, and the
-        /// endpoint answered a 500 whose cause nothing named - the framework logs the
-        /// reflection wrapper around the endpoint, never the exception inside it. This is a
-        /// configuration fault rather than a wrong password, so it is logged with its own
-        /// message and audited as a failed attempt by the account it was made for; the caller
-        /// is told the sign-in failed, which is the truth of it.
+        /// <see cref="RestApiSession.EstablishIdentity"/> answers <see langword="null"/> when the
+        /// token issuer cannot sign (for example without a usable <c>WebExpress:Authentication</c>
+        /// section) and writes the cause to the server log. The caller receives the failed
+        /// sign-in response; the audit log receives a critical <see cref="AuditAction.SignInFailed"/>
+        /// event for the account whose credentials were accepted.
         /// </remarks>
         /// <param name="identity">The account the credentials belong to.</param>
         /// <param name="request">The request the sign-in was made with.</param>
@@ -86,18 +88,14 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// <returns>The issued credentials, or null when they could not be issued.</returns>
         protected override IdentityTokenPair EstablishIdentity(IIdentity identity, IRequest request, bool rememberMe = true)
         {
-            try
-            {
-                return base.EstablishIdentity(identity, request, rememberMe);
-            }
-            catch (Exception ex)
-            {
-                CoreHub.ComponentHub?.LogManager?.DefaultLog?.Exception(ex);
+            var tokens = base.EstablishIdentity(identity, request, rememberMe);
 
-                RecordSignInFailure(identity, ex);
-
-                return null;
+            if (tokens is null)
+            {
+                RecordSignInFailure(identity, UnissuedReason);
             }
+
+            return tokens;
         }
 
         /// <summary>
@@ -183,13 +181,13 @@ namespace KleeneStar.Core.WWW.Api._1_
         /// </summary>
         /// <remarks>
         /// The attempt named a real account and still ended without a credential, so the event
-        /// names that account and carries the issuer's reason as a delta. It is critical rather
+        /// names that account and carries the reason as a delta. It is critical rather
         /// than a warning: a failed password is one person's bad morning, an installation that
         /// cannot issue credentials is everybody's.
         /// </remarks>
         /// <param name="identity">The account the sign-in was made for.</param>
-        /// <param name="reason">The failure the issuer reported.</param>
-        private static void RecordSignInFailure(IIdentity identity, Exception reason)
+        /// <param name="reason">The reason recorded as the <c>reason</c> delta.</param>
+        private static void RecordSignInFailure(IIdentity identity, string reason)
         {
             using var activity = CoreHub.AuditManager.BeginActivity
             (
@@ -203,7 +201,7 @@ namespace KleeneStar.Core.WWW.Api._1_
                 AuditCategory.Security,
                 AuditAction.SignInFailed,
                 new AuditTarget(AuditTargetType.Identity, identity?.Id, identity?.Name),
-                [AuditDelta.Added("reason", reason?.Message, AuditValueKind.Text)],
+                [AuditDelta.Added("reason", reason, AuditValueKind.Text)],
                 AuditOutcome.Failed,
                 AuditSeverity.Critical
             );

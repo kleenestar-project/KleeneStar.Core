@@ -18,9 +18,8 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// The dialog is a workspace-scoped page (<c>Issues/${workspacekey}/organize</c>); the
-    /// workspace is resolved from the current object. The dialog content is fetched into the modal
-    /// on demand and its inline scripts would not run there, so this fragment loads the persistence
-    /// controller (<c>assets/js/objectmovetree.js</c>) onto the parent page during render.
+    /// workspace is resolved from the current object, which the address names as
+    /// <c>select</c>, so the tree opens on it.
     /// </remarks>
     [Section<SectionHeadlineMorePrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
@@ -72,8 +71,6 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            visualTree.AddHeaderScriptLink(renderContext.PageContext.ApplicationContext.Route.Concat("assets/js/objectmovetree.js").ToString());
-
             return base.Render(renderContext, visualTree);
         }
 
@@ -95,7 +92,8 @@ namespace KleeneStar.Core.WebFragment.Object
             }
 
             return CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Organize>()?
-                .BindParameters(new WorkspaceKeyParameter(workspace.Key));
+                .BindParameters(new WorkspaceKeyParameter(workspace.Key))?
+                .Add(new WebExpress.WebCore.WebUri.UriQuery(Workspace.WorkspaceObjectsOrganizeFragment.SelectParameter, @object.Id.ToString()));
         }
     }
 }

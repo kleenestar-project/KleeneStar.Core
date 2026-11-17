@@ -301,16 +301,34 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
-        /// <c>within("KEY")</c> expands to the subtree before parsing and filters like any WQL;
-        /// <c>not within</c> selects the rest, an unknown key nothing.
+        /// The breadcrumb trail of an object is its visible ancestry from the root to the object.
         /// </summary>
         [Fact]
-        public void Within_ExpandsToTheSubtree()
+        public void Ancestry_RunsFromTheRootToTheObject()
         {
-            Seed(nameof(Within_ExpandsToTheSubtree));
+            Seed(nameof(Ancestry_RunsFromTheRootToTheObject));
 
-            Assert.Equal("Summary = \"x\"", WqlWithin.Expand("Summary = \"x\""));
-            Assert.Contains("Id not in (", WqlWithin.Expand("not within('OPS3-2')", _ => [SubId]));
+            var chain = ObjectHierarchy.GetVisibleAncestry(CoreHub.ObjectManager.GetObject(TaskCId));
+
+            Assert.Equal(new[] { RootId, SubId, DeepId, TaskCId }, chain.Select(x => x.Id));
+            Assert.Single(ObjectHierarchy.GetVisibleAncestry(CoreHub.ObjectManager.GetObject(RootId)));
+            Assert.Empty(ObjectHierarchy.GetVisibleAncestry(null));
+        }
+
+        /// <summary>
+        /// <c>within("KEY")</c> binds the subtree of the key as a WQL predicate and filters like
+        /// any WQL; <c>not within</c> selects the rest, an unknown key nothing, a call without a
+        /// string argument is a parse error.
+        /// </summary>
+        [Fact]
+        public void Within_SelectsTheSubtree()
+        {
+            Seed(nameof(Within_SelectsTheSubtree));
+
+            var parser = WqlWithin.CreateParser<ObjectEntity>();
+            Assert.Contains(WqlWithin.Name, parser.PredicateNames);
+            Assert.False(parser.Parse("not within('OPS3-2')").HasErrors);
+            Assert.False(WqlFilter.TryValidate<ObjectEntity>("within(12)", out _));
 
             var all = ModelHub.GetObjects(new Query<ObjectEntity>().Where(x => x.WorkspaceId == WorkspaceId)).ToList();
 

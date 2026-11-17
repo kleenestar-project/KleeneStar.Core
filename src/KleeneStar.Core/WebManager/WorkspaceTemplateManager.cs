@@ -3,7 +3,6 @@ using KleeneStar.Core.WebWorkspaceTemplate;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -22,11 +21,14 @@ namespace KleeneStar.Core.WebManager
     /// Manages the workspace templates the installed plugins define.
     /// </summary>
     /// <remarks>
-    /// The registration follows the framework's <c>FragmentManager</c>: the plugin manager is the
-    /// source of truth about what is installed, so this manager subscribes to it rather than
-    /// scanning the process, and it keeps its registrations keyed by plugin so a plugin that goes
-    /// away takes exactly its own templates with it. Discovery is by interface rather than by
-    /// attribute, because a template has nothing to declare beyond being one.
+    /// The templates are collected by WebExpress's <see cref="PluginTypeCatalog{TItem}"/>: every
+    /// <b>public sealed</b> <see cref="IWorkspaceTemplate"/> with a public parameterless constructor
+    /// in a plugin assembly, keyed by <see cref="IWorkspaceTemplate.Key"/> (compared without case).
+    /// The catalog builds an <see cref="IWorkspaceTemplateContext"/> per type, naming the plugin
+    /// and the type. A type that misses the convention is skipped silently, one whose constructor
+    /// throws or whose key is blank is logged and skipped. The latest offer of a key is in use; a
+    /// plugin that leaves takes only the keys it still provides. <see cref="Register"/> adds a
+    /// template that is no plugin type (a test's stand-in).
     /// </remarks>
     public sealed class WorkspaceTemplateManager : IWorkspaceTemplateManager
     {
@@ -34,10 +36,9 @@ namespace KleeneStar.Core.WebManager
         private readonly IHttpServerContext _httpServerContext;
 
         /// <summary>
-        /// The registrations, keyed by the plugin that defines them. A dictionary per plugin
-        /// rather than one flat list, because removal is per plugin and has to be exact.
+        /// The templates of the plugins and the registered ones.
         /// </summary>
-        private readonly ConcurrentDictionary<IPluginContext, List<IWorkspaceTemplateContext>> _dictionary = new();
+        private readonly PluginTypeCatalog<IWorkspaceTemplateContext> _catalog;
 
         /// <summary>
         /// Raised after a template has been registered.
@@ -58,176 +59,109 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Gets every registered template, in catalogue order.
         /// </summary>
-        public IEnumerable<IWorkspaceTemplateContext> WorkspaceTemplates => Order(_dictionary.Values.SelectMany(x => x));
+        public IEnumerable<IWorkspaceTemplateContext> WorkspaceTemplates => Order(_catalog.Items);
 
         /// <summary>
         /// Initializes a new instance of the manager. Invoked by WebExpress via reflection.
         /// </summary>
-        /// <param name="componentHub">The component hub.</param>
-        /// <param name="httpServerContext">The HTTP server context.</param>
+        /// <param name="componentHub">The component hub, or <see langword="null"/> without a host.</param>
+        /// <param name="httpServerContext">The HTTP server context, or <see langword="null"/>.</param>
         [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "Used via reflection.")]
         private WorkspaceTemplateManager(IComponentHub componentHub, IHttpServerContext httpServerContext)
         {
             _componentHub = componentHub;
             _httpServerContext = httpServerContext;
 
+            _catalog = new PluginTypeCatalog<IWorkspaceTemplateContext>(x => x.Template?.Key, typeof(IWorkspaceTemplate), Create);
+            _catalog.Added += OnAdded;
+            _catalog.Removed += OnRemoved;
+
             if (_componentHub?.PluginManager is not null)
             {
-                _componentHub.PluginManager.AddPlugin += OnAddPlugin;
-                _componentHub.PluginManager.RemovePlugin += OnRemovePlugin;
-
-                // the manager is built while the core's own components are registered, which is
-                // before every other plugin has arrived - so the plugins already known are swept
-                // here and the rest reach it through the event above. Neither pass alone is
-                // enough: the sweep misses what comes later, the event misses what came first.
-                foreach (var pluginContext in _componentHub.PluginManager.Plugins)
-                {
-                    Register(pluginContext);
-                }
+                _catalog.Attach(_componentHub, _httpServerContext);
             }
         }
 
         /// <summary>
-        /// Discovers the templates a plugin defines and registers them.
+        /// Builds the registration of a discovered template type.
+        /// </summary>
+        /// <param name="origin">The type and the plugin that ships it.</param>
+        /// <returns>The registration.</returns>
+        private static IWorkspaceTemplateContext Create(PluginTypeOrigin origin)
+        {
+            return new WorkspaceTemplateContext
+            {
+                PluginContext = origin.PluginContext,
+                TemplateType = origin.Type,
+                Template = (IWorkspaceTemplate)Activator.CreateInstance(origin.Type)
+            };
+        }
+
+        /// <summary>
+        /// Collects the templates of a plugin; collecting a plugin again does nothing.
         /// </summary>
         /// <param name="pluginContext">The plugin to scan.</param>
         private void Register(IPluginContext pluginContext)
         {
-            if (pluginContext?.Assembly is null || _dictionary.ContainsKey(pluginContext))
+            if (pluginContext?.Assembly is not null)
             {
-                return;
-            }
-
-            var registered = new List<IWorkspaceTemplateContext>();
-
-            foreach (var templateType in GetTemplateTypes(pluginContext))
-            {
-                var template = Instantiate(templateType);
-
-                if (template is null || string.IsNullOrWhiteSpace(template.Key))
-                {
-                    continue;
-                }
-
-                registered.Add(new WorkspaceTemplateContext
-                {
-                    PluginContext = pluginContext,
-                    TemplateType = templateType,
-                    Template = template
-                });
-            }
-
-            if (registered.Count == 0)
-            {
-                return;
-            }
-
-            _dictionary[pluginContext] = registered;
-
-            Log(pluginContext, registered);
-
-            foreach (var context in registered)
-            {
-                AddWorkspaceTemplate?.Invoke(this, context);
+                _catalog.Collect(pluginContext);
             }
         }
 
         /// <summary>
-        /// Returns the template types of a plugin.
+        /// Registers a template that is no plugin type; no plugin removal takes it away.
         /// </summary>
-        /// <remarks>
-        /// A plugin whose types cannot all be loaded is not a reason to lose the ones that can:
-        /// an assembly referencing something absent throws on the whole set, and the templates
-        /// that resolved are still valid.
-        /// </remarks>
-        /// <param name="pluginContext">The plugin to scan.</param>
-        /// <returns>The candidate types.</returns>
-        private static IEnumerable<Type> GetTemplateTypes(IPluginContext pluginContext)
+        /// <param name="template">The template.</param>
+        /// <exception cref="ArgumentException">The template carries no key.</exception>
+        public void Register(IWorkspaceTemplate template)
         {
-            Type[] types;
+            ArgumentNullException.ThrowIfNull(template);
 
-            try
+            if (string.IsNullOrWhiteSpace(template.Key))
             {
-                types = pluginContext.Assembly.GetTypes();
-            }
-            catch (System.Reflection.ReflectionTypeLoadException ex)
-            {
-                types = [.. ex.Types.Where(x => x is not null)];
+                throw new ArgumentException("A workspace template must carry a key.", nameof(template));
             }
 
-            return types
-                .Where(x => x.IsClass && !x.IsAbstract && x.IsPublic)
-                .Where(x => typeof(IWorkspaceTemplate).IsAssignableFrom(x));
+            _catalog.Register(new WorkspaceTemplateContext
+            {
+                TemplateType = template.GetType(),
+                Template = template
+            });
         }
 
         /// <summary>
-        /// Instantiates a template type.
+        /// Announces a template the catalog took into use.
         /// </summary>
-        /// <param name="templateType">The type to instantiate.</param>
-        /// <returns>The template, or <see langword="null"/> when it could not be created.</returns>
-        private IWorkspaceTemplate Instantiate(Type templateType)
+        /// <param name="sender">The catalog.</param>
+        /// <param name="e">The template.</param>
+        private void OnAdded(object sender, PluginTypeCatalogEventArgs<IWorkspaceTemplateContext> e)
         {
-            try
-            {
-                return Activator.CreateInstance(templateType) as IWorkspaceTemplate;
-            }
-            catch (Exception ex)
-            {
-                // a template that throws in its constructor is a defect of the plugin that ships
-                // it, and the rest of the catalogue must still be offered
-                _httpServerContext?.Log?.Warning(templateType.FullName + ": " + ex.Message);
+            _httpServerContext?.Log?.Info("Workspace template '" + e.Key + "' of '" + (e.PluginContext?.PluginId?.ToString() ?? "-") + "'.");
 
-                return null;
-            }
+            AddWorkspaceTemplate?.Invoke(this, e.Item);
         }
 
         /// <summary>
-        /// Drops the registrations of a plugin.
+        /// Announces a template the catalog dropped.
         /// </summary>
-        /// <param name="pluginContext">The plugin that was removed.</param>
-        private void Remove(IPluginContext pluginContext)
+        /// <param name="sender">The catalog.</param>
+        /// <param name="e">The template.</param>
+        private void OnRemoved(object sender, PluginTypeCatalogEventArgs<IWorkspaceTemplateContext> e)
         {
-            if (pluginContext is null || !_dictionary.TryRemove(pluginContext, out var removed))
-            {
-                return;
-            }
-
-            foreach (var context in removed)
-            {
-                RemoveWorkspaceTemplate?.Invoke(this, context);
-            }
-        }
-
-        /// <summary>
-        /// Handles the arrival of a plugin.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The plugin context.</param>
-        private void OnAddPlugin(object sender, IPluginContext e)
-        {
-            Register(e);
-        }
-
-        /// <summary>
-        /// Handles the removal of a plugin.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The plugin context.</param>
-        private void OnRemovePlugin(object sender, IPluginContext e)
-        {
-            Remove(e);
+            RemoveWorkspaceTemplate?.Invoke(this, e.Item);
         }
 
         /// <summary>
         /// Returns the templates the supplied plugin defines.
         /// </summary>
         /// <param name="pluginContext">The plugin.</param>
-        /// <returns>Its templates, in catalogue order.</returns>
+        /// <returns>Its templates in use, in catalogue order.</returns>
         public IEnumerable<IWorkspaceTemplateContext> GetWorkspaceTemplates(IPluginContext pluginContext)
         {
-            return pluginContext is not null && _dictionary.TryGetValue(pluginContext, out var templates)
-                ? Order(templates)
-                : [];
+            return pluginContext is null
+                ? []
+                : Order(_catalog.Items.Where(x => ReferenceEquals(x.PluginContext, pluginContext)));
         }
 
         /// <summary>
@@ -237,9 +171,7 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The registration, or <see langword="null"/>.</returns>
         public IWorkspaceTemplateContext GetWorkspaceTemplate(string key)
         {
-            return string.IsNullOrWhiteSpace(key)
-                ? null
-                : WorkspaceTemplates.FirstOrDefault(x => string.Equals(x.Template.Key, key, StringComparison.OrdinalIgnoreCase));
+            return string.IsNullOrWhiteSpace(key) ? null : _catalog.Find(key.Trim());
         }
 
         /// <summary>
@@ -789,42 +721,13 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Announces what a plugin contributed, the way the framework's managers announce what
-        /// they found.
-        /// </summary>
-        /// <remarks>
-        /// Per plugin rather than once over the whole catalogue, because the catalogue is never
-        /// complete at one moment: this manager is built while the core registers its components,
-        /// and every plugin after that arrives through an event.
-        /// </remarks>
-        /// <param name="pluginContext">The plugin that contributed.</param>
-        /// <param name="templates">Its templates.</param>
-        private void Log(IPluginContext pluginContext, IEnumerable<IWorkspaceTemplateContext> templates)
-        {
-            if (_httpServerContext?.Log is null)
-            {
-                return;
-            }
-
-            using var frame = new LogFrameSimple(_httpServerContext.Log);
-
-            var lines = new List<string> { "Workspace templates of '" + pluginContext.PluginId + "':" };
-
-            lines.AddRange(Order(templates).Select(x => string.Empty.PadRight(2) + x.Template.Key));
-
-            _httpServerContext.Log.Info(string.Join(Environment.NewLine, lines));
-        }
-
-        /// <summary>
-        /// Releases unmanaged resources reserved during use.
+        /// Stops following the plugins.
         /// </summary>
         public void Dispose()
         {
-            if (_componentHub?.PluginManager is not null)
-            {
-                _componentHub.PluginManager.AddPlugin -= OnAddPlugin;
-                _componentHub.PluginManager.RemovePlugin -= OnRemovePlugin;
-            }
+            _catalog.Added -= OnAdded;
+            _catalog.Removed -= OnRemoved;
+            _catalog.Dispose();
 
             GC.SuppressFinalize(this);
         }

@@ -81,5 +81,44 @@ namespace KleeneStar.Core.WebManager
 
             return result;
         }
+
+        /// <summary>
+        /// Answers the object and the ancestors along <c>ParentId</c> the caller may see, from the
+        /// root to the object.
+        /// </summary>
+        /// <remarks>
+        /// The ancestors are read through <see cref="IObjectManager.GetObject"/>, so the chain
+        /// starts below the first ancestor the caller may not see. It is bounded by
+        /// <see cref="HierarchySettings.MaxDepth"/> and stops at a repeated object.
+        /// </remarks>
+        /// <param name="object">The object.</param>
+        /// <returns>The chain; empty for no object.</returns>
+        public static IReadOnlyList<ObjectEntity> GetVisibleAncestry(ObjectEntity @object)
+        {
+            if (@object is null)
+            {
+                return [];
+            }
+
+            var chain = new List<ObjectEntity> { @object };
+            var visited = new HashSet<Guid> { @object.Id };
+            var depth = (CoreHub.HierarchySettings ?? new HierarchySettings()).EffectiveMaxDepth;
+            var parentId = @object.ParentId;
+
+            while (parentId is Guid id && chain.Count < depth && visited.Add(id))
+            {
+                var parent = CoreHub.ObjectManager.GetObject(id);
+
+                if (parent is null)
+                {
+                    break;
+                }
+
+                chain.Insert(0, parent);
+                parentId = parent.ParentId;
+            }
+
+            return chain;
+        }
     }
 }

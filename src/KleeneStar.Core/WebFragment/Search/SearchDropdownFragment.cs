@@ -25,7 +25,7 @@ namespace KleeneStar.Core.WebFragment.Search
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Condition<SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Order(10)]
     [Cache]
     public sealed class SearchDropdownFragment : SearchDropdownControl, IFragmentControl<SearchDropdownControl>, IFragmentControlNavigationItem

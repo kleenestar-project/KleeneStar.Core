@@ -37,8 +37,8 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
     /// - is promoted to a root entry. A visited set guards the recursion against an
     /// inheritance cycle older data may carry. Abstract classes are listed like any other:
     /// they have no objects of their own, but their entry gathers those of their descendants.
-    /// The links are not bound against the request, which would otherwise turn every entry's
-    /// <c>class</c> into the one the page already shows (see <see cref="UnboundSidebarItemLink"/>).
+    /// Each entry is a <see cref="ControlSidebarItemLink"/>, which binds path variables only, so
+    /// the <c>class</c> query of an entry is its own and not the one of the page.
     /// </remarks>
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>]
@@ -229,7 +229,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
         {
             var description = ProseText.ToPlainText(@class.Description);
 
-            var entry = new UnboundSidebarItemLink("asset-class-" + @class.Id.ToString("N"))
+            var entry = new ControlSidebarItemLink("asset-class-" + @class.Id.ToString("N"))
             {
                 Text = _ => @class.Name,
                 Tooltip = _ => string.IsNullOrWhiteSpace(description) ? @class.Name : description,

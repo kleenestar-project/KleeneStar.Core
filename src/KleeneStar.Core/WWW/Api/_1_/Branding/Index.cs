@@ -99,6 +99,35 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         }
 
         /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Model.Entities.Branding item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item is null ? null : Model.Entities.Branding.SingletonId, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Model.Entities.Branding item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item is null ? null : Model.Entities.Branding.SingletonId, request);
+        }
+
+        /// <summary>
         /// Persists the edited branding and applies it to the running application.
         /// </summary>
         /// <param name="existingItem">The currently persisted branding.</param>
@@ -107,27 +136,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Branding
         /// <returns>A result object containing information about the update operation.</returns>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Branding existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            // the icon is taken out of the payload and stored separately: the icon control submits
-            // it inline as a data url, which the binder would hand to RestValueConverterImageIcon
-            // and end up as the URI "http:///". See AvatarStorage.
-            var avatarSent = payload.Detach(nameof(Model.Entities.Branding.Icon), out var avatar);
-
+            // an emptied icon binds null; the application then shows the icon its [Icon] attribute declares
             var res = base.Update(existingItem, payload, request);
-
-            if (avatarSent)
-            {
-                // an empty value is how the form reports that the icon was removed; the
-                // application then falls back to the icon it declared through its [Icon]
-                // attribute, which is what the field's help text promises - so there is no
-                // generated icon to fall back to here, unlike everywhere else
-                existingItem.Icon = AvatarStorage.Resolve
-                (
-                    Model.Entities.Branding.SingletonId,
-                    avatar,
-                    existingItem.Icon,
-                    null
-                );
-            }
 
             CoreHub.BrandingManager.Update(existingItem);
 

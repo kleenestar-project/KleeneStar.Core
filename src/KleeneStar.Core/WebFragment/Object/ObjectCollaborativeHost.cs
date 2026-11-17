@@ -24,15 +24,18 @@ namespace KleeneStar.Core.WebFragment.Object
     /// object surface does through the data services it declares.
     /// </para>
     /// <para>
-    /// <b>Framework gap.</b> The control value-syncs <c>input</c> and <c>textarea</c> only - see
-    /// <c>_onInput</c> in <c>webexpress.webapp.collaborative.js</c>, which deliberately skips
-    /// contenteditable hosts because writing rich HTML through <c>textContent</c> would flatten
-    /// it. On the prose editor that means the title is mirrored live while the body is not; the
-    /// body converges through the shared draft instead (one <see cref="Model.Entities.ObjectDraft"/>
-    /// per object, last autosave wins). Closing the gap is a framework change: give the
-    /// collaborative control an HTML-valued input message for editor hosts and apply it through
-    /// the editor's own value API rather than through the DOM, so the remote caret and the
-    /// undo history survive the write.
+    /// The container holds the details sheet (<c>ObjectItemDetailFragment</c>): presence,
+    /// pointers and carets, and the values of its plain inputs by value. The prose and
+    /// spreadsheet editors are collaborative on their own: <c>ControlDataModalDocument</c> with
+    /// <c>Collaborative</c>, <c>CollaborationId</c> and <c>Document</c> wraps the editor in a container of its own,
+    /// and the framework edits a document of an editor host concurrently through operational
+    /// transformation (<c>webexpress.webapp.CollaborativeDocument</c>). The shared draft
+    /// (<see cref="Model.Entities.ObjectDraft"/>) stays the persistence of the edited text.
+    /// </para>
+    /// <para>
+    /// <see cref="ControlCollaborative.Document"/> is the channel id, so the shared documents of
+    /// an object are the same on every page that shows it; without it the framework scopes them
+    /// by the path and query of the page.
     /// </para>
     /// </remarks>
     internal static class ObjectCollaborativeHost
@@ -60,8 +63,13 @@ namespace KleeneStar.Core.WebFragment.Object
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(renderContext?.Request);
             var identity = identityId == Guid.Empty ? null : CoreHub.IdentityManager.GetIdentity(identityId);
 
-            return new ControlCollaborative("collab-" + surface + "-" + @object.Id.ToString("N"), controls)
+            var channel = "collab-" + surface + "-" + @object.Id.ToString("N");
+
+            return new ControlCollaborative(channel, controls)
             {
+                // the documents belong to the record, not to the page: the detail page and the
+                // preview pane of one object meet in the same documents
+                Document = _ => channel,
                 Classes = ["wx-kleenestar-collaborative"],
                 Presence = _ => true,
                 Cursor = _ => true,

@@ -45,6 +45,19 @@ namespace KleeneStar.Core.WebManager
         WebIdentity.SessionCredential GetCurrentCredential(IRequest request);
 
         /// <summary>
+        /// Decides whether a verified credential may still act: the stored account is
+        /// <see cref="Model.Entities.IdentityState.Active"/>, and the grant of a sign-in is not
+        /// revoked (<see cref="IIdentitySessionManager.Accepts"/>) or the personal access token is
+        /// an active row of its owner whose scope allows the request
+        /// (<see cref="IAccessTokenManager.Accepts"/>). Asked by
+        /// <see cref="WebIdentity.SessionValidatorBase"/> on every authenticated request.
+        /// </summary>
+        /// <param name="credential">The verified credential.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the credential may act.</returns>
+        bool Accepts(WebIdentity.SessionCredential credential, IRequest request);
+
+        /// <summary>
         /// Acts as the supplied identity for the life of the returned scope: everything asking
         /// <see cref="GetCurrentIdentityId"/> without a request answers it until the scope is
         /// closed.

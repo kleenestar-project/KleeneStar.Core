@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// <remarks>
     /// The signed-in start page describes the organization - its figures, its news, its
     /// activity - and none of that is for somebody the installation does not know yet; its
-    /// fragments are gated on <see cref="SignedInCondition"/> and this one on the complement,
+    /// fragments are gated on <see cref="global::WebExpress.WebApp.WebCondition.ConditionLogin"/> and this one on the complement,
     /// so a page shows exactly one of the two. The greeting is the
     /// <see cref="Model.Entities.Branding.WelcomeText"/> an administrator writes on the branding
     /// page, rendered through <see cref="ProseText.ToSafeHtml"/> because the reader is anybody;
@@ -29,7 +29,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// control on the session endpoint, and reloads the page into the signed-in one.
     /// </remarks>
     [Section<SectionContentPrimary>]
-    [Condition<SignedOutCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogout>]
     [Scope<global::KleeneStar.Core.WWW.Index>]
     [Order(5)]
     [Cache]

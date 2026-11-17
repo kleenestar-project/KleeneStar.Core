@@ -18,29 +18,22 @@ namespace KleeneStar.Core.WebControl
     /// carries the buttons that save the query on screen and share the saved search.
     /// </summary>
     /// <remarks>
-    /// Two things the framework control cannot do are done by <c>Assets/js/savedsearch.js</c>
-    /// on the attributes written here:
-    /// <list type="bullet">
-    /// <item><see cref="WqlAttribute"/> - the control seeds only its basic box from
-    /// <c>data-value</c>, so a WQL expression to open with is handed to the script, which puts
-    /// it into the WQL prompt and switches to that mode.</item>
-    /// <item><see cref="CarryAttribute"/> - a dialog address is fixed when the page renders,
-    /// while the query to save is whatever the user typed since; the script appends the current
-    /// expression to the address of every button marked so, the moment it is clicked.</item>
-    /// </list>
+    /// The expression to open with is <see cref="ControlAdvancedSearch.Wql"/>
+    /// (<see cref="SavedSearchRun.ResolveWql"/>), which opens the search in WQL mode.
+    /// <para>
     /// The buttons are built per request, because which of them a caller gets depends on who
-    /// they are and on the saved search the page runs. They stand <em>beside</em> the search, in
-    /// a bar wrapping both (<c>.ks-savedsearch-bar</c>), not inside it: the framework's
-    /// <c>SearchCtrl</c> clears its host before it collects the children it means to keep, so
-    /// content handed to <see cref="ControlAdvancedSearch.Add(IControl[])"/> never survives.
+    /// they are and on the saved search the page runs. They are rendered as children of the
+    /// search host in <c>.ks-savedsearch-actions</c>; the framework's <c>SearchCtrl</c> moves
+    /// the children of its host into its extended content beside the input.
+    /// </para>
+    /// <para>
+    /// <see cref="CarryAttribute"/> marks a button whose dialog receives the expression on
+    /// screen: <c>Assets/js/savedsearch.js</c> appends it to the dialog address on click,
+    /// because the address is fixed when the page renders.
+    /// </para>
     /// </remarks>
     public sealed class SavedSearchAdvancedSearch : ControlAdvancedSearch
     {
-        /// <summary>
-        /// The attribute carrying the WQL expression the search opens with.
-        /// </summary>
-        public const string WqlAttribute = "data-ks-wql";
-
         /// <summary>
         /// The attribute marking a button whose dialog receives the current expression.
         /// </summary>
@@ -58,6 +51,7 @@ namespace KleeneStar.Core.WebControl
         public SavedSearchAdvancedSearch(string id)
             : base(id)
         {
+            Wql = renderContext => SavedSearchRun.ResolveWql(renderContext?.Request);
         }
 
         /// <summary>
@@ -69,36 +63,25 @@ namespace KleeneStar.Core.WebControl
         /// <returns>An HTML node representing the rendered control.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree, params IControl[] controls)
         {
-            var request = renderContext?.Request;
             var html = base.Render(renderContext, visualTree, controls);
 
-            if (html is HtmlElement element)
+            if (html is not HtmlElement element)
             {
-                element.AddUserAttribute(HostAttribute);
-
-                if (SavedSearchRun.ResolveWql(request) is { } wql)
-                {
-                    element.AddUserAttribute(WqlAttribute, wql);
-                }
+                return html;
             }
+
+            element.AddUserAttribute(HostAttribute);
 
             var buttons = BuildButtons(renderContext)
                 .Select(x => x.Render(renderContext, visualTree))
                 .ToArray();
 
-            if (buttons.Length == 0)
+            if (buttons.Length > 0)
             {
-                return html;
+                element.Add(new HtmlElementTextContentDiv(buttons) { Class = "ks-savedsearch-actions" });
             }
 
-            return new HtmlElementTextContentDiv
-            (
-                html,
-                new HtmlElementTextContentDiv(buttons) { Class = "ks-savedsearch-actions" }
-            )
-            {
-                Class = "ks-savedsearch-bar"
-            };
+            return element;
         }
 
         /// <summary>

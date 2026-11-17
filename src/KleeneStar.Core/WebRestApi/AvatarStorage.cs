@@ -1,42 +1,172 @@
 using System;
 using WebExpress.WebApp.WebRestApi;
-using WebExpress.WebUI.WebIcon;
+using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
+using WebExpress.WebUI.WebIcon;
 
 namespace KleeneStar.Core.WebRestApi
 {
     /// <summary>
-    /// Applies application storage and fallback policies to framework avatar submissions.
+    /// The storage policy of the avatar dialogs, applied through the image hooks of
+    /// <see cref="RestApiCrud{TIndexItem}"/>.
     /// </summary>
+    /// <remarks>
+    /// <see cref="RestApiCrud{TIndexItem}"/> takes every inline or emptied picture of a property
+    /// bound by <c>RestValueConverterImageIcon</c> out of the payload, checks it against
+    /// <c>ImageOptions</c> and hands it to <c>StoreImage</c> or <c>RemoveImage</c>; the address
+    /// <c>StoreImage</c> answers is bound to the property, an emptied picture binds
+    /// <see langword="null"/>. An endpoint behind an avatar dialog overrides the three members
+    /// with <see cref="Options"/>, <see cref="Store"/> and <see cref="Remove"/> and sets its
+    /// fallback icon after the binding where the property is <see langword="null"/>.
+    /// <para>
+    /// A picture is stored or removed on an update (<c>PUT</c>, <c>PATCH</c>) only. On a create
+    /// the record has no id that could name the file, and on a clone the hooks receive the source
+    /// record, whose pictures must stay; the create and clone paths assign a generated icon.
+    /// </para>
+    /// </remarks>
     public static class AvatarStorage
     {
         /// <summary>
-        /// Removes the avatar field from the payload and hands back what it carried, so the
-        /// CRUD binder never sees the inline picture.
+        /// Gets the image formats and limits the application icon route accepts.
         /// </summary>
-        /// <param name="fieldMap">The payload to take the picture out of.</param>
+        public static RestApiAvatarUploadOptions Options
+        {
+            get
+            {
+                var options = new RestApiAvatarUploadOptions();
+                options.Formats["image/jpg"] = ".jpg";
+                options.Formats["image/svg+xml"] = ".svg";
+
+                return options;
+            }
+        }
+
+        /// <summary>
+        /// Stores a picture for a record and answers the address of the stored file.
+        /// </summary>
+        /// <param name="ownerId">The record the picture belongs to; it names the file.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The request; only an update stores.</param>
+        /// <returns>The address, or <see langword="null"/> when nothing was stored.</returns>
+        public static string Store(Guid? ownerId, RestApiAvatarUpload image, IRequest request)
+        {
+            if (ownerId is not Guid id || id == Guid.Empty || image is null || !IsUpdate(request))
+            {
+                return null;
+            }
+
+            return CoreHub.StoreIcon(id, image)?.Uri?.ToString();
+        }
+
+        /// <summary>
+        /// Removes the stored pictures of a record.
+        /// </summary>
+        /// <param name="ownerId">The record the pictures belong to.</param>
+        /// <param name="request">The request; only an update removes.</param>
+        public static void Remove(Guid? ownerId, IRequest request)
+        {
+            if (ownerId is Guid id && id != Guid.Empty && IsUpdate(request))
+            {
+                CoreHub.RemoveStoredIcons(id);
+            }
+        }
+
+        /// <summary>
+        /// Stores the inline picture a new record was bound with under its own id.
+        /// </summary>
+        /// <remarks>
+        /// On a create or clone <see cref="Store"/> stores nothing, so the binding leaves an
+        /// inline picture as a <c>data:</c> address on the record. This writes it to the icons
+        /// directory under the new id; a record without a picture, or with one that does not
+        /// decode, takes the fallback.
+        /// </remarks>
+        /// <param name="ownerId">The id of the new record.</param>
+        /// <param name="icon">The picture the record was bound with.</param>
+        /// <param name="fallback">The picture of a record without one.</param>
+        /// <returns>The picture to store on the record.</returns>
+        public static ImageIcon Adopt(Guid ownerId, ImageIcon icon, Func<ImageIcon> fallback)
+        {
+            var address = icon?.Uri?.ToString();
+
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return fallback?.Invoke();
+            }
+
+            if (!address.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                return icon;
+            }
+
+            var field = new RestApiCrudFormData { ["Icon"] = address }.DetachAvatar("Icon", Options, new RestApiValidationResult());
+
+            return field.State == RestApiFormFieldState.Valid
+                ? CoreHub.StoreIcon(ownerId, field.Value) ?? fallback?.Invoke()
+                : fallback?.Invoke();
+        }
+
+        /// <summary>
+        /// Refuses a picture address the dialog did not load.
+        /// </summary>
+        /// <remarks>
+        /// The image hooks of <see cref="RestApiCrud{TIndexItem}"/> check inline pictures
+        /// (<c>data:</c>, <c>file:</c>) and empty entries; any other value is bound as an address.
+        /// An address other than the one the record carries is reported as an invalid picture, so
+        /// a client cannot point a record at a foreign image.
+        /// </remarks>
+        /// <param name="payload">The submitted form fields.</param>
+        /// <param name="name">The image field name.</param>
+        /// <param name="result">The validation result receiving the error.</param>
+        /// <param name="current">The picture the record carries.</param>
+        /// <returns>The supplied result.</returns>
+        public static IRestApiValidationResult Validate(RestApiCrudFormData payload, string name, IRestApiValidationResult result, ImageIcon current = null)
+        {
+            if (payload is null || !payload.TryGetValue(name, out var value))
+            {
+                return result;
+            }
+
+            var text = value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(text)
+                || text.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+                || (current is not null && string.Equals(text, current.Uri?.ToString(), StringComparison.Ordinal)))
+            {
+                return result;
+            }
+
+            // the framework reports an address as an invalid picture
+            new RestApiCrudFormData { [name] = value }.DetachAvatar(name, Options, result);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Removes a field from the payload and hands back what it carried.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
         /// <param name="name">
         /// The field name as declared on the entity (e.g. <c>Icon</c>); the lookup is
         /// case-insensitive, matching the lower-cased keys the payload parser produces.
         /// </param>
         /// <param name="submitted">
-        /// When this method returns, contains the submitted value: the inline picture, or an
-        /// empty string when the dialog reported that the picture was removed.
+        /// When this method returns, contains the submitted value, or an empty string for an
+        /// empty entry.
         /// </param>
-        /// <returns>
-        /// True when the payload carried the field at all. False means the form does not edit
-        /// the avatar, and the current icon must be left exactly as it is - which is not the
-        /// same as an empty value, and is why this is reported separately.
-        /// </returns>
+        /// <returns><see langword="true"/> when the payload carried the field.</returns>
         public static bool Detach(this RestApiCrudFormData fieldMap, string name, out string submitted)
         {
             submitted = null;
+
             if (fieldMap is null || string.IsNullOrEmpty(name))
             {
                 return false;
             }
+
             var field = fieldMap.Detach<string>(name);
             submitted = field.State == RestApiFormFieldState.Empty ? string.Empty : field.Value;
+
             return field.State != RestApiFormFieldState.Missing;
         }
 
@@ -53,73 +183,21 @@ namespace KleeneStar.Core.WebRestApi
             {
                 return (null, false);
             }
+
             var field = fieldMap.TryRead<string>(name);
+
             return (field.State == RestApiFormFieldState.Empty ? string.Empty : field.Value,
                 field.State != RestApiFormFieldState.Missing);
         }
 
         /// <summary>
-        /// Answers the icon an entity should carry after its avatar dialog was submitted:
-        /// stores the picture and points at the file, or falls back when it was removed.
+        /// Determines whether a request updates a record.
         /// </summary>
-        /// <param name="ownerId">
-        /// The entity the picture belongs to; it names the file and scopes the cleanup, so it
-        /// must be the id of the record being saved.
-        /// </param>
-        /// <param name="submitted">The value <see cref="Detach"/> handed back.</param>
-        /// <param name="current">The icon the entity carries now.</param>
-        /// <param name="fallback">
-        /// What the entity falls back to when the picture was removed - the generated initials
-        /// icon for most records, <see langword="null"/> where the application supplies its own
-        /// default. It is a factory rather than a value because generating an icon writes a
-        /// file, which must not happen on a save that removes nothing.
-        /// </param>
-        /// <returns>The icon to store.</returns>
-        public static ImageIcon Resolve(Guid ownerId, string submitted, ImageIcon current, Func<ImageIcon> fallback)
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> for <c>PUT</c> and <c>PATCH</c>.</returns>
+        private static bool IsUpdate(IRequest request)
         {
-            if (current is not null && string.Equals(submitted, current.Uri?.ToString(), StringComparison.Ordinal))
-            {
-                return current;
-            }
-            var fields = new RestApiCrudFormData { ["Icon"] = submitted };
-            var validation = new RestApiValidationResult();
-            var field = fields.DetachAvatar("Icon", Options(), validation);
-            return field.ResolveAvatar(current, upload => CoreHub.StoreIcon(ownerId, upload),
-                image => image, () => CoreHub.RemoveStoredIcons(ownerId), fallback);
-        }
-        /// <summary>
-        /// Validates an avatar without consuming the payload before the complete form is accepted.
-        /// </summary>
-        /// <param name="payload">The submitted form fields.</param>
-        /// <param name="name">The image field name.</param>
-        /// <param name="result">The validation result receiving upload errors.</param>
-        /// <param name="current">The existing image accepted as an unchanged control value.</param>
-        /// <returns>The supplied result including upload validation.</returns>
-        public static IRestApiValidationResult Validate(RestApiCrudFormData payload, string name, IRestApiValidationResult result, ImageIcon current = null)
-        {
-            var copy = new RestApiCrudFormData();
-            if (payload.TryGetValue(name, out var value))
-            {
-                if (current is not null && string.Equals(value?.ToString(), current.Uri?.ToString(), StringComparison.Ordinal))
-                {
-                    return result;
-                }
-                copy[name] = value;
-            }
-            copy.DetachAvatar(name, Options(), result);
-            return result;
-        }
-
-        /// <summary>
-        /// Retains the image formats supported by the application icon route.
-        /// </summary>
-        /// <returns>The application upload limits.</returns>
-        private static RestApiAvatarUploadOptions Options()
-        {
-            var options = new RestApiAvatarUploadOptions();
-            options.Formats["image/jpg"] = ".jpg";
-            options.Formats["image/svg+xml"] = ".svg";
-            return options;
+            return request?.Method is RequestMethod.PUT or RequestMethod.PATCH;
         }
     }
 }

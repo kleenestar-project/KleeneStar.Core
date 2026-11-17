@@ -18,7 +18,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// Represents a control fragment that provides a button link for adding a new object within the workspace.
     /// </summary>
     [Section<SectionAppQuickcreatePreferences>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Scope<IScopeGeneral>]
     [Cache]
     public sealed class ObjectAddButtonFragment : FragmentControlSplitButtonItemLink

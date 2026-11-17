@@ -9,10 +9,10 @@ using WebExpress.WebCore.WebRestApi;
 namespace KleeneStar.Core.WWW.Api._1_.Objects
 {
     /// <summary>
-    /// REST endpoint that re-parents an object inside its workspace. The URL is the fixed
-    /// <c>/api/1/objects/move</c>; the body carries both operands so the client-side tree
-    /// (see <c>Assets/js/objectmovetree.js</c>) can persist a drag-and-drop move with a
-    /// single request.
+    /// REST endpoint that re-parents an object, or several, inside its workspace. The URL is the
+    /// fixed <c>/api/1/objects/move</c>; the body carries both operands. The organize dialog moves
+    /// through <c>/api/1/organize/{workspacekey}</c>, which uses the same
+    /// <see cref="ObjectMove.Attempt"/>.
     /// </summary>
     /// <remarks>
     /// <para>

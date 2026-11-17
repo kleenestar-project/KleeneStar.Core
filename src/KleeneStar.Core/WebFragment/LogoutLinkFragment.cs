@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebFragment
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Cache]
     public sealed class LogoutLinkFragment : FragmentControlDropdownItemLinkLogout
     {

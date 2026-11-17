@@ -28,18 +28,16 @@ It follows that templates are **read-only at runtime**. What an administrator ch
 
 ## The Manager
 
-`WorkspaceTemplateManager` is modelled on the framework's `FragmentManager`, and works the same way:
+`WorkspaceTemplateManager` holds WebExpress's `PluginTypeCatalog` (`WebExpress.WebCore/docs/plugin-type-catalog.md`) as a field:
 
-- it subscribes to the **plugin manager**, which is the source of truth about what is installed, rather than scanning the process;
-- it scans the assembly of every plugin for public, non-abstract types implementing `IWorkspaceTemplate`, and instantiates them by reflection;
-- it keeps its registrations **keyed by plugin**, so a plugin that goes away takes exactly its own templates with it;
-- it announces what each plugin contributed to the log, and raises an event per registration and removal.
+- a template is a **`public sealed`** class implementing `IWorkspaceTemplate` with a public parameterless constructor; a type that misses the convention is skipped silently, one whose constructor throws or whose key is blank is logged and skipped;
+- the catalog follows the **plugin manager**: it collects the plugins already loaded and those that arrive later, and a plugin that goes away takes only the keys it still provides;
+- a factory builds one `IWorkspaceTemplateContext` per type, naming the plugin and the type; the key is `IWorkspaceTemplate.Key`, compared without case, and the latest offer of a key is in use;
+- the manager logs every template it takes into use and raises `AddWorkspaceTemplate` / `RemoveWorkspaceTemplate` from the catalog's events;
+- `Register(template)` adds a template that is no plugin type (a test's stand-in).
 
-Two things differ from the fragment manager, and both follow from what a template is.
-
-**Discovery is by interface, not by attribute.** A fragment declares a section, a scope, conditions and policies — it needs attributes because it has things to say about *where* it belongs. A template has nothing to declare beyond being one.
-**A template is not bound to an application.** A fragment is a piece of one particular page and means nothing outside the application that page belongs to. A workspace is the installation's, not an application's, so the registry has one dimension where the fragment manager has two.
-There is one ordering subtlety worth knowing about. The manager is constructed while the **core's** components are registered, which is before every other plugin has arrived. Neither discovery pass alone is therefore enough: the constructor sweeps the plugins already known, and the `AddPlugin` event catches the rest. A manager written with only one of the two would work in exactly half the installations.
+**Discovery is by interface, not by attribute.** A template has nothing to declare beyond being one.
+**A template is not bound to an application.** A workspace is the installation's, so the catalog is bound per plugin, not per application.
 
 ## Applying a Template
 

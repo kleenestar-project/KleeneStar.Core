@@ -202,6 +202,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
 
             fieldMap.BindTo(newItem);
 
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
             CoreHub.TenantManager.Add(newItem);
 
             return new RestApiCrudResultCreate();
@@ -240,9 +243,41 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
 
             fieldMap.BindTo(newItem);
 
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
             CoreHub.TenantManager.Add(newItem);
 
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Model.Entities.Tenant item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item?.Id, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Model.Entities.Tenant item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item?.Id, request);
         }
 
         /// <summary>
@@ -259,24 +294,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Tenant existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            // the avatar dialog posts its picture inline as a data url, which the binder would
-            // hand to RestValueConverterImageIcon and collapse to the URI "http:///" - while the
-            // request still answers 200. So it is taken out of the payload before the binder sees
-            // it, decoded, and written to the icons directory. See AvatarStorage.
-            var avatarSent = payload.Detach(nameof(Model.Entities.Tenant.Icon), out var avatar);
-
             var res = base.Update(existingItem, payload, request);
 
-            if (avatarSent)
-            {
-                existingItem.Icon = AvatarStorage.Resolve
-                (
-                    existingItem.Id,
-                    avatar,
-                    existingItem.Icon,
-                    () => CoreHub.GenerateIcon(existingItem.Id)
-                );
-            }
+            // an emptied picture binds null; the record then carries its generated icon
+            existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
 
             CoreHub.TenantManager.Update(existingItem);
 

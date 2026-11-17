@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// closes the column.
     /// </remarks>
     [Section<SectionContentPrimary>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Scope<global::KleeneStar.Core.WWW.Index>]
     [Order(40)]
     public sealed class LandingSideColumnFragment : FragmentControlPanel

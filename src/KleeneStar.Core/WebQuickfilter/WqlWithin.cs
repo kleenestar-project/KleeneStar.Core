@@ -1,56 +1,97 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
+using WebExpress.WebApp.WebIndex;
+using WebExpress.WebCore;
+using WebExpress.WebIndex.Wql;
+using WebExpress.WebIndex.Wql.Predicate;
+using ObjectEntity = KleeneStar.Model.Entities.Object;
 
 namespace KleeneStar.Core.WebQuickfilter
 {
     /// <summary>
-    /// The WQL predicate <c>within("KEY")</c> - true for every object below that object (or any
-    /// object), at any depth - and its negation <c>not within("KEY")</c>
-    /// (<c>kleenestar.hierarchy.md</c>).
+    /// The WQL predicate <c>within("KEY")</c>: true for every object below the object of that key,
+    /// at any depth; <c>not within("KEY")</c> is its negation (<c>kleenestar.hierarchy.md</c>).
     /// </summary>
     /// <remarks>
-    /// WebIndex registers scalar functions per parser instance only (remedy prompt W5), so the
-    /// predicate is expanded <b>before</b> parsing into the set condition the grammar already has:
-    /// <c>Id in ("…", "…")</c> over the subtree (<see cref="WebManager.ObjectHierarchy.GetDescendantIds"/>,
-    /// one range query on the path index). The object is resolved narrowed - an unknown or unreadable
-    /// key selects nothing. Every KleeneStar WQL site goes through
-    /// <see cref="WqlFilter"/>, which expands; the framework's own search table parses the raw
-    /// expression and does not know the predicate.
+    /// The predicate is a <see cref="WqlIdPredicate{TIndexItem}"/> over
+    /// <see cref="ObjectEntity"/>: the parser binds the call to the subtree ids
+    /// (<see cref="WebManager.ObjectHierarchy.GetDescendantIds"/>, one range query on the path
+    /// index), and the condition is the <c>Contains</c> of that set. The object of the key is
+    /// read through <see cref="WebManager.IObjectManager.GetObjectByKey"/>, so an unknown or
+    /// unreadable key binds the empty set and selects nothing. A call whose argument is no
+    /// string is a parse error.
+    /// <para>
+    /// <see cref="Register"/> registers the predicate with the index manager of the host
+    /// (<see cref="IndexManager.RegisterWqlPredicate"/>), so every WebApp REST endpoint over
+    /// objects and the WQL prompt know it; <see cref="CreateParser{TIndexItem}"/> answers a
+    /// parser that knows it with or without a host.
+    /// </para>
     /// </remarks>
-    public static partial class WqlWithin
+    public static class WqlWithin
     {
-        private const string Nothing = "00000000-0000-0000-0000-000000000000";
+        /// <summary>
+        /// The name of the predicate.
+        /// </summary>
+        public const string Name = "within";
 
         /// <summary>
-        /// Expands every <c>within(…)</c> of an expression; an expression without one is returned
-        /// unchanged.
+        /// Gets the predicate with the default resolution of a key.
         /// </summary>
-        /// <param name="wql">The expression.</param>
-        /// <param name="resolve">Answers the subtree ids of a key (default: narrowed lookup plus
-        /// the descendants), <see langword="null"/> for an unknown key.</param>
-        /// <returns>The expanded expression.</returns>
-        public static string Expand(string wql, Func<string, Guid[]> resolve = null)
-        {
-            if (string.IsNullOrWhiteSpace(wql) || wql.IndexOf("within", StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                return wql;
-            }
+        public static IWqlPredicate<ObjectEntity> Predicate { get; } = Create();
 
+        /// <summary>
+        /// Creates the predicate.
+        /// </summary>
+        /// <param name="resolve">
+        /// Answers the subtree ids of a key, <see langword="null"/> for an unknown key; the
+        /// default reads the object narrowed and its descendants.
+        /// </param>
+        /// <returns>The predicate.</returns>
+        public static IWqlPredicate<ObjectEntity> Create(Func<string, IEnumerable<Guid>> resolve = null)
+        {
             resolve ??= Subtree;
 
-            return Predicate().Replace(wql, match =>
+            return new WqlIdPredicate<ObjectEntity>(Name, arguments =>
             {
-                var key = match.Groups["key"].Success ? match.Groups["key"].Value : match.Groups["key2"].Value;
-                var ids = resolve(key.Trim()) ?? [];
-                var values = ids.Length == 0
-                    ? $"\"{Nothing}\""
-                    : string.Join(", ", ids.Select(x => $"\"{x}\""));
+                if (arguments is null || arguments.Count != 1 || arguments[0] is not string key)
+                {
+                    throw new ArgumentException("within expects one object key as a string.");
+                }
 
-                return match.Groups["not"].Success
-                    ? $"Id not in ({values})"
-                    : $"Id in ({values})";
+                return resolve(key.Trim()) ?? [];
             });
+        }
+
+        /// <summary>
+        /// Registers the predicate with the index manager of the host. Without a host nothing
+        /// is registered.
+        /// </summary>
+        public static void Register()
+        {
+            WebEx.ComponentHub?.GetComponentManager<IndexManager>()?.RegisterWqlPredicate(Predicate);
+        }
+
+        /// <summary>
+        /// Creates the parser KleeneStar reads stored and submitted WQL with: the parser of the
+        /// index manager (registered functions and predicates), else a plain parser; a parser
+        /// over objects knows <c>within</c> in either case.
+        /// </summary>
+        /// <typeparam name="TIndexItem">The type the expression is written against.</typeparam>
+        /// <returns>The parser.</returns>
+        public static WqlParser<TIndexItem> CreateParser<TIndexItem>()
+            where TIndexItem : WebExpress.WebIndex.IIndexItem
+        {
+            var parser = WebEx.ComponentHub?.GetComponentManager<IndexManager>()?.CreateWqlParser<TIndexItem>()
+                ?? new WqlParser<TIndexItem>();
+
+            if (parser is WqlParser<ObjectEntity> objects
+                && !objects.PredicateNames.Contains(Name, StringComparer.OrdinalIgnoreCase))
+            {
+                objects.RegisterPredicate(Predicate);
+            }
+
+            return parser;
         }
 
         /// <summary>
@@ -58,14 +99,11 @@ namespace KleeneStar.Core.WebQuickfilter
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns>The ids, or <see langword="null"/> for an unknown or unreadable key.</returns>
-        private static Guid[] Subtree(string key)
+        private static IEnumerable<Guid> Subtree(string key)
         {
             var root = string.IsNullOrWhiteSpace(key) ? null : CoreHub.ObjectManager.GetObjectByKey(key);
 
-            return root is null ? null : [.. WebManager.ObjectHierarchy.GetDescendantIds(root.Id)];
+            return root is null ? null : WebManager.ObjectHierarchy.GetDescendantIds(root.Id).ToList();
         }
-
-        [GeneratedRegex(@"(?<not>\bnot\s+)?\bwithin\s*\(\s*(?:""(?<key>[^""]*)""|'(?<key2>[^']*)')\s*\)", RegexOptions.IgnoreCase)]
-        private static partial Regex Predicate();
     }
 }

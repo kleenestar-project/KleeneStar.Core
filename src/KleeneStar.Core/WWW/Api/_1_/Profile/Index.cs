@@ -140,6 +140,35 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
         }
 
         /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Model.Entities.Identity item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item?.Id, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Model.Entities.Identity item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item?.Id, request);
+        }
+
+        /// <summary>
         /// Persists the edited profile settings of the calling identity.
         /// </summary>
         /// <remarks>
@@ -166,12 +195,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
                 editable[entry.Key] = entry.Value;
             }
 
-            // the picture is taken out of the payload and stored separately: the avatar control
-            // submits it inline as a data url, which the binder would hand to
-            // RestValueConverterImageIcon and end up as the URI "http:///" - while the request
-            // still answers 200. See AvatarStorage.
-            var avatarSent = editable.Detach(nameof(Model.Entities.Identity.Avatar), out var avatar);
-
             // the item handed in came through Sanitize, which blanked the password hash on its
             // way to the client. Saving that copy would write the blank back, so the edits are
             // applied to a freshly read record instead.
@@ -179,16 +202,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Profile
 
             var res = base.Update(persisted, editable, request);
 
-            if (avatarSent)
-            {
-                persisted.Avatar = AvatarStorage.Resolve
-                (
-                    persisted.Id,
-                    avatar,
-                    persisted.Avatar,
-                    () => CoreHub.GenerateIcon(persisted.Id)
-                );
-            }
+            // an emptied picture binds null; the record then carries its generated icon
+            persisted.Avatar ??= CoreHub.GenerateIcon(persisted.Id);
 
             // an identity must not stand in for itself — the deputy would be the very account
             // that is absent

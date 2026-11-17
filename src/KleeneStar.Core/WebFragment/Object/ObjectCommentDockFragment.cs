@@ -34,10 +34,9 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </para>
     /// <para>
     /// The thread is read from and the composer posts to the same endpoint,
-    /// <c>/api/1/comments/{objectkey}</c>. The composer shows its <b>WYSIWYG form right away</b>
-    /// rather than the framework's one-line trigger, so unfolding its section is the only
-    /// gesture between reading and writing; the control offers no option for that, which is
-    /// what <see cref="CommentComposerExpandScript"/> exists for.
+    /// <c>/api/1/comments/{objectkey}</c>. The composer starts expanded
+    /// (<see cref="ControlDataCommentComposer.Expanded"/>, without focusing the editor), so
+    /// unfolding its section is the only gesture between reading and writing.
     /// </para>
     /// </remarks>
     [Section<SectionContentSecondary>]
@@ -77,9 +76,9 @@ namespace KleeneStar.Core.WebFragment.Object
         /// </summary>
         public ControlDataCommentComposer Composer { get; } = new("object-comment-composer")
         {
-            // the composer would otherwise mount on its one-line trigger and only build the
-            // editor once that is clicked; the class asks the companion script to open it
-            Classes = [CommentComposerExpandScript.OptInClass],
+            // the WYSIWYG form is shown on load; the class is the style hook in kleenestar.css
+            Expanded = _ => true,
+            Classes = ["ks-comment-composer-open"],
             Placeholder = renderContext => I18N.Translate(renderContext, "kleenestar.core:comment.composer.placeholder"),
             ServiceFactory = renderContext => DataServiceDescriptor.QueryData
             (
@@ -151,13 +150,6 @@ namespace KleeneStar.Core.WebFragment.Object
             if (@object is null || CoreHub.WorkspaceManager.IsHome(@object))
             {
                 return null;
-            }
-
-            var script = CommentComposerExpandScript.Value;
-
-            if (!string.IsNullOrEmpty(script))
-            {
-                visualTree.AddHeaderScript(script);
             }
 
             // the thread arrives from the rest endpoint, but the count is cheap to read here -

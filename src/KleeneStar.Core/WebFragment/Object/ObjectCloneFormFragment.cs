@@ -42,8 +42,8 @@ namespace KleeneStar.Core.WebFragment.Object
     /// <para>
     /// The wizard loads the clone values (<c>mode=clone</c>: summary with the copy suffix,
     /// description, field values, security level) and posts all steps at once with the id of the
-    /// original. The endpoint answers <c>{ created, id, key, uri }</c>, which
-    /// <c>objectcreated.js</c> follows to the copy.
+    /// original. The endpoint answers the address of the copy as <c>uri</c>, which the wizard
+    /// follows (<see cref="TypeRestFormSuccess.FollowUri"/>).
     /// </para>
     /// </remarks>
     [Title("kleenestar.core:object.clone.title")]
@@ -87,6 +87,7 @@ namespace KleeneStar.Core.WebFragment.Object
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Objects.Index>();
 
             Mode = _ => TypeRestFormMode.Clone;
+            SuccessAction = _ => TypeRestFormSuccess.FollowUri;
             FinishLabel = _ => "webexpress.webapp:clone.label";
             FinishIcon = _ => new IconClone();
             ItemId = renderContext => CoreHub.ObjectManager

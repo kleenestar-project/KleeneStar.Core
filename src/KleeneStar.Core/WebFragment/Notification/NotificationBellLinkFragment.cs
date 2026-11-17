@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WebFragment.Notification
     [Scope<IScopeAdmin>]
     // a caller who is not signed in has no notifications, and the header drops the bell with
     // its last entry
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Order(0)]
     public sealed class NotificationBellLinkFragment : FragmentControlDropdownItemLink
     {

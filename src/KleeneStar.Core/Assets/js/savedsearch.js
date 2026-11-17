@@ -4,36 +4,23 @@ kleenestar.core = kleenestar.core || {}
 /**
  * Saved searches on the global search page.
  *
- * The page's advanced search is the framework's SearchCtrl, and three things a saved search
- * needs are not in its contract; they are done here, on attributes the server writes
- * (WebControl/SavedSearchAdvancedSearch.cs). The search element belongs to the framework's
- * controller, so this is no control of its own but a singleton listening on the document.
+ * The page's advanced search is the framework's SearchCtrl (WebControl/SavedSearchAdvancedSearch.cs),
+ * which opens on the running saved search through data-wql and carries the save and share buttons
+ * in its extended content. The search element belongs to the framework's controller, so this is
+ * no control of its own but a singleton listening on the document.
  *
- * 1. Opening on a saved query. The control seeds only its basic box (data-value) and restores
- *    whichever mode the user left it in. A search host carrying data-ks-wql is switched to the
- *    WQL prompt and given that expression, so running a saved search shows the query it runs.
- *    The results table is seeded with the same expression on the server, so the first paint
- *    is already right; switching the mode re-announces the query, which re-queries the table
- *    with what it already shows.
+ * 1. Saving what is on screen. A dialog address is fixed when the page renders, while the query
+ *    to save is whatever the user typed since. A button marked data-ks-savedsearch-carry gets the
+ *    current expression appended to its dialog address on click, in the capture phase, before the
+ *    framework's action handler reads the address. The expression is read from the controller,
+ *    else from the change events the search emits; a basic term is saved as the WQL the basic
+ *    search stands for, a match on the summary.
  *
- * 2. Saving what is on screen. A dialog address is fixed when the page renders, while the
- *    query to save is whatever the user typed since. A button marked data-ks-savedsearch-carry
- *    gets the current expression appended to its dialog address the moment it is clicked -
- *    before the framework's action handler reads the address. The expression is tracked from
- *    the change events the search emits (a public contract); a basic term is saved as the WQL
- *    the basic search stands for, a match on the summary.
- *
- * 3. Showing the result. The sidebar and the headline are rendered once; after a saved-search
- *    dialog succeeds the page is reloaded - after a delete, without the deleted search's id. A
- *    create is left to kleenestar.core.ObjectCreated, which follows the answer to the new saved
- *    search.
+ * 2. Showing the result. The sidebar and the headline are rendered once; after an edit, permission
+ *    or delete dialog succeeds the page is reloaded, after a delete without the deleted search's id.
+ *    A create answers data.created and is followed by its dialog (success action follow-uri).
  */
 kleenestar.core.SavedSearch = new class {
-    /**
-     * The attribute naming the expression a search host opens with.
-     */
-    WQL_ATTRIBUTE = "data-ks-wql";
-
     /**
      * The attribute marking a button that carries the current expression into its dialog; its
      * value is the query parameter the expression travels in.
@@ -69,27 +56,6 @@ kleenestar.core.SavedSearch = new class {
         }, true);
 
         document.addEventListener(webexpress.webui.Event.UPLOAD_SUCCESS_EVENT, (event) => this._onSuccess(event));
-
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", () => this.ready());
-        } else {
-            this.ready();
-        }
-    }
-
-    /**
-     * Seeds every search host that opens on a saved query.
-     */
-    ready() {
-        document.querySelectorAll("[" + this.WQL_ATTRIBUTE + "]").forEach((host) => {
-            const wql = host.getAttribute(this.WQL_ATTRIBUTE) || "";
-
-            this._current.set(host, { value: wql, searchType: "wql" });
-
-            if (wql) {
-                this.seed(host, wql, 0);
-            }
-        });
     }
 
     /**
@@ -119,55 +85,13 @@ kleenestar.core.SavedSearch = new class {
     }
 
     /**
-     * Puts a search host into WQL mode with an expression, once its controller exists.
-     * @param {HTMLElement} host - The search host.
-     * @param {string} wql - The expression.
-     * @param {number} attempt - The number of tries so far.
-     */
-    seed(host, wql, attempt) {
-        const instance = webexpress.webui.Controller.getInstanceByElement(host);
-
-        // the controllers are built when the page is ready; a script included earlier waits
-        if (!instance) {
-            if (attempt < 50) {
-                window.setTimeout(() => this.seed(host, wql, attempt + 1), 50);
-            }
-
-            return;
-        }
-
-        // the embedded prompt and the mode switch are the control's own members; guarded, so a
-        // framework that renames them leaves the page on the server-seeded results
-        if (instance._wqlCtrl && typeof instance._applyMode === "function") {
-            // switching modes announces the prompt's text as the new query, but it reads it off
-            // the editable box's `value`, which a div does not have - the table would be
-            // re-queried with no expression at all. The table is seeded with this expression on
-            // the server already, so the switch is made quietly, the way the control makes its
-            // own first one.
-            const initializing = instance._isInitializing;
-            instance._isInitializing = true;
-
-            try {
-                instance._applyMode("wql");
-            } finally {
-                instance._isInitializing = initializing;
-            }
-
-            instance._wqlCtrl.value = wql;
-        }
-
-        this._current.set(host, { value: wql, searchType: "wql" });
-    }
-
-    /**
-     * Returns the search host a button belongs to. The buttons stand beside the search in one
-     * bar, because the framework control clears whatever is rendered inside it.
+     * Returns the search host a button belongs to. The buttons stand in the host's extended
+     * content; an entry of the "..." menu may be drawn outside it, and the page has one search.
      * @param {HTMLElement} button - The button.
      * @returns {HTMLElement|null} The host.
      */
     hostOf(button) {
-        return button.closest(".ks-savedsearch-bar")?.querySelector("[data-ks-savedsearch-host]")
-            // an entry of the "..." menu may be drawn outside the bar; the page has one search
+        return button.closest("[data-ks-savedsearch-host]")
             || document.querySelector("[data-ks-savedsearch-host]");
     }
 
@@ -226,8 +150,7 @@ kleenestar.core.SavedSearch = new class {
     _onSuccess(event) {
         const form = event?.detail?.form;
 
-        // a create is followed by kleenestar.core.ObjectCreated; a form outside a dialog reports
-        // where it stands
+        // a create is followed by its dialog; a form outside a dialog reports where it stands
         if (event?.detail?.response?.data?.created === true || !form || !form.closest) {
             return;
         }

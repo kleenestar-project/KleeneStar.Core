@@ -65,8 +65,8 @@ kleenestar.core.ObjectRefresh = new class {
             return false;
         }
 
-        // a clone created a new object, which kleenestar.core.ObjectCreated opens; reloading the
-        // original here would race that navigation
+        // a create or clone answers the new object's page, which its wizard follows (success
+        // action follow-uri); a reload here would race that navigation
         if (event?.detail?.response?.data?.created === true) {
             return false;
         }

@@ -27,7 +27,7 @@ namespace KleeneStar.Core.WebFragment
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedOutCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogout>]
     [Cache]
     public sealed class LoginModalFragment : ControlDataModalLogin, IFragmentControl<ControlDataModalLogin>
     {

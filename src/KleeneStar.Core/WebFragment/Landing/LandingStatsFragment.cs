@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WebFragment.Landing
     /// </para>
     /// </remarks>
     [Section<SectionContentPrimary>]
-    [Condition<global::KleeneStar.Core.WebIdentity.SignedInCondition>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Scope<global::KleeneStar.Core.WWW.Index>]
     [Order(20)]
     public sealed class LandingStatsFragment : FragmentControlPanel
