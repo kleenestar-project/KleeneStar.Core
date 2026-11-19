@@ -82,6 +82,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Editor
                 });
             }
 
+            var related = Parameter(request, "related");
+
+            if (related is not null)
+            {
+                var @object = Guid.TryParse(related, out var relatedId)
+                    ? CoreHub.ObjectManager.GetObject(relatedId)
+                    : CoreHub.ObjectManager.GetObjectByKey(related);
+                var pages = EditorRelatedPages.Find(@object, Max(request, EditorRelatedPages.DefaultMax));
+
+                return Json(new
+                {
+                    items = pages.Select(x => Project(new EditorObjectItem(x, null), request)).ToArray(),
+                    total = pages.Count,
+                    truncated = false
+                });
+            }
+
             var wql = Parameter(request, "wql");
 
             if (!EditorObjectQuery.TryValidate(wql, out var error))
@@ -157,11 +174,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Editor
         /// <summary>
         /// Reads the number of objects asked for.
         /// </summary>
-        private static int Max(IRequest request)
+        /// <param name="request">The request.</param>
+        /// <param name="fallback">The number when the request names none.</param>
+        private static int Max(IRequest request, int fallback = 10)
         {
             return int.TryParse(Parameter(request, "max"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var max)
                 ? Math.Clamp(max, 1, EditorObjectQuery.MaxItems)
-                : 10;
+                : fallback;
         }
 
         /// <summary>

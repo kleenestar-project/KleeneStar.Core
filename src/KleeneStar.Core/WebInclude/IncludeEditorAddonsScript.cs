@@ -24,6 +24,7 @@ namespace KleeneStar.Core.WebInclude
     [Asset("/assets/js/editor/addons/count.js")]
     [Asset("/assets/js/editor/addons/news.js")]
     [Asset("/assets/js/editor/addons/children.js")]
+    [Asset("/assets/js/editor/addons/related.js")]
     [Asset("/assets/js/editor/addons/legacy.js")]
     [Asset("/assets/js/editor/addons/callout.js")]
     public sealed class IncludeEditorAddonsScript : IInclude

@@ -10,6 +10,7 @@ The WYSIWYG editor every document, blog entry and description is written in is t
 | `ks-list` *Object list* | block | A live list of the objects a filter selects - workspace key, class name, object type, open/done, assigned to the reader, an optional WQL condition, a maximum - with state chips and "n more". |
 | `ks-count` *Key figure* | block | The number of objects the same filter selects, as a large figure with a caption. |
 | `ks-children` *Child pages* | block | The pages directly below the page it stands on, by title. |
+| `ks-related` *Related pages* | block | The pages that belong to the page it stands on, the most relevant first, under the title *Related pages*; how many is a property (default 5, at most 50). |
 | `ks-news` *News* | block | The latest blog posts - of one workspace (key) or of all - exactly as the blog overview and the start page show them: teaser, pictures, labels, likes, comments, read marker, *show more posts*. |
 | `ks-toc` *Table of contents* | block | Built from the headings of the document; in the reading view the entries link to anchors it gives the headings. |
 | `ks-callout` *Notice* | container | A box the author writes into, as info, tip, warning or danger, with an optional title. |
@@ -21,7 +22,7 @@ The framework migration delegates `ks-toc` and `ks-status` to WebExpress's `toc`
 
 The document stores an add-on as a node `{ type: "addon", attrs: { name, data, inline, container } }` - its **name and its properties, nothing it displays**. The editor and the reading view (`ControlContent`, client side) both draw it anew through the add-on's `renderer`, and a controller registered for the rendered element (`webexpress.webui.Controller.registerClass`) brings it to life. So a list in a page is as current as the issues it names, every time the page is opened, and a saved document never carries a stale copy of somebody else's data.
 
-The application definitions live in `Assets/js/editor/addons/` - written like the framework's own add-ons: `common.js` (the helpers singleton `kleenestar.core.EditorAddons`), then one file per add-on with its registration and its control (`object.js` `kleenestar.core.ObjectAddonCtrl`, `list.js` `ListAddonCtrl`, `count.js` `CountAddonCtrl`, `news.js` `NewsAddonCtrl`, `children.js` `ChildrenAddonCtrl`, `legacy.js` the `ks-toc`/`ks-status` delegations, `callout.js`) - included on every page of the application with the client translations it is labelled with (`IncludeEditorAddonsScript`: `Assets/js/i18n/en.js`, `de.js`, keys `kleenestar.core:editor.addon.*`) - every page, because documents are edited in dialogs and read in panes on pages that are no object page, and an add-on the registry does not know is drawn as nothing. The looks are in `kleenestar.css` under *editor add-ons*.
+The application definitions live in `Assets/js/editor/addons/` - written like the framework's own add-ons: `common.js` (the helpers singleton `kleenestar.core.EditorAddons`), then one file per add-on with its registration and its control (`object.js` `kleenestar.core.ObjectAddonCtrl`, `list.js` `ListAddonCtrl`, `count.js` `CountAddonCtrl`, `news.js` `NewsAddonCtrl`, `children.js` `ChildrenAddonCtrl`, `related.js` `RelatedAddonCtrl`, `legacy.js` the `ks-toc`/`ks-status` delegations, `callout.js`) - included on every page of the application with the client translations it is labelled with (`IncludeEditorAddonsScript`: `Assets/js/i18n/en.js`, `de.js`, keys `kleenestar.core:editor.addon.*`) - every page, because documents are edited in dialogs and read in panes on pages that are no object page, and an add-on the registry does not know is drawn as nothing. The looks are in `kleenestar.css` under *editor add-ons*.
 
 ## Where the data comes from
 
@@ -29,6 +30,7 @@ The application definitions live in `Assets/js/editor/addons/` - written like th
 
 - `?key=SD-12` - one object;
 - `?parent=<key or id>` - the documents below it (`EditorObjectQuery.Children`);
+- `?related=<key or id>&max=` - the documents related to it, the most relevant first (`EditorRelatedPages.Find`, default `EditorRelatedPages.DefaultMax`, 5);
 - `?workspace=&class=&kind=&state=open|done&mine=1&wql=&max=` - a filter (`EditorObjectQuery.Run`).
 
 Every read goes through `ObjectManager`, so **the answer is the reader's**: permissions and security levels narrow it, the same list in the same document shows different objects to different readers, and a reference to a classified record is answered as not found rather than described.
@@ -37,7 +39,9 @@ Workspace, class, kind and assignee are columns and narrow the query. The **stat
 
 *News* is not drawn by KleeneStar at all: its controller builds the blog overview's own `webexpress.webapp.FeedCtrl` over `/api/1/blogs/feed` (all workspaces) or `/api/1/blogs/{workspacekey}/feed` (address in `<meta name="kleenestar.editor.news">`). A feed normally takes its data service from a `wx-service` island the server writes into its host; the editor's widget sanitizer lets no such element through, so the controller puts the descriptor the island would have carried where the service registry keeps parsed islands (`host._wxServiceDescriptors`) and constructs the feed itself.
 
-*Child pages* needs to know which page it stands on: the detail pages name the object in `<meta name="kleenestar.object">`, the edit routes carry the key in the address; on a page not yet saved it says so.
+*Related pages* weighs every active document connected to the page and lists the heaviest (`WebRestApi/EditorRelatedPages`): a page it references with `ks-object` (5), a page a relation joins to it in either direction (5), a page referencing it (4), its parent and the pages beside it below the same parent (2 each), and every label the two share (1 each, compared without case). Equal weight is ordered by the order of the references in the page, then by title. The page itself and its children (what `ks-children` lists) are left out, as are other kinds and archived pages. References and relations reach any workspace; referencing pages, the tree and the labels are read in the workspace of the page, bounded by `EditorObjectQuery.ScanLimit`. Every candidate is read through `ObjectManager`, so the list is the reader's. `UnitTestEditorRelatedPages`.
+
+*Child pages* and *Related pages* need to know which page they stand on: the detail pages name the object in `<meta name="kleenestar.object">`, the edit routes carry the key in the address; on a page not yet saved it says so.
 
 ## Traps the implementation handles
 

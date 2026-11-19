@@ -13,7 +13,7 @@ kleenestar.core = kleenestar.core || {}
  *
  * One file per add-on beside this one, the way the framework's own add-ons are written
  * (editor/addons/*.js): object.js (ks-object), list.js (ks-list), count.js (ks-count),
- * news.js (ks-news), children.js (ks-children), legacy.js (ks-toc, ks-status) and callout.js
+ * news.js (ks-news), children.js (ks-children), related.js (ks-related), legacy.js (ks-toc, ks-status) and callout.js
  * (ks-callout).
  *
  * The objects are read from /api/1/editor/objects, whose address the page names in

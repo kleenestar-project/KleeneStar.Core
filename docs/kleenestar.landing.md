@@ -128,7 +128,7 @@ The target pages list through one definition (`LandingScope`). A page caps what 
 
 ## Seeded content
 
-`DemoSeeder.Landing` (plugin `KleeneStar.Seeder`) seeds thirteen help pages (`SD-9000` … `SD-9012`) as documents of the service-desk knowledge class and attaches the label of the group each belongs to — one page per entry rather than one per group, so each group reads as a list rather than as a single row. It also pins a small set of documents. `KleeneStarDbSeeder.Shares` hands out shares and watches so the two personal entry paths are populated as well.
+The plugin `KleeneStar.Help` seeds the help workspace `HELP` (`KleeneStar.Help/docs/kleenestar.help.md`): a home page, three chapters and the help pages below them, each topic labelled `First Steps`, `Help` or `FAQ` — one page per entry rather than one per group, so each group reads as a list rather than as a single row. The help is product content and is seeded into every store. `DemoSeeder.Landing` (plugin `KleeneStar.Seeder`) pins a small set of demo documents and archives the help pages an earlier demo seed wrote into the service desk (`SD-9000` … `SD-9012`). `KleeneStarDbSeeder.Shares` hands out shares and watches so the two personal entry paths are populated as well.
 
 Both passes skip what is already present, so the step runs on every start: a page added to the set later reaches an installation that was seeded before it existed. Descriptions are written as plain prose. An FAQ entry leads to its page like a guide does.
 
