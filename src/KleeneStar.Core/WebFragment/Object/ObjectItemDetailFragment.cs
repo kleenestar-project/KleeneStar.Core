@@ -85,7 +85,7 @@ namespace KleeneStar.Core.WebFragment.Object
             (
                 "object-detail",
                 @object,
-                x => !ObjectFieldSheet.IsDescriptionAlias(x) && x.FieldType is not (FieldType.Workflow or FieldType.Date),
+                x => !ObjectFieldSheet.IsDescriptionAlias(x) && x.FieldType != FieldType.Workflow && !ObjectFieldSheet.IsDateField(x),
                 ContentAuthorization.MayWrite(@object, renderContext?.Request),
                 ResolveObjectRestUri(@object, renderContext),
                 collapseEmpty: false

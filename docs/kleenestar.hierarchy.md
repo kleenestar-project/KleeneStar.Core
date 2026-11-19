@@ -123,12 +123,28 @@ answers the plan - classes with their candidates, dropped fields, state mapping,
 run's `result` is the moved object's new address.
 
 **Dialog.** *Move to another workspace…* in the overflow menu of the issue, asset, document and blog
-pages (`ObjectTransferMoreFragment`, link `#ks-transfer`, endpoint and object in
-`<meta name="kleenestar.transfer">`), drawn by `Assets/js/transfer.js` (`kleenestar.core.Transfer`,
-included on those pages by `IncludeTransferScript`): target workspace, adjustable class mapping,
-state mapping, dropped fields, declassify. Only the answer to the current choice is shown, and
-confirming sends exactly the request that plan was checked for; afterwards the object opens under
-its new key.
+pages and of the preview pane (`ObjectTransferMoreFragment`) opens the modal
+`WWW/Issue/{objectkey}/Transfer`, a framework wizard (`ObjectTransferFormFragment`) built like the
+classification dialog:
+
+1. `workspace`: the target workspace as a searchable tile selection (active workspaces the caller
+   may read, without the object's own).
+2. `classes`: one tile selection per class of the subtree. The first tile keeps the class: its value
+   is the source class itself, and a class mapped onto itself is kept by the manager (the objects
+   move into the target workspace and stay objects of the source workspace's class, with every
+   value, state and security level). The other tiles are the candidates of the target. Preset with
+   the earlier answer, else the class of the same name, else the kept class.
+3. `review`: the number of objects or the refusal, the security levels without counterpart in the
+   chosen class (the move removes them; the wizard always declassifies), the class mapping, the
+   changed states and the dropped fields.
+
+Steps 2 and 3 are rendered by `POST /api/1/transfers/form?part=classes|review` from the
+answers so far; the wizard reloads a step whenever the answers changed. A class mapping counts only
+for the workspace the class step was rendered for (hidden `TransferContext`). The finish posts the
+answers to `POST /api/1/transfers`, which starts the run with the dialog's idempotency key and
+answers the page of the moved object (`{ data, uri }`, followed by the wizard), or
+`400 { message }`. A run the worker processes answers the object's current page; its summary arrives
+in the notification center. `WebRestApi/ObjectTransferForm` reads the answers for both endpoints.
 
 Not built: an own commit type and an automation trigger for the transfer; re-matching a priority
 against the target's priorities; ending SLA clocks explicitly (they follow the class, which changed).

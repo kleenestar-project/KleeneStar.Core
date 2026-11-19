@@ -203,6 +203,11 @@ namespace KleeneStar.Core.WebFragment.Object
                 Uri = _ => uploadUri,
                 Multiple = _ => true,
                 AutoUpload = _ => true,
+                // on the object's own pages a file dropped anywhere on the page is attached. Not in
+                // the preview pane: it is loaded into an overview page again and again, and every
+                // load would leave another listener on the overview's body
+                FullScreenDropzone = _ => !(renderContext?.PageContext?.EndpointId?.ToString()?
+                    .EndsWith(".issue._objectkey_.preview", StringComparison.OrdinalIgnoreCase) ?? false),
                 Placeholder = _ => "kleenestar.core:object.attachment.upload.placeholder",
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Three, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None)
             };

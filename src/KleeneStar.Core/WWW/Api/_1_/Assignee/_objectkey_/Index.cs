@@ -1,28 +1,31 @@
 using KleeneStar.Core.WebAttribute;
+using KleeneStar.Core.WebFragment.Object;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebRestApi;
 using System;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
-using WebExpress.WebCore.WebUri;
+using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_
 {
     /// <summary>
-    /// REST endpoint backing the "assign to me" / "unassign" link on the people card
-    /// (<see cref="WebFragment.Object.ObjectPropertyPeopleCardFragment"/>). The URL is
-    /// <c>/api/1/assignee/{objectkey}</c>; the <c>{objectkey}</c> URL segment is declared
-    /// via <see cref="ObjectKeySegmentAttribute"/> so callers can bind the segment from the
-    /// current request's <see cref="ObjectKeyParameter"/>.
+    /// REST endpoint behind the "assign to me" / "unassign" action of the people card
+    /// (<see cref="ObjectPropertyPeopleCardFragment"/>). The URL is
+    /// <c>/api/1/assignee/{objectkey}</c>; <c>?clear=1</c> clears the assignment, otherwise the
+    /// object is assigned to the caller.
     /// </summary>
     /// <remarks>
-    /// A <c>GET</c> assigns the object addressed by the URL to the current identity, or
-    /// clears the assignment when <c>?clear=1</c> is supplied, and then issues a <c>302</c>
-    /// redirect back to the object detail page so a plain navigation link can drive the
-    /// change without any client-side scripting. The current identity is resolved through
-    /// <see cref="CoreHub.SessionManager"/>, which currently attributes every request to the
-    /// seeded admin identity until the WebExpress identity flow exposes the authenticated
-    /// user on the request.
+    /// <list type="bullet">
+    ///   <item><c>PUT</c> changes the assignment and answers <c>{ html }</c>, the assignee row of
+    ///   the people card rendered anew; <c>Assets/js/assignee.js</c> puts it in place of the old
+    ///   one, so the page is not reloaded. Nobody signed in is <c>403</c>, an object the caller
+    ///   cannot see is <c>404</c>, one they may not change <c>403</c>.</item>
+    ///   <item><c>GET</c> does the same and redirects to the object's detail page, for a plain
+    ///   navigation without the script.</item>
+    /// </list>
     /// </remarks>
     [Title("kleenestar.core:object.assignee.api.title")]
     [ObjectKeySegment]
@@ -37,34 +40,77 @@ namespace KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_
         }
 
         /// <summary>
-        /// Handles <c>GET {base}</c>: assigns the object addressed by the URL to the current
-        /// identity, or clears the assignment when <c>?clear=1</c> is present, then redirects
-        /// to the object detail page.
+        /// Handles <c>GET {base}</c>: changes the assignment, then redirects to the object detail
+        /// page.
         /// </summary>
         /// <param name="request">The incoming request.</param>
         /// <returns>A <c>302</c> redirect to the object detail page.</returns>
         [Method(RequestMethod.GET)]
         public IResponse Assign(IRequest request)
         {
-            var keyParameter = request?.GetParameter<ObjectKeyParameter>();
-            var @object = CoreHub.ObjectManager.GetObjectByKey(keyParameter?.Value);
+            var @object = CoreHub.ObjectManager.GetObjectByKey(request?.GetParameter<ObjectKeyParameter>()?.Value);
 
-            if (@object is not null && global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request))
-            {
-                var clear = string.Equals(request?.GetParameter("clear")?.Value, "1", StringComparison.OrdinalIgnoreCase);
-
-                @object.AssigneeId = clear ? null : CoreHub.SessionManager.GetCurrentIdentityId(request);
-                @object.Updated = DateTime.UtcNow;
-
-                CoreHub.ObjectManager.Update(@object);
-            }
+            Change(@object, request);
 
             // dispatch to the detail view matching the object's kind (/issue, /document, …)
-            var target = global::KleeneStar.Core.CoreHub.ObjectKindManager
+            var target = CoreHub.ObjectKindManager
                 .ResolveDetailUri(@object)?
                 .BindParameters(request);
 
             return new ResponseMovedTemporarily(target);
+        }
+
+        /// <summary>
+        /// Handles <c>PUT {base}</c>: changes the assignment and answers the assignee row of the
+        /// people card.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns><c>{ html }</c>, or <c>403</c> / <c>404</c>.</returns>
+        [Method(RequestMethod.PUT)]
+        public IResponse Update(IRequest request)
+        {
+            var @object = CoreHub.ObjectManager.GetObjectByKey(request?.GetParameter<ObjectKeyParameter>()?.Value);
+
+            if (@object is null)
+            {
+                return new ResponseNotFound();
+            }
+
+            if (!Change(@object, request))
+            {
+                return new ResponseForbidden();
+            }
+
+            var renderContext = new RenderControlFormContext(null, null, request as Request, null);
+            var row = ObjectPropertyPeopleCardFragment.BuildAssignee(@object, request);
+
+            return JsonApi.Json(new { html = row.Render(renderContext, null)?.ToString() ?? string.Empty });
+        }
+
+        /// <summary>
+        /// Assigns the object to the caller, or clears the assignment for <c>?clear=1</c>, when
+        /// a signed-in caller may change the object.
+        /// </summary>
+        /// <param name="object">The object, or <see langword="null"/>.</param>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the assignment was written.</returns>
+        private static bool Change(Model.Entities.Object @object, IRequest request)
+        {
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            if (@object is null || identityId == Guid.Empty || !ContentAuthorization.MayWrite(@object, request))
+            {
+                return false;
+            }
+
+            var clear = string.Equals(request?.GetParameter("clear")?.Value, "1", StringComparison.OrdinalIgnoreCase);
+
+            @object.AssigneeId = clear ? null : identityId;
+            @object.Updated = DateTime.UtcNow;
+
+            CoreHub.ObjectManager.Update(@object);
+
+            return true;
         }
     }
 }

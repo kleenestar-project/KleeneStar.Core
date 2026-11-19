@@ -54,7 +54,7 @@ namespace KleeneStar.Core.WebPermission
         /// </summary>
         private static readonly HashSet<string> ObjectWritePages = new(StringComparer.OrdinalIgnoreCase)
         {
-            "edit", "delete", "clone", "draft", "securitylevel"
+            "edit", "delete", "clone", "draft", "securitylevel", "transfer"
         };
 
         /// <summary>

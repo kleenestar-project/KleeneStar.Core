@@ -139,7 +139,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             foreach (var field in workflowFields)
             {
-                var block = BuildFieldBlock(@object, field);
+                var block = BuildFieldBlock(@object, field, workflowFields.Count > 1);
                 if (block is not null)
                 {
                     section.Add(block);
@@ -187,13 +187,14 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Builds the labelled split-button block for a single workflow-backed field, or
+        /// Builds the split-button block for a single workflow-backed field, or
         /// <c>null</c> when the attached workflow can no longer be resolved.
         /// </summary>
         /// <param name="object">The object whose status is displayed.</param>
         /// <param name="field">The workflow-type field being rendered.</param>
-        /// <returns>The control hosting the field label and split button, or <c>null</c>.</returns>
-        private IControl BuildFieldBlock(Model.Entities.Object @object, Field field)
+        /// <param name="labelled">Whether the field name is shown above the split button.</param>
+        /// <returns>The control hosting the split button, or <c>null</c>.</returns>
+        private IControl BuildFieldBlock(Model.Entities.Object @object, Field field, bool labelled)
         {
             // the state machine is needed in full here - the states to offer come from the
             // transitions - so the structural load is used rather than the shallow header read
@@ -240,11 +241,17 @@ namespace KleeneStar.Core.WebFragment.Object
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.Two)
             };
 
-            panel.Add(new ControlText("object-workflow-label-" + field.Id.ToString("N"))
+            // the section header already names the status; the field name is needed only to tell
+            // several workflow fields of one class apart
+            if (labelled)
             {
-                Text = _ => field.Name,
-                Format = _ => TypeFormatText.Small
-            });
+                panel.Add(new ControlText("object-workflow-label-" + field.Id.ToString("N"))
+                {
+                    Text = _ => field.Name,
+                    Format = _ => TypeFormatText.Small
+                });
+            }
+
             panel.Add(split);
 
             return panel;

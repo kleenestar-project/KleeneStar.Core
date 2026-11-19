@@ -19,7 +19,9 @@ namespace KleeneStar.Core.WebManager
     /// <remarks>
     /// The object lands at the root of the target workspace, its subtree below it. Per object: a
     /// new key in the target workspace, the old one kept as an alias
-    /// (<see cref="ObjectKeyAlias"/>, so links and mentions still resolve); the class mapped; the
+    /// (<see cref="ObjectKeyAlias"/>, so links and mentions still resolve); the class mapped onto a
+    /// class of the target workspace, or kept when the mapping names the class itself (the object
+    /// then stays an object of the source workspace's class, with its fields, states and levels); the
     /// field values moved by field name onto the target class (a field it lacks is dropped - the
     /// commit records the removal); the workflow state by name, else by status category, else the
     /// target workflow's entry state; the security level by name, else refused unless the caller
@@ -185,9 +187,12 @@ namespace KleeneStar.Core.WebManager
                 var source = CoreHub.ClassManager.GetClass(group.Key);
 
                 var candidates = targets;
-                var chosen = options?.ClassMap is not null && options.ClassMap.TryGetValue(group.Key, out var wanted)
-                    ? candidates.FirstOrDefault(x => x.Id == wanted)
-                    : null;
+                var wanted = options?.ClassMap is not null && options.ClassMap.TryGetValue(group.Key, out var mapped) ? mapped : (Guid?)null;
+
+                // a class mapped onto itself is kept: the objects move without changing their class
+                var chosen = wanted == group.Key
+                    ? source
+                    : wanted is Guid id ? candidates.FirstOrDefault(x => x.Id == id) : null;
 
                 chosen ??= candidates.FirstOrDefault(x => string.Equals(x.Name?.Trim(), source?.Name?.Trim(), StringComparison.OrdinalIgnoreCase));
 
@@ -289,6 +294,12 @@ namespace KleeneStar.Core.WebManager
                     if (into is null)
                     {
                         CoreHub.ValueManager.Remove(value.Id);
+                        continue;
+                    }
+
+                    // a kept class keeps its fields and states: nothing to write
+                    if (into.Id == value.FieldId && string.Equals(data, value.Data, StringComparison.Ordinal))
+                    {
                         continue;
                     }
 

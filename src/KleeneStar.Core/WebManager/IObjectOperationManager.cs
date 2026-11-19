@@ -85,7 +85,8 @@ namespace KleeneStar.Core.WebManager
     /// The target and mapping of a transfer.
     /// </summary>
     /// <param name="TargetWorkspaceId">The workspace to move into (the object lands at its root).</param>
-    /// <param name="ClassMap">Source class to target class, where the caller chose one; the rest map by name.</param>
+    /// <param name="ClassMap">Source class to target class, where the caller chose one; the rest map by name.
+    /// A source class mapped onto itself is kept.</param>
     /// <param name="Declassify">Whether an object whose security level has no counterpart may lose it.</param>
     public sealed record TransferOptions(Guid TargetWorkspaceId, IReadOnlyDictionary<Guid, Guid> ClassMap, bool Declassify);
 

@@ -193,6 +193,18 @@ namespace KleeneStar.Core.WebControl
         }
 
         /// <summary>
+        /// Determines whether a field holds a date: a date, a span of dates, or either picked from
+        /// an inline calendar. The dates card of the object page shows these fields, the details
+        /// card leaves them out.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <returns><see langword="true"/> for a date field.</returns>
+        public static bool IsDateField(FieldEntity field)
+        {
+            return field?.FieldType is FieldType.Date or FieldType.DateRange or FieldType.Calendar or FieldType.CalendarRange;
+        }
+
+        /// <summary>
         /// Determines whether a field names the description, a system attribute of the object
         /// that its own card shows.
         /// </summary>

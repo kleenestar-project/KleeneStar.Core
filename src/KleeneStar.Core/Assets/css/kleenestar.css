@@ -1598,153 +1598,151 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     }
 }
 
-/* ============================================================== transfer */
-/* the dialog moving an object into another workspace (Assets/js/transfer.js): its own small
-   dialog, the mapping sections and the toasts that follow the run */
-.ks-transfer-dialog {
-    border: 0;
-    border-radius: 8px;
-    padding: 1.25rem;
-    width: min(32rem, calc(100vw - 2rem));
-    background: Canvas;
-    color: CanvasText;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-}
-
-.ks-transfer-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.35);
-}
-
-.ks-transfer-dialog h2 {
-    font-size: 1.1rem;
-    margin: 0 0 0.75rem 0;
-}
-
-.ks-transfer-field {
+/* ============================================================ people card */
+/* the people of an object (ObjectPropertyPeopleCardFragment, ObjectPersonRow): a round picture,
+   the role in small letters above the name, an optional status chip and an action at the end */
+.ks-people {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    margin: 0 0 0.75rem 0;
+    gap: 0.15rem;
 }
 
-.ks-transfer-input {
-    padding: 0.4rem 0.5rem;
-    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    border-radius: 6px;
-    background: transparent;
-    color: inherit;
-}
-
-.ks-transfer-dialog-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.ks-transfer-dialog-buttons button {
-    border-radius: 6px;
-    padding: 0.35rem 0.9rem;
-    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-}
-
-.ks-transfer-dialog-buttons button.primary {
-    background: var(--wx-primary, #0d6efd);
-    border-color: var(--wx-primary, #0d6efd);
-    color: #fff;
-}
-
-.ks-transfer-toasts {
-    position: fixed;
-    left: 50%;
-    bottom: 1.25rem;
-    transform: translateX(-50%);
-    z-index: 2100;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: min(40rem, calc(100vw - 2rem));
-}
-
-.ks-transfer-toast {
+.ks-person {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.55rem 0.8rem;
-    border-radius: 6px;
-    background: #1f2937;
-    color: #f9fafb;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-    font-size: 0.9rem;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.35rem 0.4rem;
+    border-radius: var(--wx-border-radius, 6px);
 }
 
-.ks-transfer-toast.error {
-    background: #7f1d1d;
+.ks-person:hover {
+    background: var(--wx-tertiary-bg);
 }
 
-.ks-transfer-toast button {
-    background: transparent;
-    border: 0;
-    color: #93c5fd;
+.ks-person-avatar {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    overflow: hidden;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--wx-primary) 18%, transparent);
+    color: var(--wx-primary);
+    font-size: 0.75rem;
     font-weight: 600;
-    cursor: pointer;
+    letter-spacing: 0.02em;
 }
 
-.ks-transfer-toast button.close {
-    color: inherit;
-    font-size: 1.1rem;
-    line-height: 1;
+.ks-person-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.ks-transfer-choice {
+.ks-person-avatar-group {
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--wx-secondary-color) 18%, transparent);
+    color: var(--wx-secondary-color);
+}
+
+.ks-person-muted .ks-person-avatar {
+    background: transparent;
+    border: 1.5px dashed var(--wx-border-color);
+}
+
+.ks-person-text {
     display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    margin: 0.35rem 0;
-    cursor: pointer;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.25;
 }
 
-.ks-transfer-warning {
-    padding: 0.4rem 0.6rem;
-    border-left: 3px solid #dc3545;
-    background: color-mix(in srgb, #dc3545 10%, transparent);
+.ks-person-role {
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.ks-transfer-toast.progress {
-    background: #1e3a8a;
+.ks-person-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.ks-transfer-dialog:has(.ks-transfer) {
-    width: min(42rem, calc(100vw - 2rem));
+.ks-person-muted .ks-person-name {
+    color: var(--wx-secondary-color);
+    font-weight: 400;
+    font-style: italic;
 }
 
-.ks-transfer-section {
-    margin: 0.75rem 0;
+.ks-person-status {
+    flex: 0 0 auto;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    --ks-status-color: var(--wx-secondary-color);
+    color: var(--ks-status-color);
+    background: color-mix(in srgb, var(--ks-status-color) 15%, transparent);
 }
 
-.ks-transfer-section h3 {
-    font-size: 0.95rem;
-    margin: 0 0 0.35rem 0;
+.ks-person-status-success { --ks-status-color: var(--wx-success); }
+.ks-person-status-danger { --ks-status-color: var(--wx-danger); }
+.ks-person-status-pending { --ks-status-color: var(--wx-warning); }
+
+/* yellow text on a yellow wash falls far short of 4.5:1; the pending chip darkens its text
+   towards the body colour and keeps the yellow wash */
+.ks-person-status-pending {
+    color: color-mix(in srgb, var(--wx-warning) 45%, var(--wx-body-color));
 }
 
-.ks-transfer-section ul {
-    margin: 0;
-    padding-left: 1.2rem;
-    font-size: 0.875rem;
+.ks-person-action {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    white-space: nowrap;
 }
 
-.ks-transfer-row {
-    display: grid;
-    grid-template-columns: minmax(8rem, 1fr) 2fr;
+.ks-people-heading {
+    display: block;
+    margin: 0.6rem 0.4rem 0.15rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ks-people > .wx-watcher,
+.ks-people > [id="object-property-watcher"] {
+    padding: 0 0.4rem;
+}
+
+/* the dates card uses the field sheet; in the narrow property column its rows are tighter */
+.ks-field-sheet-compact .ks-field-row {
+    padding: 0.2rem 0.4rem;
+}
+
+/* ====================================================== page-wide file drop */
+/* an upload that takes files dropped anywhere on the page (ControlUpload.FullScreenDropzone)
+   shows its zone over the whole viewport while a drag is over the page */
+.wx-upload[data-fullscreen-dropzone="true"].wx-drag-over .wx-upload-dropzone {
+    position: fixed;
+    inset: 1rem;
+    z-index: 2000;
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin: 0.25rem 0;
-}
-
-.ks-transfer-total {
-    font-size: 0.875rem;
-    opacity: 0.8;
+    justify-content: center;
+    border: 2px dashed var(--wx-primary);
+    border-radius: var(--wx-border-radius-lg, 12px);
+    background: color-mix(in srgb, var(--wx-body-bg) 82%, transparent);
+    backdrop-filter: blur(2px);
+    font-size: 1.15rem;
+    pointer-events: none;
 }

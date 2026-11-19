@@ -227,5 +227,40 @@ namespace KleeneStar.Core.Test.WebManager
             // ... and the source numbering never hands one of them out again
             Assert.Equal("SRC-4", CoreHub.ObjectManager.NextObjectKey(SourceId));
         }
+
+        /// <summary>
+        /// A class mapped onto itself is kept: the plan names it as its own target, drops no field,
+        /// keeps the states and finds the security level; the run moves the objects into the target
+        /// workspace and leaves class, values, state and classification as they were.
+        /// </summary>
+        [Fact]
+        public void Run_KeepsAClassMappedOntoItself()
+        {
+            Seed(nameof(Run_KeepsAClassMappedOntoItself));
+
+            using var unrestricted = CoreHub.SecurityLevelManager.BeginUnrestricted();
+
+            var keep = new Dictionary<Guid, Guid> { [SrcTaskClass] = SrcTaskClass };
+            var plan = CoreHub.ObjectOperationManager.PlanTransfer(TaskBId, Options(map: keep), _ => true, _ => true);
+
+            Assert.False(plan.Refused);
+            Assert.Equal(SrcTaskClass, plan.Transfer.Classes.Single().TargetId);
+            Assert.Empty(plan.Transfer.DroppedFields);
+            Assert.All(plan.Transfer.Levels, x => Assert.Equal(SrcLevel, x.TargetId));
+            Assert.All(plan.Transfer.States, x => Assert.Equal(x.From, x.To));
+
+            var run = CoreHub.ObjectOperationManager.StartTransfer(TaskBId, Options(map: keep), null, Guid.Empty, _ => true, _ => true).Operation;
+
+            Assert.Equal(ObjectOperationState.Completed, run.State);
+
+            var task = Read(TaskBId)!;
+
+            Assert.Equal(TargetId, task.WorkspaceId);
+            Assert.Equal(SrcTaskClass, task.ClassId);
+            Assert.Equal(SrcLevel, task.SecurityLevelId);
+            Assert.Null(task.ParentId);
+            Assert.StartsWith("DST-", task.Key);
+            Assert.Equal("Open", CoreHub.ValueManager.GetValue(TaskBId, SrcStatusField)?.Data);
+        }
     }
 }
