@@ -284,8 +284,8 @@ namespace KleeneStar.Core.Test.WebFragment
         }
 
         /// <summary>
-        /// Verifies that <see cref="TemplateEditFormFragment"/> registers the
-        /// four template-edit controls and binds the non-scoped
+        /// Verifies that <see cref="TemplateEditFormFragment"/>, a wizard whose
+        /// steps are built per request, binds the non-scoped
         /// <c>…/Api/_1_/Templates/Index</c> endpoint. The edit page is
         /// addressed by template id alone, so a workspace-scoped endpoint
         /// would leave a <c>${workspacekey}</c> placeholder in the rendered
@@ -302,7 +302,7 @@ namespace KleeneStar.Core.Test.WebFragment
 
             AssertEditFragmentShape(
                 frag,
-                expectedControls: 4,
+                expectedControls: null,
                 expectedDataServiceEndpoint: typeof(KleeneStar.Core.WWW.Api._1_.Templates.Index));
         }
 

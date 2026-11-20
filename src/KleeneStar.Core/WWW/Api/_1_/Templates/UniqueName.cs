@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using System.Linq;
 using System.Text.RegularExpressions;
 using WebExpress.WebApp.WebRestApi;
@@ -49,6 +49,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
 
             var query = new Query<Model.Entities.Template>()
                 .WhereEqualsIgnoreCase(x => x.Name, value);
+
+            // the template being edited does not compete with its own name
+            if (System.Guid.TryParse(request?.GetParameter("exclude")?.Value, out var exclude))
+            {
+                query = query.Where(x => x.Id != exclude);
+            }
 
             using var context = ModelHub.CreateDbContext();
 

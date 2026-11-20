@@ -47,9 +47,9 @@ namespace KleeneStar.Core.WebFragment.Template
         };
 
         /// <summary>
-        /// Gets the input control for specifying the category of the template.
+        /// Gets the tag input for the categories of the template (<see cref="TemplateCategories"/>).
         /// </summary>
-        public ControlFormItemInputText Category { get; } = new()
+        public ControlFormItemInputTag Category { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Template.Category),
             Label = _ => "kleenestar.core:template.category.label",

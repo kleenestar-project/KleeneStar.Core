@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
@@ -155,8 +156,7 @@ namespace KleeneStar.Core.WebFragment.Template
                 .Where(x => x.Class.WorkspaceId == workspace.Id);
 
             return [.. _templateManager.GetTemplates(query)
-                .Select(x => x.Category)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .SelectMany(x => TemplateCategories.Parse(x.Category))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)];
         }

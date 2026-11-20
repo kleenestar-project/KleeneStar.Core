@@ -147,7 +147,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         private static Guid? ClassOfCreate(IRequest request)
         {
             return ContentAuthorization.ReadPayloadGuid(request, "classid")
-                ?? (ContentAuthorization.ReadPayloadGuid(request, "templateid") is { } templateId
+                ?? (TemplateChoice.TryParse(ContentAuthorization.ReadPayloadText(request, "templateid"), out var templateId)
                     ? CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId
                     : null);
         }
@@ -958,7 +958,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             // an object created from a template inherits the class the template instantiates
             // when the payload names only the template
-            if (@object.ClassId == Guid.Empty && fieldMap.TryGetGuid("TemplateId", out var templateId))
+            if (@object.ClassId == Guid.Empty && TryGetTemplateId(fieldMap, out var templateId))
             {
                 @object.ClassId = CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId ?? Guid.Empty;
             }
@@ -1072,7 +1072,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <returns>The active template, or null when the payload names none.</returns>
         private static Model.Entities.Template ResolveTemplate(RestApiCrudFormData fieldMap)
         {
-            if (!fieldMap.TryGetGuid("TemplateId", out var templateId))
+            if (!TryGetTemplateId(fieldMap, out var templateId))
             {
                 return null;
             }
@@ -1080,6 +1080,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             var template = CoreHub.TemplateManager.GetTemplate(templateId);
 
             return template?.State == TemplateState.Active ? template : null;
+        }
+
+        /// <summary>
+        /// Reads the template a create payload names: a template id, or the value of a template
+        /// card offered under a further class of the template (<see cref="TemplateChoice"/>).
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="templateId">When this method returns, the template id, or <see cref="Guid.Empty"/>.</param>
+        /// <returns><see langword="true"/> when the payload names a template.</returns>
+        private static bool TryGetTemplateId(RestApiCrudFormData fieldMap, out Guid templateId)
+        {
+            templateId = Guid.Empty;
+
+            return fieldMap.TryGetValue("TemplateId", out var value)
+                && TemplateChoice.TryParse(value?.ToString(), out templateId);
         }
 
         /// <summary>

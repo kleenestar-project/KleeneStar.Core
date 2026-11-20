@@ -10,11 +10,12 @@ The `TemplateManager` is responsible for the lifecycle of these templates. It en
 
 ## Data Model and Relationships
 
-Templates are bound to a specific workspace and a specific class. They contain metadata for presentation (icon, title, description, category) and a payload of preset field values.
+Templates are bound to a workspace and serve one or several classes of it. They contain metadata for presentation (icon, title, description, category) and a payload of preset field values.
 
-- **Key attributes**: `Id` (stable GUID), `Name` (internal/system name), `Title` (localizable display name), `Description` (localizable), `Category` (for grouping in the UI), `Icon` (visual identifier), `State` (Active, Archived), `Created`/`Updated` timestamps.
-- **Class Reference**: A mandatory link (`ClassId`) to the class this template instantiates.
-- **Presets**: A serialized dictionary or collection of field presets (mapping `FieldId` or `FieldName` to default values).
+- **Key attributes**: `Id` (stable GUID), `Name` (internal/system name), `Title` (localizable display name), `Description` (localizable), `Category` (the categories that group the template in the UI, separated by `;`, see below), `Icon` (visual identifier), `State` (Active, Archived), `Created`/`Updated` timestamps.
+- **Class Reference**: A mandatory link (`ClassId`) to the owning class. It decides the workspace, the permission chain (`ClassOf` of `/api/1/templates`, `RouteAuthorization`) and the class a child of a composite is created in.
+- **Further classes**: `TemplateClass` rows (`TemplateId`, `ClassId`, unique pair, cascading from both sides) name the other classes of the same workspace the template serves. The owning class is never stored as a further class. `ITemplateManager.GetClassIds` answers the owning class first, then the further classes; `GetFurtherTemplateIds(classId)` answers the templates serving a class as a further class; `SetFurtherClasses` replaces them.
+- **Presets**: A JSON object mapping field names to values in storage form (the form a value row holds: dates round trip, booleans `true`, tags comma separated), plus `Summary` for the title. One preset reaches every served class that has a field of that name.
 - **Permissions**: Like classes and fields, templates can have specific permission profiles (e.g., restricting a "VIP Support Request" template to specific user groups).
 
 ```
@@ -54,6 +55,12 @@ A template is applied by `/api/1/objects` when a create payload names it (`Templ
 - **The template's own description is the `Description` preset**, unless its presets name one. The description is written with the same editor the object description uses, and a child of a composite has always been described by it; answering it as a preset is what makes the text a template was written with the text its objects start with. A template that wants to say one thing on its card and another in its objects writes `Description` into its presets, which wins. Preset names are matched ignoring case.
 
 The object row, its answered values, its presets and the children of a composite template are recorded in one genesis commit per object.
+
+### Templates serving several classes
+
+The object creation wizard offers a template under each class it serves (`ObjectAddFormFragment`, `Catalog.TemplatesOf`). The tile selection needs a distinct value per card, so the card under the owning class carries the template id and a card under a further class carries `{templateId}@{classId}` (`WebControl/TemplateChoice`). `/api/1/objects` and `/api/1/objects/form` read the template id through `TemplateChoice.TryParse`; the class travels as `ClassId`. A payload naming only a template creates the object in the owning class.
+
+The template overview lists every served class in the class column (owning class first); its class quick filter and the template count of the class overview include the templates serving the class as a further class.
 
 ### Work structures across workspaces
 
@@ -148,34 +155,22 @@ Workspace administrators manage templates via a dedicated list view, similar to 
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
-### Template Edit (Modal/Page)
+### Template wizard (add and edit)
 
-Editing a template involves setting its metadata (Title, Category, Icon) and defining the **Presets**. Presets are rendered dynamically based on the selected Class. The admin fills out the form exactly as an end-user would, but saves it as a template rather than an object.
+Templates are created and edited in a wizard laid out like the object creation wizard (`WebFragment/Template/TemplateWizardFragmentBase`, sealed `TemplateAddFormFragment` on `/templates/{workspacekey}/add` and `TemplateEditFormFragment` on `/template/{templateid}/edit`). The steps are built per request.
 
-```
-╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
-║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
-║└─────╔TemplateEditModal═══════════════════════════════════════════════════════╗─────┘║
-║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
-║│ / Se║│ Edit Template                                                        │║     │║
-║└─────║├──────────────┬────────────────────────────┬──────────────────────────┤║─────┘║
-║┌Sideb║│ General Info │ Presets (Class: Incident)  │ Permissions              │║─────┐║
-║│     ║├──────────────┴────────────────────────────┴──────────────────────────┤║     │║
-║│  - A║│                                                                      │║ Add]│║
-║│  - A║│       Title*: [ Software Issue                                     ] │║     │║
-║│  - A║│  Description: [ Report a bug or software problem                   ] │║     │║
-║│     ║│     Category: [ IT Support                                         ] │║atus │║
-║│     ║│         Icon: [ (Select Icon) ▼                                    ] │║-----│║
-║│     ║│       Active: [x]                                                    │║ctive│║
-║│     ║│                                                                      │║ctive│║
-║│     ║│                                                                      │║ctive│║
-║│     ║└──────────────────────────────────────────────────────────────────────┘║     │║
-║├─────║                                                                        ║     │║
-║│     ║                                                       [Save] [Cancel]  ║     │║
-║└─────║                                                                        ║─────┘║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
-```
+|Step       |Content
+|-----------|---------------------------------------------------------------------------------------------------------------------
+|`classes`  |Tile selection `Classes` with several selectable tiles (Ctrl+click adds, Shift+click selects a range), semicolon separated. Offered: the active concrete classes of the workspace the caller administers, plus the classes the edited template serves. Each card shows the object type, the description, the number of fields that take a preset and the number of templates. The owning class carries the chip *Owner*.
+|`template` |`Name` (unique among all templates, `/api/1/templates/uniquename?exclude={templateid}` on an edit), `Category` (tag input, several categories; a comma, semicolon or space ends one), `Description` (prose editor; the description the objects start with).
+|`structure`|`ParentId`, on an edit `AssigneeId` and `PredecessorId`, `State`.
+|`presets`  |Rendered by `POST /api/1/templates/form?part=presets[&id={templateid}]` from the wizard payload (`WWW/Api/_1_/Templates/Form`, built by `WebControl/TemplatePresetForm`).
+
+**Presets step.** The step shows a title input (`Summary`) and the dialog inputs of the object mask (`ObjectFieldSheet.CreateDialogInput`) for the fields of the selected classes, once per field name: a name several classes share appears under the first class that has it, laid out after that class's create form (else its edit form); fields on neither form follow below it. Several contributing classes become one tab per class, with a note that fields of the same name share one preset. Workflow, attachment, picture and password fields take no preset, and no input is required. The inputs are named `Preset_{field name}`, because the template's own attributes (`Name`, `Category`, `State`, ...) travel in the same payload. An input starts from the answer the payload carries for it, else from the stored preset.
+
+**Saving** (`/api/1/templates`): the classes come from `Classes` (an API client may send `ClassId`); a create needs at least one, all of them in one workspace (the template's on an edit) and administered by the caller (`MayCreate`, `ValidateClasses`). The first selected class owns a new template; an edit keeps the owning class while it is selected. When the payload carries preset keys, `TemplatePresetForm.Collect` writes the presets: every offered field takes its answer in storage form; a blank answer, an unticked checkbox, an empty editor document and the starting value of a control that always submits one (colour `#000000`, rating `0`, slider `0;100`, range `5`) preset nothing, unless the field carried a stored preset. A stored `Description` or `SecurityLevelId` preset is kept, a preset naming no field of the served classes is dropped. A payload without preset keys leaves the presets unchanged. A clone copies the classes of its source.
+
+**Categories** (`WebControl/TemplateCategories`): `Template.Category` holds the categories separated by `;`, the value format of the tag input (wizard and clone dialog). `/api/1/templates` stores them trimmed, each once ignoring case, `null` for none, and refuses a text longer than the column (128 characters). A single category without separator, as seeds and workspace templates write it, is one category. Readers split the text: the sidebar lists every category once, its filter (`TemplateCategoryFilter`) matches a whole category (`Category = c`, starting with `c;`, ending with `;c` or containing `;c;`), the table shows the column as tags, the template cards of the object wizard name the categories joined by ` · `.
 
 ## Permissions
 

@@ -1,4 +1,5 @@
-﻿using KleeneStar.Core.WebRestApi;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -34,6 +35,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
         protected override System.Guid? ClassOf(Model.Entities.Template item)
         {
             return item?.ClassId;
+        }
+
+        /// <summary>
+        /// Determines whether the caller may create a template: they must administer every class
+        /// the payload names (<see cref="TemplatePresetForm.ClassesField"/>, else <c>ClassId</c>).
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the template may be created.</returns>
+        protected override bool MayCreate(IRequest request)
+        {
+            var classIds = TemplatePresetForm.ParseClassIds(ContentAuthorization.ReadPayloadText(request, TemplatePresetForm.ClassesField));
+
+            if (classIds.Count == 0)
+            {
+                return base.MayCreate(request);
+            }
+
+            return classIds.All(x => ContentAuthorization.MayAdminister(x, request));
         }
 
         /// <summary>
@@ -176,17 +195,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             var result = AvatarStorage.Validate(payload, nameof(Model.Entities.Template.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
             var errors = new List<RestApiError>();
 
-            // a template instantiates exactly one class, so a create without a resolvable class
+            // a template is bound to at least one class, so a create without a resolvable class
             // would otherwise reach the database and fail there on the foreign key. Clone and
-            // update take the class from the existing record and therefore carry none.
-            if (existingItem is null && !TryResolveClass(payload, out _))
-            {
-                errors.Add(new RestApiError
-                (
-                    I18N.Translate(request, "kleenestar.core:template.class.placeholder"),
-                    field: nameof(Model.Entities.Template.ClassId)
-                ));
-            }
+            // update take the classes from the existing record unless the payload names them.
+            errors.Add(ValidateClasses(existingItem, payload, request));
+            errors.Add(ValidateCategories(payload, request));
 
             // the parent reference is rejected here rather than at the database, which knows only
             // that the row exists and nothing about workspaces or cycles
@@ -233,17 +246,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             };
 
             fieldMap.BindTo(newItem);
+            newItem.Category = TemplateCategories.Normalize(newItem.Category);
 
             // an inline picture of the dialog is stored under the new id
             newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
 
-            // the class is taken from the payload only when it names one that exists, so an
+            // the classes are taken from the payload only where they name ones that exist, so an
             // unknown id becomes an empty reference the validation reports rather than a
-            // dangling one the insert fails on
-            TryResolveClass(fieldMap, out var classId);
-            newItem.ClassId = classId;
+            // dangling one the insert fails on. The first named class owns the template.
+            var classIds = ResolveClasses(fieldMap);
+            newItem.ClassId = classIds.FirstOrDefault();
+
+            if (TemplatePresetForm.Carries(fieldMap.Keys))
+            {
+                newItem.Presets = TemplatePresetForm.Collect(fieldMap, classIds, null, request.Culture);
+            }
 
             CoreHub.TemplateManager.AddTemplate(newItem);
+            CoreHub.TemplateManager.SetFurtherClasses(newItem.Id, classIds.Skip(1));
 
             return new RestApiCrudResultCreate();
         }
@@ -281,17 +301,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             };
 
             fieldMap.BindTo(newItem);
+            newItem.Category = TemplateCategories.Normalize(newItem.Category);
 
             // an inline picture of the dialog is stored under the new id
             newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
 
-            // the class a template instantiates is fixed at creation time and therefore not
-            // part of the clone form — carrying it over from the source keeps the copy bound
-            // to the same class and its presets meaningful
-            newItem.ClassId = existingItem?.ClassId
-                ?? (TryResolveClass(fieldMap, out var classId) ? classId : Guid.Empty);
+            // the classes are not part of the clone form; carrying them over from the source
+            // keeps the copy serving the same classes and its presets meaningful
+            var classIds = existingItem is not null
+                ? CoreHub.TemplateManager.GetClassIds(existingItem.Id)
+                : ResolveClasses(fieldMap);
+            newItem.ClassId = classIds.FirstOrDefault();
 
             CoreHub.TemplateManager.AddTemplate(newItem);
+            CoreHub.TemplateManager.SetFurtherClasses(newItem.Id, classIds.Skip(1));
 
             return new RestApiCrudResultCreate();
         }
@@ -339,12 +362,32 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Template existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            var stored = CoreHub.TemplateManager.GetStoredPresets(existingItem.Id);
+            var classIds = CoreHub.TemplateManager.GetClassIds(existingItem.Id);
+            var owner = existingItem.ClassId;
             var res = base.Update(existingItem, payload, request);
+
+            // the binding takes nothing but what the payload names; the owning class is moved
+            // only through the class selection, which keeps the current owner where it can
+            existingItem.ClassId = owner;
+            existingItem.Category = TemplateCategories.Normalize(existingItem.Category);
+
+            if (payload.ContainsKey(TemplatePresetForm.ClassesField) && ResolveClasses(payload) is { Count: > 0 } named)
+            {
+                classIds = named.Contains(owner) ? [owner, .. named.Where(x => x != owner)] : named;
+                existingItem.ClassId = classIds[0];
+            }
+
+            if (TemplatePresetForm.Carries(payload.Keys))
+            {
+                existingItem.Presets = TemplatePresetForm.Collect(payload, classIds, stored, request.Culture);
+            }
 
             // an emptied picture binds null; the record then carries its generated icon
             existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
 
             CoreHub.TemplateManager.UpdateTemplate(existingItem);
+            CoreHub.TemplateManager.SetFurtherClasses(existingItem.Id, classIds.Skip(1));
 
             return res;
         }
@@ -389,8 +432,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
 
             var reference = CoreHub.TemplateManager.GetTemplate(referenceId.Value);
             var workspaceId = existingItem?.Class?.WorkspaceId
-                ?? (TryResolveClass(payload, out var classId)
-                    ? CoreHub.ClassManager.GetClass(classId)?.WorkspaceId
+                ?? (ResolveClasses(payload) is { Count: > 0 } classIds
+                    ? CoreHub.ClassManager.GetClass(classIds[0])?.WorkspaceId
                     : null);
 
             if (reference is null)
@@ -495,27 +538,107 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
         }
 
         /// <summary>
-        /// Resolves the class a payload binds a template to and verifies that it exists, so an
-        /// unknown or missing reference is reported as a validation error instead of surfacing
-        /// as a foreign-key violation when the record is written.
+        /// Validates the classes of the payload: a create names at least one, every named class
+        /// exists, all of them belong to one workspace (the template's, on an update), and the
+        /// caller administers each of them.
         /// </summary>
-        /// <param name="fieldMap">The payload carrying the class reference.</param>
-        /// <param name="classId">
-        /// When this method returns, contains the id of the referenced class, or
-        /// <see cref="Guid.Empty"/> when the payload names none that exists.
-        /// </param>
-        /// <returns>True when the payload names an existing class; otherwise false.</returns>
-        private static bool TryResolveClass(RestApiCrudFormData fieldMap, out Guid classId)
+        /// <param name="existingItem">The template being edited, or null while one is created.</param>
+        /// <param name="payload">The payload carrying the classes.</param>
+        /// <param name="request">The request, for localizing the message and judging the caller.</param>
+        /// <returns>The validation error, or null when the classes are valid or not named.</returns>
+        private static RestApiError ValidateClasses(Model.Entities.Template existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            if (!fieldMap.TryGetGuid(nameof(Model.Entities.Template.ClassId), out classId) ||
-                CoreHub.ClassManager.GetClass(classId) is null)
-            {
-                classId = Guid.Empty;
+            var field = TemplatePresetForm.ClassesField;
+            var names = NamedClasses(payload);
 
-                return false;
+            if (names is null)
+            {
+                return existingItem is null
+                    ? new RestApiError(I18N.Translate(request, "kleenestar.core:template.classes.required"), field: field)
+                    : null;
             }
 
-            return true;
+            if (names.Count == 0)
+            {
+                return new RestApiError(I18N.Translate(request, "kleenestar.core:template.classes.required"), field: field);
+            }
+
+            var classes = names.Select(CoreHub.ClassManager.GetClass).ToList();
+
+            if (classes.Any(x => x is null))
+            {
+                return new RestApiError(I18N.Translate(request, "kleenestar.core:template.classes.unknown"), field: field);
+            }
+
+            var workspaceId = existingItem is not null
+                ? (existingItem.Class ?? CoreHub.ClassManager.GetClass(existingItem.ClassId))?.WorkspaceId
+                : classes[0].WorkspaceId;
+
+            if (classes.Any(x => x.WorkspaceId != workspaceId))
+            {
+                return new RestApiError(I18N.Translate(request, "kleenestar.core:template.classes.workspace"), field: field);
+            }
+
+            if (classes.Any(x => !ContentAuthorization.MayAdminister(x.Id, request)))
+            {
+                return new RestApiError(I18N.Translate(request, "kleenestar.core:template.classes.forbidden"), field: field);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Validates the categories of the payload: stored separated by semicolons, they have to
+        /// fit the column (<see cref="TemplateCategories.MaxLength"/>).
+        /// </summary>
+        /// <param name="payload">The payload carrying the categories.</param>
+        /// <param name="request">The request, for localizing the message.</param>
+        /// <returns>The validation error, or null when the categories fit or are not named.</returns>
+        private static RestApiError ValidateCategories(RestApiCrudFormData payload, IRequest request)
+        {
+            var field = nameof(Model.Entities.Template.Category);
+
+            if (!payload.TryGetValue(field, out var value)
+                || (TemplateCategories.Normalize(value?.ToString())?.Length ?? 0) <= TemplateCategories.MaxLength)
+            {
+                return null;
+            }
+
+            return new RestApiError(I18N.Translate(request, "kleenestar.core:template.category.length", TemplateCategories.MaxLength), field: field);
+        }
+
+        /// <summary>
+        /// Reads the classes a payload names: the class selection
+        /// (<see cref="TemplatePresetForm.ClassesField"/>), else a single <c>ClassId</c> as an
+        /// API client sends it.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <returns>The named ids in order, or null when the payload names no classes at all.</returns>
+        private static IReadOnlyList<Guid> NamedClasses(RestApiCrudFormData fieldMap)
+        {
+            if (fieldMap.TryGetValue(TemplatePresetForm.ClassesField, out var classes))
+            {
+                return TemplatePresetForm.ParseClassIds(classes);
+            }
+
+            if (fieldMap.TryGetValue(nameof(Model.Entities.Template.ClassId), out var classId))
+            {
+                return TemplatePresetForm.ParseClassIds(classId);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves the classes a payload binds a template to, keeping those that exist, so an
+        /// unknown or missing reference is reported by the validation instead of surfacing as a
+        /// foreign-key violation when the record is written.
+        /// </summary>
+        /// <param name="fieldMap">The payload carrying the classes.</param>
+        /// <returns>The existing classes in the order named; the first owns the template.</returns>
+        private static IReadOnlyList<Guid> ResolveClasses(RestApiCrudFormData fieldMap)
+        {
+            return [.. (NamedClasses(fieldMap) ?? []).Where(x => CoreHub.ClassManager.GetClass(x) is not null)];
         }
     }
 }

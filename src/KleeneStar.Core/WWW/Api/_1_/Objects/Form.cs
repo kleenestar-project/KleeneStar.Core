@@ -97,7 +97,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var payload = ReadPayload(request);
             var classId = ReadGuid(payload, nameof(ObjectEntity.ClassId));
-            var templateId = ReadGuid(payload, "TemplateId");
+            var templateId = ReadTemplateId(payload);
             var part = request.GetParameter("part")?.Value?.Trim().ToLowerInvariant() ?? PartValues;
 
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
@@ -415,6 +415,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             {
                 return [];
             }
+        }
+
+        /// <summary>
+        /// Reads the template the payload names: a template id, or the value of a template card
+        /// offered under a further class of the template (<see cref="TemplateChoice"/>). The
+        /// "no template" entry reads as absent.
+        /// </summary>
+        /// <param name="payload">The payload.</param>
+        /// <returns>The template id, or <see cref="Guid.Empty"/>.</returns>
+        private static Guid ReadTemplateId(Dictionary<string, JsonElement> payload)
+        {
+            var entry = payload.FirstOrDefault(x => string.Equals(x.Key, "TemplateId", StringComparison.OrdinalIgnoreCase));
+
+            return entry.Key is not null
+                && entry.Value.ValueKind == JsonValueKind.String
+                && TemplateChoice.TryParse(entry.Value.GetString(), out var id)
+                ? id
+                : Guid.Empty;
         }
 
         /// <summary>

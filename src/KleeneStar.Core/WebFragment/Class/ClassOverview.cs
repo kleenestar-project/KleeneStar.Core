@@ -247,8 +247,10 @@ namespace KleeneStar.Core.WebFragment.Class
             }
 
             // the create wizard offers a class's templates as the starting points of an object
+            // a template serving the class as a further class is one of its templates too
+            var furtherTemplates = CoreHub.TemplateManager.GetFurtherTemplateIds(@class.Id).ToList();
             var templates = CoreHub.TemplateManager
-                .GetTemplates(new Query<Model.Entities.Template>().WhereEquals(x => x.ClassId, @class.Id))
+                .GetTemplates(new Query<Model.Entities.Template>().Where(x => x.ClassId == @class.Id || furtherTemplates.Contains(x.Id)))
                 .Count(x => x.State == TemplateState.Active);
             var workspaceKey = CoreHub.WorkspaceManager.GetWorkspace(@class.WorkspaceId)?.Key;
             var templatesUri = Uri(() => CoreHub.GetUri<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>()?.BindParameters(new WorkspaceKeyParameter(workspaceKey)));

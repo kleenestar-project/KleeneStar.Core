@@ -363,7 +363,7 @@ namespace KleeneStar.Core.WebFragment.Object
             foreach (var @class in catalog.Classes)
             {
                 var fields = catalog.FieldCount(@class.Id);
-                var templates = catalog.Templates.Count(x => x.ClassId == @class.Id);
+                var templates = catalog.TemplatesOf(@class.Id).Count;
                 var sla = catalog.Sla(renderContext, @class.Id, null);
                 var kind = CoreHub.ObjectKindManager.GetKind(@class.Kind)?.Label;
 
@@ -417,8 +417,7 @@ namespace KleeneStar.Core.WebFragment.Object
 
             foreach (var @class in catalog.Classes)
             {
-                var templates = catalog.Templates
-                    .Where(x => x.ClassId == @class.Id)
+                var templates = catalog.TemplatesOf(@class.Id)
                     .OrderBy(x => x.Order)
                     .ThenBy(x => x.Name)
                     .ToList();
@@ -452,11 +451,13 @@ namespace KleeneStar.Core.WebFragment.Object
             // the presets themselves are not projected from here: the last step is rendered
             // by the server, which reads the chosen template from the payload and fills the
             // form with them directly
-            var card = new ControlTileCard(template.Id.ToString())
+            // a template serving several classes is offered under each of them, and each card
+            // needs a value of its own (TemplateChoice)
+            var card = new ControlTileCard(TemplateChoice.Value(template.Id, @class.Id, template.ClassId))
             {
                 Header = _ => template.Name,
                 Icon = _ => template.Icon ?? @class.Icon,
-                Badge = _ => template.Category,
+                Badge = _ => string.Join(" · ", TemplateCategories.Parse(template.Category)),
                 BadgeColor = _ => new PropertyColorTile(CoreHub.AccentColor(template.Id)),
                 Chip = _ => recommended ? "kleenestar.core:object.add.template.recommended" : null,
                 FilterValue = _ => @class.Id.ToString()
@@ -564,6 +565,22 @@ namespace KleeneStar.Core.WebFragment.Object
             /// </summary>
             public IReadOnlyList<TemplateEntity> Templates { get; private init; }
 
+            /// <summary>
+            /// Gets the classes each template serves, keyed by template id.
+            /// </summary>
+            private IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> ClassesOfTemplates { get; init; }
+
+            /// <summary>
+            /// Returns the active templates serving a class, as the class they are bound to or
+            /// as a further class.
+            /// </summary>
+            /// <param name="classId">The class.</param>
+            /// <returns>The templates.</returns>
+            public IReadOnlyList<TemplateEntity> TemplatesOf(Guid classId)
+            {
+                return [.. Templates.Where(x => ClassesOfTemplates.TryGetValue(x.Id, out var ids) ? ids.Contains(classId) : x.ClassId == classId)];
+            }
+
             private IReadOnlyDictionary<Guid, int> Fields { get; init; }
 
             private IReadOnlyDictionary<Guid, List<PriorityEntity>> PrioritiesByClass { get; init; }
@@ -590,6 +607,11 @@ namespace KleeneStar.Core.WebFragment.Object
                     .ToList();
 
                 var known = classes.Select(x => x.Id).ToHashSet();
+                var templates = CoreHub.TemplateManager
+                    .GetTemplates(new Query<TemplateEntity>())
+                    .Where(x => x.State == TemplateState.Active)
+                    .ToList();
+                var classesOfTemplates = CoreHub.TemplateManager.GetClassIds(templates);
 
                 return new Catalog
                 {
@@ -598,9 +620,8 @@ namespace KleeneStar.Core.WebFragment.Object
                         .Where(x => x.State == WorkspaceState.Active)
                         .OrderBy(x => x.Name)],
                     Classes = [.. classes.OrderBy(x => x.WorkspaceId).ThenBy(x => x.Name)],
-                    Templates = [.. CoreHub.TemplateManager
-                        .GetTemplates(new Query<TemplateEntity>())
-                        .Where(x => x.State == TemplateState.Active && known.Contains(x.ClassId))],
+                    Templates = [.. templates.Where(x => classesOfTemplates[x.Id].Any(known.Contains))],
+                    ClassesOfTemplates = classesOfTemplates,
                     Fields = CoreHub.FieldManager
                         .GetFields(new Query<FieldEntity>())
                         .Where(x => !x.Deprecated && x.State == FieldState.Active)

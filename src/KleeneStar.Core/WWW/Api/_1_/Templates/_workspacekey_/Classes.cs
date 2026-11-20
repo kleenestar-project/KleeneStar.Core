@@ -78,14 +78,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
             var query = new Query<Model.Entities.Template>()
                 .Where(x => x.Class.WorkspaceId == workspace.Id);
 
-            return CoreHub.TemplateManager.GetTemplates(query)
-                .Where(x => x.Class is not null)
-                .GroupBy(x => x.Class.Id)
+            // a template counts for the class it is bound to and for each of its further classes
+            return CoreHub.TemplateManager
+                .GetClassIds(CoreHub.TemplateManager.GetTemplates(query))
+                .SelectMany(x => x.Value)
+                .GroupBy(x => x)
                 .Select(g => new
                 {
-                    Class = g.First().Class,
+                    Class = CoreHub.ClassManager.GetClass(g.Key),
                     Count = g.Count()
                 })
+                .Where(x => x.Class is not null)
                 .OrderBy(x => x.Class.Name, StringComparer.CurrentCultureIgnoreCase)
                 .Select(x => new RestApiQuickfilterItem()
                 {

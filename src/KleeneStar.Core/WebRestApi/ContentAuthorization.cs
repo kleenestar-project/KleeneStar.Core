@@ -258,6 +258,21 @@ namespace KleeneStar.Core.WebRestApi
         /// <returns>The value, or <see langword="null"/> when absent or not an id.</returns>
         public static Guid? ReadPayloadGuid(IRequest request, string name)
         {
+            var value = ReadPayloadText(request, name);
+
+            return Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
+        }
+
+        /// <summary>
+        /// Reads a text field of a request's payload - JSON or form data - by name, ignoring case,
+        /// before the endpoint parses it. A JSON array is joined by semicolons, the way a multiple
+        /// choice submits it.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <param name="name">The field name.</param>
+        /// <returns>The value, or <see langword="null"/> when absent.</returns>
+        public static string ReadPayloadText(IRequest request, string name)
+        {
             var value = default(string);
 
             if ((request as Request)?.Content is { Length: > 0 } content
@@ -272,7 +287,14 @@ namespace KleeneStar.Core.WebRestApi
                         var property = document.RootElement.EnumerateObject()
                             .FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
 
-                        value = property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() : null;
+                        value = property.Value.ValueKind switch
+                        {
+                            JsonValueKind.String => property.Value.GetString(),
+                            JsonValueKind.Array => string.Join(";", property.Value.EnumerateArray()
+                                .Where(x => x.ValueKind == JsonValueKind.String)
+                                .Select(x => x.GetString())),
+                            _ => null
+                        };
                     }
                 }
                 catch (JsonException)
@@ -281,9 +303,7 @@ namespace KleeneStar.Core.WebRestApi
                 }
             }
 
-            value ??= request?.GetParameter(name)?.Value ?? request?.GetParameter(name.ToLowerInvariant())?.Value;
-
-            return Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
+            return value ?? request?.GetParameter(name)?.Value ?? request?.GetParameter(name.ToLowerInvariant())?.Value;
         }
     }
 }

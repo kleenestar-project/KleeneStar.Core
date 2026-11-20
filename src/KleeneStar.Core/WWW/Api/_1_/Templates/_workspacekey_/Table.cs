@@ -139,7 +139,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
             {
                 Id = "category",
                 Label = I18N.Translate(request, "kleenestar.core:template.table.column.category"),
-                Visible = true
+                Visible = true,
+                Template = new RestApiTableColumnTemplateTag()
             };
 
             // the composition hierarchy is the row tree, so it needs no column of its own
@@ -189,6 +190,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
             }
 
             var templates = CoreHub.TemplateManager.GetTemplates(query, context).ToList();
+
+            // a template serves the class it is bound to and its further classes; the cell names
+            // them all, the owning class first
+            var classIds = CoreHub.TemplateManager.GetClassIds(templates);
+            string ClassNames(Model.Entities.Template template) => string.Join(", ", classIds[template.Id]
+                .Select(id => id == template.ClassId ? template.Class?.Name : CoreHub.ClassManager.GetClass(id)?.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name)));
+
             var rows = templates.Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),
@@ -201,10 +210,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                             Content = ProseText.ToPlainText(x.Description)
                         },
                         new() {
-                            Content = x.Class?.Name
+                            Content = ClassNames(x)
                         },
                         new() {
-                            Content = x.Category
+                            Content = TemplateCategories.Normalize(x.Category)
                         },
                         new() {
                             Content = x.State.ToString()
@@ -273,7 +282,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                 .Select(f => TemplateCategoryFilter.TryGetCategory(f, out var c) ? c : null)
                 .Where(c => c is not null))
             {
-                query = query.Where(x => x.Category == category);
+                // a template stands in several categories, stored separated by semicolons
+                var first = category + TemplateCategories.Separator;
+                var last = TemplateCategories.Separator + category;
+                var inner = TemplateCategories.Separator + category + TemplateCategories.Separator;
+
+                query = query.Where(x => x.Category == category
+                    || x.Category.StartsWith(first)
+                    || x.Category.EndsWith(last)
+                    || x.Category.Contains(inner));
             }
 
             // the quick filter's class dropdown sends the picked class the same way; it is a
@@ -282,7 +299,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                 .Select(f => TemplateClassFilter.TryGetClass(f, out var c) ? c : Guid.Empty)
                 .Where(c => c != Guid.Empty))
             {
-                query = query.WhereEquals(x => x.ClassId, classId);
+                var further = CoreHub.TemplateManager.GetFurtherTemplateIds(classId).ToList();
+
+                query = query.Where(x => x.ClassId == classId || further.Contains(x.Id));
             }
 
             foreach (var filter in filters.Where(f => f.StartsWith("qf_", StringComparison.OrdinalIgnoreCase)))

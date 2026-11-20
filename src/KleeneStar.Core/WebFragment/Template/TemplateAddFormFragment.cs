@@ -1,100 +1,26 @@
-﻿using KleeneStar.Core.WebControl;
-using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebControl;
-using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
-using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
-using WebExpress.WebCore.WebHtml;
-using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
+
+using TemplateEntity = KleeneStar.Model.Entities.Template;
+using WorkspaceEntity = KleeneStar.Model.Entities.Workspace;
 
 namespace KleeneStar.Core.WebFragment.Template
 {
     /// <summary>
-    /// Represents an add form fragment for a template.
+    /// Represents the wizard a template is created with (<see cref="TemplateWizardFragmentBase"/>),
+    /// offering the classes of the workspace the route names.
     /// </summary>
     [Title("kleenestar.core:template.add.title")]
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Templates._workspacekey_.Add>]
     [Cache]
-    public sealed class TemplateAddFormFragment : FragmentControlDataFormAdd
+    public sealed class TemplateAddFormFragment : TemplateWizardFragmentBase
     {
-        /// <summary>
-        /// Gets the input control configuration for the template name field.
-        /// </summary>
-        public ControlDataFormItemInputUnique TemplateName { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.Name),
-            Label = _ => "kleenestar.core:template.name.label",
-            Placeholder = _ => "kleenestar.core:template.name.placeholder",
-            Help = _ => "kleenestar.core:template.name.help",
-            Required = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.UniqueName>().ToString())};
-
-        /// <summary>
-        /// Gets the input control for editing the template description.
-        /// </summary>
-        public ControlFormItemInputText Description { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.Description),
-            Label = _ => "kleenestar.core:template.description.label",
-            Placeholder = _ => "kleenestar.core:template.description.placeholder",
-            Format = _ => TypeEditTextFormat.Wysiwyg,
-            LinkLibraryUri = CoreHub.EditorLinkLibrary,
-            Required = _ => false
-        };
-
-        /// <summary>
-        /// Gets the input control for specifying the category of the template.
-        /// </summary>
-        public ControlFormItemInputText Category { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.Category),
-            Label = _ => "kleenestar.core:template.category.label",
-            Placeholder = _ => "kleenestar.core:template.category.placeholder",
-            Help = _ => "kleenestar.core:template.category.help"
-        };
-
-        /// <summary>
-        /// Gets the configuration for the class selection input used in the form.
-        /// </summary>
-        public ControlDataFormItemInputSelection ClassSelection { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.ClassId),
-            Label = _ => "kleenestar.core:template.class.label",
-            Placeholder = _ => "kleenestar.core:template.class.placeholder",
-            Help = _ => "kleenestar.core:template.class.help",
-            StickySelection = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Index>().ToString())};
-
-        /// <summary>
-        /// Gets the input selection configuration for the template state field.
-        /// </summary>
-        public ControlDataFormItemInputSelection TemplateState { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.State),
-            Label = _ => "kleenestar.core:template.state.label",
-            Placeholder = _ => "kleenestar.core:template.state.placeholder",
-            Help = _ => "kleenestar.core:template.state.help",
-            StickySelection = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.State>().ToString())};
-
-
-        /// <summary>
-        /// Gets the input selection configuration for the parent template.
-        /// </summary>
-        public ControlDataFormItemInputSelection ParentSelection { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.ParentId),
-            Label = _ => "kleenestar.core:template.parent.label",
-            Placeholder = _ => "kleenestar.core:template.parent.placeholder",
-            Help = _ => "kleenestar.core:template.parent.help",
-            StickySelection = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_.Selection>().ToString())};
-
-
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -102,31 +28,32 @@ namespace KleeneStar.Core.WebFragment.Template
         public TemplateAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Add(TemplateName);
-            Add(Description);
-            Add(Category);
-            Add(ClassSelection);
-            Add(ParentSelection);
-            Add(TemplateState);
-
-            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Templates.Index>();
+            Mode = _ => TypeRestFormMode.Add;
+            FinishLabel = _ => "kleenestar.core:template.wizard.finish.add";
+            FinishIcon = _ => new IconPlus();
         }
 
         /// <summary>
-        /// Renders the control as an HTML node.
+        /// Returns no template: one is being created.
         /// </summary>
-        /// <param name="renderContext">
-        /// The context in which the control is rendered.
-        /// </param>
-        /// <param name="visualTree">
-        /// The visual tree representing the control's structure.
-        /// </param>
-        /// <returns>
-        /// An HTML node representing the rendered control.
-        /// </returns>
-        public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <returns>Always null.</returns>
+        protected override TemplateEntity ResolveTemplate(IRenderControlContext renderContext)
         {
-            return base.Render(renderContext, visualTree);
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the workspace the route names.
+        /// </summary>
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="template">Not used.</param>
+        /// <returns>The workspace, or null.</returns>
+        protected override WorkspaceEntity ResolveWorkspace(IRenderControlContext renderContext, TemplateEntity template)
+        {
+            var key = renderContext?.Request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+
+            return string.IsNullOrWhiteSpace(key) ? null : CoreHub.WorkspaceManager.GetWorkspaceByKey(key);
         }
     }
 }

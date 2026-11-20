@@ -112,6 +112,98 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
+        /// Verifies that a template serves the class it is bound to first and its further
+        /// classes after it, and that the owning class is never stored as a further class.
+        /// </summary>
+        [Fact]
+        public void SetFurtherClasses_ThenGetClassIds_OwnerFirst()
+        {
+            Seed(nameof(SetFurtherClasses_ThenGetClassIds_OwnerFirst));
+            var second = AddClass(nameof(SetFurtherClasses_ThenGetClassIds_OwnerFirst), "Problem");
+            var third = AddClass(nameof(SetFurtherClasses_ThenGetClassIds_OwnerFirst), "Change");
+
+            var template = Sample("Shared");
+            CoreHub.TemplateManager.AddTemplate(template);
+            CoreHub.TemplateManager.SetFurtherClasses(template.Id, [second, ClassId, third, second]);
+
+            Assert.Equal([ClassId, second, third], CoreHub.TemplateManager.GetClassIds(template.Id));
+            Assert.Equal([ClassId, second, third], CoreHub.TemplateManager.GetClassIds([template])[template.Id]);
+            Assert.Contains(template.Id, CoreHub.TemplateManager.GetFurtherTemplateIds(third));
+            Assert.DoesNotContain(template.Id, CoreHub.TemplateManager.GetFurtherTemplateIds(ClassId));
+        }
+
+        /// <summary>
+        /// Verifies that setting the further classes replaces the previous ones.
+        /// </summary>
+        [Fact]
+        public void SetFurtherClasses_ReplacesPrevious()
+        {
+            Seed(nameof(SetFurtherClasses_ReplacesPrevious));
+            var second = AddClass(nameof(SetFurtherClasses_ReplacesPrevious), "Problem");
+            var third = AddClass(nameof(SetFurtherClasses_ReplacesPrevious), "Change");
+
+            var template = Sample("Shared");
+            CoreHub.TemplateManager.AddTemplate(template);
+            CoreHub.TemplateManager.SetFurtherClasses(template.Id, [second]);
+            CoreHub.TemplateManager.SetFurtherClasses(template.Id, [third]);
+
+            Assert.Equal([ClassId, third], CoreHub.TemplateManager.GetClassIds(template.Id));
+            Assert.Empty(CoreHub.TemplateManager.GetFurtherTemplateIds(second));
+
+            CoreHub.TemplateManager.SetFurtherClasses(template.Id, []);
+
+            Assert.Equal([ClassId], CoreHub.TemplateManager.GetClassIds(template.Id));
+        }
+
+        /// <summary>
+        /// Verifies that an update writes the assignee, the predecessor and the owning class, and
+        /// that the empty guid of a "none" entry is written as no reference.
+        /// </summary>
+        [Fact]
+        public void UpdateTemplate_WritesReferences()
+        {
+            Seed(nameof(UpdateTemplate_WritesReferences));
+            var second = AddClass(nameof(UpdateTemplate_WritesReferences), "Problem");
+
+            var sibling = Sample("Sibling");
+            var template = Sample("Initial");
+            CoreHub.TemplateManager.AddTemplate(sibling);
+            CoreHub.TemplateManager.AddTemplate(template);
+
+            template.PredecessorId = sibling.Id;
+            template.ParentId = Guid.Empty;
+            template.ClassId = second;
+            CoreHub.TemplateManager.UpdateTemplate(template);
+
+            var loaded = CoreHub.TemplateManager.GetTemplate(template.Id);
+            Assert.Equal(sibling.Id, loaded.PredecessorId);
+            Assert.Null(loaded.ParentId);
+            Assert.Equal(second, loaded.ClassId);
+
+            template.PredecessorId = Guid.Empty;
+            CoreHub.TemplateManager.UpdateTemplate(template);
+
+            Assert.Null(CoreHub.TemplateManager.GetTemplate(template.Id).PredecessorId);
+        }
+
+        /// <summary>
+        /// Adds a further class to the seeded workspace.
+        /// </summary>
+        /// <param name="connectionString">The per-test in-memory database name.</param>
+        /// <param name="name">The class name.</param>
+        /// <returns>The class id.</returns>
+        private static Guid AddClass(string connectionString, string name)
+        {
+            using var db = CoreHubFixture.CreateDbContext(connectionString);
+            var id = Guid.NewGuid();
+
+            db.Classes.Add(new Class { Id = id, Name = name, WorkspaceId = WorkspaceId });
+            db.SaveChanges();
+
+            return id;
+        }
+
+        /// <summary>
         /// Creates a sample <see cref="Template"/> attached to the seeded class.
         /// </summary>
         /// <param name="name">The template name.</param>
