@@ -20,12 +20,12 @@ namespace KleeneStar.Core.WebFragment.Workspace
 {
     /// <summary>
     /// The wizard that creates a workspace: first what kind of workspace it is to be, then what
-    /// it is called.
+    /// it is called, then how it relates to other workspaces and which tenants it belongs to.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The two steps are in that order because the first one is the decision and the second is
-    /// paperwork. A workspace is not a name and a key - it is a set of classes, and choosing them
+    /// The template comes first because it is the decision and the rest is paperwork. A
+    /// workspace is not a name and a key - it is a set of classes, and choosing them
     /// one at a time afterwards is the afternoon the templates exist to save. Asking for the
     /// shape first also lets the chosen template propose the key, which is the one field nobody
     /// has an opinion about until they have had to invent one.
@@ -42,6 +42,10 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// for the workspace, the class and the template before it asks for values, for the same
     /// reason.
     /// </para>
+    /// <para>
+    /// The details and settings steps are the steps of <see cref="WorkspaceWizardFragmentBase"/>,
+    /// with the blueprint selection added to the settings.
+    /// </para>
     /// </remarks>
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces.Add>]
@@ -49,7 +53,8 @@ namespace KleeneStar.Core.WebFragment.Workspace
     public sealed class WorkspaceAddFormFragment : FragmentControlDataWizard
     {
         private const string StepTemplate = "step-template";
-        private const string StepValues = "step-values";
+        private const string StepGeneral = "step-general";
+        private const string StepSettings = "step-settings";
 
         /// <summary>
         /// The value the "empty workspace" card carries. It is not a template key, so the create
@@ -187,14 +192,16 @@ namespace KleeneStar.Core.WebFragment.Workspace
         };
 
         /// <summary>
-        /// Gets the tenant management input.
+        /// Gets the multi-select naming the tenants the workspace is assigned to.
         /// </summary>
-        public ControlFormItemInputTag Tenant { get; } = new()
+        public ControlDataFormItemInputSelection Tenant { get; } = new()
         {
-            Name = _ => "Tenant",
+            Name = _ => nameof(Model.Entities.Workspace.TenantIds),
             Label = _ => "kleenestar.core:workspace.tenant.label",
             Placeholder = _ => "kleenestar.core:workspace.tenant.placeholder",
-            Help = _ => "kleenestar.core:workspace.tenant.help"
+            Help = _ => "kleenestar.core:workspace.tenant.help",
+            MultiSelect = _ => true,
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Tenants>().ToString())
         };
 
         /// <summary>
@@ -225,23 +232,29 @@ namespace KleeneStar.Core.WebFragment.Workspace
             };
             step1.Add(TemplateSelection);
 
-            var step2 = new ControlDataWizardPage(StepValues)
+            var step2 = new ControlDataWizardPage(StepGeneral)
             {
-                Title = _ => "kleenestar.core:workspace.add.step.values.title",
-                Subtitle = _ => "kleenestar.core:workspace.add.step.values.subtitle"
+                Title = _ => "kleenestar.core:workspace.wizard.step.general.title",
+                Subtitle = _ => "kleenestar.core:workspace.wizard.step.general.subtitle"
             };
             step2.Add(Key);
             step2.Add(WorkspaceName);
             step2.Add(Category);
             step2.Add(Description);
-            step2.Add(InheritedSelection);
-            step2.Add(BlueprintSelection);
-            step2.Add(AccessModifierSelection);
-            step2.Add(WorkspaceSealed);
-            step2.Add(Tenant);
-            step2.Add(WorkspaceState);
 
-            Add(step1, step2);
+            var step3 = new ControlDataWizardPage(StepSettings)
+            {
+                Title = _ => "kleenestar.core:workspace.wizard.step.settings.title",
+                Subtitle = _ => "kleenestar.core:workspace.add.step.settings.subtitle"
+            };
+            step3.Add(InheritedSelection);
+            step3.Add(BlueprintSelection);
+            step3.Add(AccessModifierSelection);
+            step3.Add(WorkspaceSealed);
+            step3.Add(Tenant);
+            step3.Add(WorkspaceState);
+
+            Add(step1, step2, step3);
 
             Mode = _ => TypeRestFormMode.Add;
             FinishLabel = _ => "kleenestar.core:workspace.add.submit.label";

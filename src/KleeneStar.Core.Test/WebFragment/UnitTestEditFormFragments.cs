@@ -343,25 +343,43 @@ namespace KleeneStar.Core.Test.WebFragment
         }
 
         /// <summary>
-        /// Verifies that <see cref="WorkspaceEditFormFragment"/> registers all
-        /// nine workspace-edit controls and binds the
-        /// <c>…/Api/_1_/Workspaces/Index</c> endpoint. Workspace is the only
-        /// Edit fragment whose <c>ItemId</c> setter looks up the workspace
-        /// by key (rather than reading the id directly from a request
-        /// parameter); the additional <c>WorkspaceKeyParameter</c> check
-        /// pins that behaviour down.
+        /// Verifies that the workspace edit and clone dialogs are wizards of two
+        /// steps in their mode, bound to the <c>…/Api/_1_/Workspaces/Index</c>
+        /// endpoint, whose steps carry all nine workspace controls.
         /// </summary>
         [Fact]
         public void Workspace_Fragment_HasExpectedShape()
         {
             CoreHubFixture.Initialize(nameof(Workspace_Fragment_HasExpectedShape));
 
-            var frag = new WorkspaceEditFormFragment(null!);
+            AssertWorkspaceWizard(new WorkspaceEditFormFragment(null!), WebExpress.WebApp.WebControl.TypeRestFormMode.Edit);
+            AssertWorkspaceWizard(new WorkspaceCloneFormFragment(null!), WebExpress.WebApp.WebControl.TypeRestFormMode.Clone);
+        }
 
-            AssertEditFragmentShape(
-                frag,
-                expectedControls: 9,
-                expectedDataServiceEndpoint: typeof(KleeneStar.Core.WWW.Api._1_.Workspaces.Index));
+        /// <summary>
+        /// Asserts the shape of a workspace wizard over an existing workspace.
+        /// </summary>
+        /// <param name="frag">The wizard.</param>
+        /// <param name="mode">The mode it is expected to run in.</param>
+        private static void AssertWorkspaceWizard(WorkspaceWizardFragmentBase frag, WebExpress.WebApp.WebControl.TypeRestFormMode mode)
+        {
+            Assert.Equal(mode, frag.Mode(null!));
+            Assert.NotNull(frag.ItemId);
+            Assert.NotNull(frag.FinishLabel);
+            Assert.NotEmpty(frag.ServiceFactories);
+
+            var pages = frag.Pages.ToList();
+
+            Assert.Equal(2, pages.Count);
+            Assert.Equal(9, pages.Sum(x => x.Items.Count()));
+
+            foreach (var p in typeof(WorkspaceWizardFragmentBase).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (p.DeclaringType == typeof(WorkspaceWizardFragmentBase))
+                {
+                    Assert.NotNull(p.GetValue(frag));
+                }
+            }
         }
 
         /// <summary>

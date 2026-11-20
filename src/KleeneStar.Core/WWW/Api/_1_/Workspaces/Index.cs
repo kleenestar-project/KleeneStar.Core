@@ -171,9 +171,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// <returns>
         /// An object containing the information necessary to initialize a new workspace for creation.
         /// </returns>
+        /// <remarks>
+        /// The form starts on the values a create stores when they are left empty: the access
+        /// modifier <i>public</i> and no inherited workspace (<i>None</i>, the empty guid).
+        /// </remarks>
         protected override IRestApiCrudResultRetrieve RetrieveForCreate(IRequest request)
         {
-            return base.RetrieveForCreate(request);
+            return new RestApiCrudResultRetrieve()
+            {
+                Data = new Dictionary<string, object>()
+                {
+                    [nameof(Workspace.AccessModifier)] = WorkspaceAccessModifier.Public.Id().ToString(),
+                    [nameof(Workspace.InheritedId)] = Guid.Empty.ToString()
+                }
+            };
         }
 
         /// <summary>
@@ -467,10 +478,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             newItem = new Workspace(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
-                State = WorkspaceState.Active
+                State = WorkspaceState.Active,
+                AccessModifier = WorkspaceAccessModifier.Public
             };
 
+            var tenants = DetachTenants(fieldMap);
+
             fieldMap.BindTo(newItem);
+
+            newItem.Tenants = tenants ?? [];
 
             // an inline picture of the dialog is stored under the new id
             newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
@@ -621,10 +637,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             newItem = new Workspace(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
-                State = WorkspaceState.Active
+                State = WorkspaceState.Active,
+                AccessModifier = WorkspaceAccessModifier.Public
             };
 
+            var tenants = DetachTenants(fieldMap);
+
             fieldMap.BindTo(newItem);
+
+            // a payload without a tenant list keeps the assignments of the original
+            newItem.Tenants = tenants ?? [.. existingItem?.Tenants ?? []];
 
             // an inline picture of the dialog is stored under the new id
             newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
@@ -637,6 +659,33 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             EnsureHome(newItem, request);
 
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Takes the tenant list out of the payload and resolves it to the tenants it names.
+        /// </summary>
+        /// <remarks>
+        /// The dialogs submit <see cref="Workspace.TenantIds"/>, a projection without a setter, so
+        /// the binder does not reach it. The list is removed from the payload and answered as the
+        /// stored tenants; an id that names no tenant is dropped.
+        /// </remarks>
+        /// <param name="payload">The submitted form data.</param>
+        /// <returns>
+        /// The tenants the payload names, an empty list for an empty selection, or null when the
+        /// payload carries no tenant list.
+        /// </returns>
+        private static List<Tenant> DetachTenants(RestApiCrudFormData payload)
+        {
+            if (payload is null || !payload.Detach(nameof(Workspace.TenantIds), out var submitted))
+            {
+                return null;
+            }
+
+            var ids = new Model.Converters.GuidListConverter().FromRaw(submitted, typeof(List<Guid>)) as List<Guid> ?? [];
+
+            return [.. ids
+                .Select(CoreHub.TenantManager.GetTenant)
+                .Where(x => x is not null)];
         }
 
         /// <summary>
@@ -701,7 +750,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // the workspace's own form or a hand-written payload
             payload.Detach(nameof(Workspace.HomeId), out _);
 
+            var tenants = DetachTenants(payload);
+
             var res = base.Update(existingItem, payload, request);
+
+            // a payload without a tenant list leaves the assignments as they are
+            if (tenants is not null)
+            {
+                existingItem.Tenants = tenants;
+            }
 
             // an emptied picture binds null; the record then carries its generated icon
             existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
