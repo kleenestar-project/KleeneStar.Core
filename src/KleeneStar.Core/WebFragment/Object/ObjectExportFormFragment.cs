@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// The form posts <c>Format</c> to <c>/api/1/exports/{objectkey}</c>, which answers the
     /// address of the file; <see cref="TypeRestFormSuccess.FollowUri"/> follows it, the browser
     /// downloads the attachment and the page stays. The form carries no item id, so
-    /// <c>objectrefresh.js</c> does not reload the page.
+    /// <c>kleenestar.core.object.refresh.js</c> does not reload the page.
     /// </para>
     /// </remarks>
     [Section<SectionContentPreferences>]

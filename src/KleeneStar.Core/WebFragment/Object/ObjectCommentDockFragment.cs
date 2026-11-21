@@ -159,7 +159,7 @@ namespace KleeneStar.Core.WebFragment.Object
             var count = _commentManager.GetComments(@object.Id)
                 .Count(x => x.State != Model.Entities.CommentState.Deleted && CommentAudience.Reaches(x, seesInternal));
 
-            // objectcomments.js keeps the badge in step once a comment is added, answered or
+            // kleenestar.core.object.comments.js keeps the badge in step once a comment is added, answered or
             // deleted; it reads the thread from here
             visualTree.AddMeta
             (

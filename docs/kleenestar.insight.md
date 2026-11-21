@@ -308,7 +308,7 @@ What the tabs show:
 - **Kanban** - the tab's board; a drop is a workflow transition and is refused, with the reason, where the workflow or the caller's rights forbid it.
 - **Scrum** - sprints belong to a workspace, so the backlog lists the sprints of every workspace the objects live in (named `KEY · Sprint` when there are several), refuses a move into a sprint of another workspace, and creates a sprint only when the objects live in exactly one workspace. Every change needs `workspace_write_content` on the workspace it changes. The sprint board shows the objects committed to the running sprint of their workspace.
 - **Gantt** and **Calendar** - the objects on a timeline or a calendar grid; dragging writes the dates where the caller may change the object.
-- **Reports** - cumulative flow, velocity, average age, created vs. resolved, resolution time and service level compliance, drawn with the framework's `ChartCtrl` (`InsightReportControl` and `Assets/js/insightreports.js`, included by `IncludeInsightReportsScript`). Range, interval and report are remembered in the browser per insight, and the tab links the current report and the objects as CSV.
+- **Reports** - cumulative flow, velocity, average age, created vs. resolved, resolution time and service level compliance, drawn with the framework's `ChartCtrl` (`InsightReportControl` and `Assets/js/kleenestar.core.insight.reports.js`, included by `IncludeInsightReportsScript`). Range, interval and report are remembered in the browser per insight, and the tab links the current report and the objects as CSV.
 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗

@@ -21,7 +21,7 @@ namespace KleeneStar.Core.WebControl
     /// </summary>
     /// <remarks>
     /// The control renders a host the client control <c>kleenestar.core.TemplateHierarchyCtrl</c>
-    /// (<c>Assets/js/templatehierarchy.js</c>) builds the tree in, and submits the nodes as one
+    /// (<c>Assets/js/kleenestar.core.template.hierarchy.js</c>) builds the tree in, and submits the nodes as one
     /// hidden input in the form of <see cref="TemplateHierarchyNodeList"/>. The host carries what
     /// the tree is edited with, so the client needs no further request:
     /// <list type="bullet">

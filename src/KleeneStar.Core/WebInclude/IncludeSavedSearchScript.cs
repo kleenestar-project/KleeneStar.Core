@@ -13,7 +13,7 @@ namespace KleeneStar.Core.WebInclude
     /// dialogs - the reload after any dialog success is safe only there. See
     /// <see cref="WebControl.SavedSearchAdvancedSearch"/> for the attribute it reads.
     /// </remarks>
-    [Asset("/assets/js/savedsearch.js")]
+    [Asset("/assets/js/kleenestar.core.search.saved.js")]
     [Scope<global::KleeneStar.Core.WWW.Search.Index>]
     public sealed class IncludeSavedSearchScript : IInclude
     {

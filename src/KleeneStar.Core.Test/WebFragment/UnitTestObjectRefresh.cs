@@ -48,7 +48,7 @@ namespace KleeneStar.Core.Test.WebFragment
         {
             var assembly = typeof(IncludeObjectRefreshScript).Assembly;
             var name = assembly.GetManifestResourceNames()
-                .FirstOrDefault(x => x.Replace('\\', '/').EndsWith("js/objectrefresh.js", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(x => x.Replace('\\', '/').EndsWith("js/kleenestar.core.object.refresh.js", StringComparison.OrdinalIgnoreCase));
 
             Assert.NotNull(name);
 

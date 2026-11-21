@@ -8,7 +8,7 @@ namespace KleeneStar.Core.WebInclude
     /// insight's reports endpoint and draws it with the framework's chart control. It is scoped
     /// to the insight page, the only page that carries the reports tab.
     /// </summary>
-    [Asset("/assets/js/insightreports.js")]
+    [Asset("/assets/js/kleenestar.core.insight.reports.js")]
     [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]
     public sealed class IncludeInsightReportsScript : IInclude
     {

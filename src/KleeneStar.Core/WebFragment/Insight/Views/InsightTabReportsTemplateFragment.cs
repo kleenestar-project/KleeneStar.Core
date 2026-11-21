@@ -30,7 +30,7 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
     }
 
     /// <summary>
-    /// The report surface of the reports tab, loaded and drawn by <c>insightreports.js</c> from
+    /// The report surface of the reports tab, loaded and drawn by <c>kleenestar.core.insight.reports.js</c> from
     /// <c>/api/1/insights/{insightid}/reports</c>.
     /// </summary>
     [Section<SectionTabTemplatePrimary>]

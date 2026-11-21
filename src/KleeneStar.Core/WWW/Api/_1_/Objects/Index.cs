@@ -1032,7 +1032,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// The answer is a <see cref="RestApiCreatedResult"/>: <c>uri</c> is the detail page of
         /// the new object, which the create and clone wizards follow
         /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>); <c>data</c> is
-        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>objectrefresh.js</c> not
+        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>kleenestar.core.object.refresh.js</c> not
         /// to reload the page the wizard leaves.
         /// </remarks>
         /// <param name="object">The object that was created.</param>

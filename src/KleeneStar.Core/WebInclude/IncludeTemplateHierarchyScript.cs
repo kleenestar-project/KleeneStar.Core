@@ -4,7 +4,7 @@ using WebExpress.WebCore.WebInclude;
 namespace KleeneStar.Core.WebInclude
 {
     /// <summary>
-    /// Includes <c>Assets/js/templatehierarchy.js</c> (<c>kleenestar.core.TemplateHierarchyCtrl</c>),
+    /// Includes <c>Assets/js/kleenestar.core.template.hierarchy.js</c> (<c>kleenestar.core.TemplateHierarchyCtrl</c>),
     /// the node tree of the hierarchy wizard (<see cref="WebControl.TemplateHierarchyInput"/>).
     /// </summary>
     /// <remarks>
@@ -13,7 +13,7 @@ namespace KleeneStar.Core.WebInclude
     /// translations of <c>Assets/js/i18n</c>, which <see cref="IncludeEditorAddonsScript"/>
     /// includes on every page.
     /// </remarks>
-    [Asset("/assets/js/templatehierarchy.js")]
+    [Asset("/assets/js/kleenestar.core.template.hierarchy.js")]
     public sealed class IncludeTemplateHierarchyScript : IInclude
     {
     }

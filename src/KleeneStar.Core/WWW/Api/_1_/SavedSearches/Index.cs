@@ -373,7 +373,7 @@ namespace KleeneStar.Core.WWW.Api._1_.SavedSearches
         /// Answers a create with the address that runs the new saved search, as a
         /// <see cref="RestApiCreatedResult"/>: the add dialog follows <c>uri</c>
         /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>), and <c>data.created</c> tells
-        /// <c>savedsearch.js</c> not to reload the page the dialog leaves.
+        /// <c>kleenestar.core.search.saved.js</c> not to reload the page the dialog leaves.
         /// </summary>
         /// <param name="savedSearch">The saved search that was created.</param>
         /// <returns>The create result.</returns>

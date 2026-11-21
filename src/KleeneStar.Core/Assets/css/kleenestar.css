@@ -1539,7 +1539,7 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
 }
 
 /* ---------------------------------------------------------------------------------------------
-   insight reports tab (InsightReportControl, insightreports.js): a toolbar, the chart on a stage
+   insight reports tab (InsightReportControl, kleenestar.core.insight.reports.js): a toolbar, the chart on a stage
    of a fixed height, the description above and the key figures beneath it
    --------------------------------------------------------------------------------------------- */
 
@@ -1828,7 +1828,7 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
 }
 
 /* ------------------------------------------------------------------------------------------
- * Node tree of the hierarchy wizard (Assets/js/templatehierarchy.js): the root template on top,
+ * Node tree of the hierarchy wizard (Assets/js/kleenestar.core.template.hierarchy.js): the root template on top,
  * one card per node indented by its depth, with its class, its connection (sub-object and/or
  * link), its assignee and the sibling it waits for, and a picker below that adds a template.
  * ---------------------------------------------------------------------------------------- */

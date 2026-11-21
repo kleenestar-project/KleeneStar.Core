@@ -16,7 +16,7 @@ namespace KleeneStar.Core.WebInclude
     /// <see cref="WebFragment.Object.ObjectRefreshFragment"/> meta tag; it is scoped to the
     /// detail pages, because that is the only place a page is about one record.
     /// </remarks>
-    [Asset("/assets/js/objectrefresh.js")]
+    [Asset("/assets/js/kleenestar.core.object.refresh.js")]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]

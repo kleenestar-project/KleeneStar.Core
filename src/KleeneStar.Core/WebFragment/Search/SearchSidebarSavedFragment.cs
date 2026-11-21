@@ -28,7 +28,7 @@ namespace KleeneStar.Core.WebFragment.Search
     /// The tooltip is the description as words (<see cref="ProseText"/>, it is a prose
     /// document), falling back to the query where nothing was written. The list is rendered
     /// once per page; a dialog that changes a saved search reloads the page
-    /// (<c>Assets/js/savedsearch.js</c>).
+    /// (<c>Assets/js/kleenestar.core.search.saved.js</c>).
     /// </remarks>
     [Section<SectionSidebarPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Search.Index>]
