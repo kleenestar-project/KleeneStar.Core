@@ -61,6 +61,29 @@ namespace KleeneStar.Core.WebManager
                 return [];
             }
 
+            return
+            [
+                .. FindOpenBlockers(objectId)
+                    .Select(x => x.Key)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            ];
+        }
+
+        /// <summary>
+        /// Returns the objects that block <paramref name="objectId"/> and are themselves still
+        /// open, whatever state the object stands in.
+        /// </summary>
+        /// <remarks>
+        /// This is the question behind both the refusal of a closing move and the "blocked"
+        /// marker of the detail page. The answer is not narrowed by visibility: a caller that
+        /// shows the blockers to a reader has to drop those the reader may not see.
+        /// </remarks>
+        /// <param name="objectId">The object whose blockers are asked for.</param>
+        /// <returns>The open blocking objects, each once.</returns>
+        public static IReadOnlyList<ObjectEntity> FindOpenBlockers(Guid objectId)
+        {
             var cache = new Dictionary<Guid, bool>();
 
             return
@@ -70,16 +93,13 @@ namespace KleeneStar.Core.WebManager
                     .Where(x => x.Status != RelationStatus.Obsolete)
 
                     // the blocking end is the source: "A blocks B" constrains B, so the object
-                    // being moved has to be the target for the relation to hold it back
+                    // asked about has to be the target for the relation to hold it back
                     .Where(x => x.TargetObjectId == objectId)
                     .Where(x => EffectOf(x.TypeKey) == RelationEffect.BlocksCompletion)
                     .Select(x => x.SourceObject)
                     .Where(x => x is not null)
+                    .DistinctBy(x => x.Id)
                     .Where(x => !IsClosed(x, cache))
-                    .Select(x => x.Key)
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             ];
         }
 

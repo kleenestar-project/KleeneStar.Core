@@ -962,6 +962,7 @@ object.created.label=Created
 object.creator.label=Created by
 object.hierarchy.api.title=Object hierarchy
 object.lastupdate.label=Last updated
+object.metadata.blocked.label=Blocked by {0}
 object.like.api.title=Like
 object.move.api.title=Move object
 object.property.date.header=Dates

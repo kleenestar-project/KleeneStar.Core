@@ -963,6 +963,7 @@ object.created.label=Erstellt
 object.creator.label=Erstellt von
 object.hierarchy.api.title=Objekthierarchie
 object.lastupdate.label=Letzte Aktualisierung
+object.metadata.blocked.label=Blockiert von {0}
 object.like.api.title=Gefällt mir
 object.move.api.title=Objekt verschieben
 object.property.date.header=Daten
