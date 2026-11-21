@@ -1152,9 +1152,6 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
         const selection = new webexpress.webui.InputSelectionCtrl(host);
 
-        // the selection returns the focus to its trigger after a pick through a field it never
-        // assigns itself (WebExpress 2.0.1), which throws once the menu has closed
-        selection._dropdown = selection._dropdown || host.querySelector(":scope > .form-control");
         selection._silent = true;
         selection.options = config.options || [];
         selection.value = config.value ? [String(config.value)] : [];
