@@ -191,13 +191,13 @@ namespace KleeneStar.Core.WebFragment.Class
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection ClassState { get; } = new()
+        public StateInputSelection ClassState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.ClassStateExtensions.Id(global::KleeneStar.Model.Entities.ClassState.Active).ToString(),
             Label = _ => "kleenestar.core:class.state.label",
             Placeholder = _ => "kleenestar.core:class.state.placeholder",
             Help = _ => "kleenestar.core:class.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.State>().ToString())};
 
         /// <summary>

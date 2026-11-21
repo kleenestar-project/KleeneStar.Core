@@ -49,13 +49,13 @@ namespace KleeneStar.Core.WebFragment.Priority
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection PriorityState { get; } = new()
+        public StateInputSelection PriorityState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Priority.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.PriorityStateExtensions.Id(global::KleeneStar.Model.Entities.PriorityState.Active).ToString(),
             Label = _ => "kleenestar.core:priority.state.label",
             Placeholder = _ => "kleenestar.core:priority.state.placeholder",
             Help = _ => "kleenestar.core:priority.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.State>().ToString())};
 
         /// <summary>

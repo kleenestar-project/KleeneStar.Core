@@ -146,10 +146,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <returns>The class id, or <see langword="null"/>.</returns>
         private static Guid? ClassOfCreate(IRequest request)
         {
+            var choice = ContentAuthorization.ReadPayloadText(request, "templateid");
+
             return ContentAuthorization.ReadPayloadGuid(request, "classid")
-                ?? (TemplateChoice.TryParse(ContentAuthorization.ReadPayloadText(request, "templateid"), out var templateId)
+                ?? (TemplateChoice.TryParse(choice, out var templateId)
                     ? CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId
-                    : null);
+                    : TemplateChoice.TryParseHierarchy(choice, out var hierarchyId) && CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId) is { } hierarchy
+                        ? RootClassOf(hierarchy)
+                        : null);
         }
 
         /// <summary>
@@ -542,12 +546,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             DeriveReferences(fieldMap, newItem);
             PlaceBelowOpenDocument(fieldMap, newItem);
             EnsureKey(newItem);
-            ApplyDefaultSecurityLevel(fieldMap, newItem, currentUser);
 
             var template = ResolveTemplate(fieldMap);
             var presets = template is null
                 ? new Dictionary<string, string>()
                 : CoreHub.TemplateManager.GetPresets(template.Id);
+
+            ApplyDefaultSecurityLevel(fieldMap, newItem, currentUser, presets);
 
             // the creation runs under the client's key: a second submission of the same dialog
             // is answered with what the first created, and a failure half-way through a work
@@ -591,9 +596,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     StartWorkflows(newItem);
                 }
 
-                if (template is not null)
+                if (ResolveHierarchy(fieldMap) is { } hierarchy)
                 {
-                    CreateChildren(newItem, template.Id, request, new HashSet<Guid> { template.Id }, run);
+                    CreateNodes(newItem, CoreHub.TemplateHierarchyManager.GetNodes(hierarchy.Id), null, request, run);
                 }
 
                 RelateToAggregate(fieldMap, newItem, request, currentUser, run);
@@ -698,7 +703,40 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 .OrderBy(x => x.Order)
                 .FirstOrDefault();
 
-            if (type is null)
+            Relate(type, sourceId, targetId, identityId, run);
+        }
+
+        /// <summary>
+        /// Relates two objects by the active relation type of a key; a key the catalog does not
+        /// know, or knows inactive, relates nothing.
+        /// </summary>
+        /// <param name="key">The key of the relation type.</param>
+        /// <param name="sourceId">The source end.</param>
+        /// <param name="targetId">The target end.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(string key, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            var type = CoreHub.ObjectRelationTypeManager
+                .GetRelationTypes()
+                .FirstOrDefault(x => x.Active
+                    && string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(x.System, WebExpress.WebApp.WebRelation.RelationSystem.Object, StringComparison.OrdinalIgnoreCase));
+
+            Relate(type, sourceId, targetId, identityId, run);
+        }
+
+        /// <summary>
+        /// Writes the relation of a type between two objects and tracks it in the run.
+        /// </summary>
+        /// <param name="type">The relation type, or null to relate nothing.</param>
+        /// <param name="sourceId">The source end.</param>
+        /// <param name="targetId">The target end.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(ObjectRelationType type, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            if (type is null || sourceId == targetId)
             {
                 return;
             }
@@ -905,7 +943,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
-        /// Puts the class's default classification on an object the payload left unclassified.
+        /// Puts the classification of the template, else the class's default classification, on
+        /// an object the payload left unclassified.
         /// </summary>
         /// <remarks>
         /// A class that classifies its objects names one level as the starting point, and a
@@ -921,7 +960,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="fieldMap">The payload carrying the answers.</param>
         /// <param name="object">The object being created.</param>
         /// <param name="identityId">The identity performing the create.</param>
-        private static void ApplyDefaultSecurityLevel(RestApiCrudFormData fieldMap, Model.Entities.Object @object, Guid identityId)
+        /// <param name="presets">The presets of the template the object is created from; its
+        /// choice for the class (<see cref="TemplateSecurityLevels"/>) takes the place of the
+        /// default, an unclassified choice leaves the object unclassified.</param>
+        private static void ApplyDefaultSecurityLevel(RestApiCrudFormData fieldMap, Model.Entities.Object @object, Guid identityId, IReadOnlyDictionary<string, string> presets)
         {
             // an explicit answer wins, including the explicit "unclassified" the selection
             // submits as the empty guid; a blank one is no answer - the wizard posts every input
@@ -934,7 +976,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 return;
             }
 
-            var securityLevel = CoreHub.SecurityLevelManager.GetDefaultSecurityLevel(@object.ClassId);
+            if (TemplateSecurityLevels.TryResolve(presets, @object.ClassId, out var chosen) && chosen is null)
+            {
+                return;
+            }
+
+            var securityLevel = chosen is Guid chosenId && CoreHub.SecurityLevelManager.GetSecurityLevel(chosenId) is { } level && level.ClassId == @object.ClassId
+                ? level
+                : CoreHub.SecurityLevelManager.GetDefaultSecurityLevel(@object.ClassId);
 
             if (securityLevel is not null && CoreHub.SecurityLevelManager.IsCleared(identityId, securityLevel.Id))
             {
@@ -958,6 +1007,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             // an object created from a template inherits the class the template instantiates
             // when the payload names only the template
+            if (@object.ClassId == Guid.Empty && ResolveHierarchy(fieldMap) is { } hierarchy)
+            {
+                @object.ClassId = RootClassOf(hierarchy) ?? Guid.Empty;
+            }
+
             if (@object.ClassId == Guid.Empty && TryGetTemplateId(fieldMap, out var templateId))
             {
                 @object.ClassId = CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId ?? Guid.Empty;
@@ -1093,8 +1147,51 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             templateId = Guid.Empty;
 
-            return fieldMap.TryGetValue("TemplateId", out var value)
-                && TemplateChoice.TryParse(value?.ToString(), out templateId);
+            if (!fieldMap.TryGetValue("TemplateId", out var value))
+            {
+                return false;
+            }
+
+            // a hierarchy card names the hierarchy; the object is created from its root template
+            if (TemplateChoice.TryParseHierarchy(value?.ToString(), out var hierarchyId))
+            {
+                templateId = CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId)?.RootTemplateId ?? Guid.Empty;
+
+                return templateId != Guid.Empty;
+            }
+
+            return TemplateChoice.TryParse(value?.ToString(), out templateId);
+        }
+
+        /// <summary>
+        /// Reads the hierarchy a create payload names through a hierarchy card
+        /// (<see cref="TemplateChoice.HierarchyValue"/>).
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <returns>The active hierarchy, or null when the payload names none.</returns>
+        private static Model.Entities.TemplateHierarchy ResolveHierarchy(RestApiCrudFormData fieldMap)
+        {
+            if (!fieldMap.TryGetValue("TemplateId", out var value)
+                || !TemplateChoice.TryParseHierarchy(value?.ToString(), out var hierarchyId))
+            {
+                return null;
+            }
+
+            var hierarchy = CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId);
+
+            return hierarchy?.State == TemplateState.Active ? hierarchy : null;
+        }
+
+        /// <summary>
+        /// Returns the class the root object of a hierarchy is created in.
+        /// </summary>
+        /// <param name="hierarchy">The hierarchy.</param>
+        /// <returns>The class id, or null for an unknown root template.</returns>
+        private static Guid? RootClassOf(Model.Entities.TemplateHierarchy hierarchy)
+        {
+            var root = hierarchy.RootTemplate ?? CoreHub.TemplateManager.GetTemplate(hierarchy.RootTemplateId);
+
+            return root is null ? null : CoreHub.TemplateHierarchyManager.ResolveClassId(hierarchy.RootClassId, root);
         }
 
         /// <summary>
@@ -1198,126 +1295,166 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
-        /// Creates one object per active child template of the supplied object, depth first and
-        /// in the order the child templates define - a work structure.
+        /// Creates one object per node of a template hierarchy below the supplied object, depth
+        /// first and in the order of the nodes: a work structure.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>A child is filed where its class lives.</b> A composite template may name classes
-        /// of other workspaces - an onboarding filed in HR creates the account request in the IT
-        /// desk and the access card in facility management - so the child takes the workspace of
-        /// its class. It is placed below its parent (<c>ParentId</c>) only inside the same
-        /// workspace and where the parent's class allows the child's; the containment is
-        /// workspace-bound on purpose. Every child is joined to its parent by the aggregating
-        /// relation as well, so the parent reports the progress of the whole structure across
-        /// workspaces. A same-workspace child the parent's class does not allow is skipped, as
-        /// before, so a composite template cannot build a hierarchy the object model rejects.
+        /// <b>The nodes reference templates.</b> A node names an existing template
+        /// (<see cref="TemplateHierarchyNode.TemplateId"/>) and the class its object is created in
+        /// (<see cref="ITemplateHierarchyManager.ResolveClassId"/>: the chosen class of a template
+        /// serving several, else the bound one). A node referencing an archived template creates
+        /// nothing, nor do the nodes below it. The nodes below a node are created with the object
+        /// of that node as their parent.
         /// </para>
         /// <para>
-        /// <b>Who does it and what it waits for.</b> A child template's assignee is the child's
-        /// (<see cref="Template.AssigneeId"/>), and a predecessor among the siblings becomes a
-        /// blocking relation from the predecessor's object to the child's
-        /// (<see cref="Template.PredecessorId"/>), so the workflow refuses to finish the child
-        /// first.
+        /// <b>Sub-object, link or both.</b> A node with <see cref="TemplateHierarchyNode.AsChild"/>
+        /// creates a sub-object: it is placed below its parent (<c>ParentId</c>) inside the same
+        /// workspace where the parent's class allows the child's, and is joined to its parent by
+        /// the relation that aggregates progress, so the parent reports the progress of the whole
+        /// structure across workspaces. A node naming a relation type
+        /// (<see cref="TemplateHierarchyNode.RelationTypeKey"/>) links the created object to its
+        /// parent with that type, from the parent to the created object or, with
+        /// <see cref="TemplateHierarchyNode.RelationInverse"/>, the other way round. A node that is
+        /// neither counts as a sub-object. A sub-object the parent's class does not allow in the
+        /// same workspace is created as a link only where the node names one, and skipped
+        /// otherwise.
         /// </para>
         /// <para>
-        /// The children are created on the template's authority: the cross-workspace classes
-        /// were authorized when the template was saved (the author had to be allowed to create
-        /// in them), not by the person filing the structure. Every object and relation is tracked
-        /// by the run, which takes them back if anything fails. The visited set carries the
-        /// templates already instantiated along this branch, which keeps a cycle in the template
-        /// hierarchy from creating objects without end.
+        /// <b>An object is filed where its class lives.</b> A hierarchy may name classes of other
+        /// workspaces (an onboarding filed in HR creates the account request in the IT desk), so
+        /// the object takes the workspace of its class. It takes the security level the referenced
+        /// template chose for the class (<see cref="TemplateSecurityLevels"/>), else the default
+        /// level of the class.
+        /// </para>
+        /// <para>
+        /// <b>Who does it and what it waits for.</b> The node's assignee is the object's
+        /// (<see cref="TemplateHierarchyNode.AssigneeId"/>), and the sibling it waits for becomes a
+        /// blocking relation from that sibling's object to this one
+        /// (<see cref="TemplateHierarchyNode.PredecessorId"/>), so the workflow refuses to finish
+        /// it first.
+        /// </para>
+        /// <para>
+        /// The objects are created on the hierarchy's authority: the cross-workspace classes were
+        /// authorized when the hierarchy was saved, not by the person filing the structure. Every
+        /// object and relation is tracked by the run, which takes them back if anything fails.
         /// </para>
         /// </remarks>
         /// <param name="parent">The object the created objects belong to.</param>
-        /// <param name="templateId">The template whose children are instantiated.</param>
+        /// <param name="nodes">The nodes of the hierarchy, depth first.</param>
+        /// <param name="parentNodeId">The node whose children are created, or null for the root.</param>
         /// <param name="request">The request, for resolving the acting identity.</param>
-        /// <param name="visited">The templates already instantiated along this branch.</param>
         /// <param name="run">The creation the objects are part of.</param>
-        private static void CreateChildren(Model.Entities.Object parent, Guid templateId, IRequest request, ISet<Guid> visited, ObjectCreationRun run)
+        private static void CreateNodes(Model.Entities.Object parent, IReadOnlyList<TemplateHierarchyNode> nodes, Guid? parentNodeId, IRequest request, ObjectCreationRun run)
         {
             var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
             var author = ResolveAuthor(request);
             var createdBy = new Dictionary<Guid, Guid>();
-            var dependencies = new List<(Guid PredecessorTemplateId, Guid ObjectId)>();
+            var dependencies = new List<(Guid PredecessorNodeId, Guid ObjectId)>();
 
-            foreach (var childTemplate in CoreHub.TemplateManager.GetChildTemplates(templateId))
+            foreach (var node in nodes.Where(x => x.ParentNodeId == parentNodeId && x.Id != parentNodeId))
             {
-                if (!visited.Add(childTemplate.Id))
+                var template = CoreHub.TemplateManager.GetTemplate(node.TemplateId);
+
+                if (template is null || template.State != TemplateState.Active)
                 {
                     continue;
                 }
 
-                var childClass = CoreHub.ClassManager.GetClass(childTemplate.ClassId);
+                var classId = CoreHub.TemplateHierarchyManager.ResolveClassId(node.ClassId, template);
+                var @class = CoreHub.ClassManager.GetClass(classId);
 
-                if (childClass is null)
+                if (@class is null)
                 {
                     continue;
                 }
 
-                var contained = childClass.WorkspaceId == parent.WorkspaceId;
+                var linked = !string.IsNullOrWhiteSpace(node.RelationTypeKey);
+                var asChild = node.AsChild || !linked;
+                var contained = @class.WorkspaceId == parent.WorkspaceId;
 
-                if (contained
+                if (asChild
+                    && contained
                     && parentClass?.AllowedChildren is { Count: > 0 }
-                    && parentClass.AllowedChildren.All(c => c.Id != childTemplate.ClassId))
+                    && parentClass.AllowedChildren.All(c => c.Id != classId))
                 {
-                    continue;
+                    if (!linked)
+                    {
+                        continue;
+                    }
+
+                    asChild = false;
                 }
 
-                // nobody answers for a child, so every preset applies. The summary is the
+                // nobody answers for the object, so every preset applies. The summary is the
                 // template's name unless a preset says otherwise; the description is what the
-                // template manager answers for it - the template's own unless a preset names one
-                var presets = CoreHub.TemplateManager.GetPresets(childTemplate.Id);
+                // template manager answers for it: the template's own unless a preset names one
+                var presets = CoreHub.TemplateManager.GetPresets(template.Id);
                 var id = Guid.NewGuid();
-                var child = new Model.Entities.Object(id)
+
+                // the security level the referenced template chose for the class, else the class
+                // default; the structure is created on the hierarchy's authority
+                var securityLevelId = TemplateSecurityLevels.TryResolve(presets, classId, out var chosenLevel)
+                    ? (chosenLevel is Guid levelId && CoreHub.SecurityLevelManager?.GetSecurityLevel(levelId)?.ClassId == classId ? levelId : null)
+                    : CoreHub.SecurityLevelManager?.GetDefaultSecurityLevel(classId)?.Id;
+                var created = new Model.Entities.Object(id)
                 {
                     Summary = TryGetPreset(presets, nameof(Model.Entities.Object.Summary), out var summary)
                         ? summary
-                        : childTemplate.Name,
+                        : template.Name,
                     Description = TryGetPreset(presets, nameof(Model.Entities.Object.Description), out var description)
                         ? description
                         : null,
-                    Icon = childTemplate.Icon ?? CoreHub.GenerateIcon(id),
+                    Icon = template.Icon ?? CoreHub.GenerateIcon(id),
                     State = WorkspaceState.Active,
-                    ClassId = childTemplate.ClassId,
-                    WorkspaceId = childClass.WorkspaceId,
-                    ParentId = contained ? parent.Id : null,
-                    AssigneeId = childTemplate.AssigneeId,
-                    SecurityLevelId = CoreHub.SecurityLevelManager?.GetDefaultSecurityLevel(childTemplate.ClassId)?.Id,
+                    ClassId = classId,
+                    WorkspaceId = @class.WorkspaceId,
+                    ParentId = asChild && contained ? parent.Id : null,
+                    AssigneeId = node.AssigneeId,
+                    SecurityLevelId = securityLevelId,
                     CreatorId = author,
                     UpdaterId = author
                 };
 
-                EnsureKey(child);
+                EnsureKey(created);
 
-                // a child gets a genesis commit of its own carrying its presets, so its history
+                // the object gets a genesis commit of its own carrying its presets, so its history
                 // starts the same way a hand-created object's does
-                using (CoreHub.CommitManager.BeginCommit(child.Id, CommitType.Created, currentUser))
+                using (CoreHub.CommitManager.BeginCommit(created.Id, CommitType.Created, currentUser))
                 {
-                    CoreHub.ObjectManager.Add(child);
-                    run?.TrackObject(child.Id);
+                    CoreHub.ObjectManager.Add(created);
+                    run?.TrackObject(created.Id);
 
-                    ApplyPresetValues(child, presets, null);
+                    ApplyPresetValues(created, presets, null);
+                    StartWorkflows(created);
                 }
 
-                Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, parent.Id, child.Id, currentUser, run);
-
-                createdBy[childTemplate.Id] = child.Id;
-
-                if (childTemplate.PredecessorId is Guid predecessorId)
+                if (asChild)
                 {
-                    dependencies.Add((predecessorId, child.Id));
+                    Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, parent.Id, created.Id, currentUser, run);
                 }
 
-                CreateChildren(child, childTemplate.Id, request, visited, run);
+                if (linked)
+                {
+                    Relate(node.RelationTypeKey, node.RelationInverse ? created.Id : parent.Id, node.RelationInverse ? parent.Id : created.Id, currentUser, run);
+                }
+
+                createdBy[node.Id] = created.Id;
+
+                if (node.PredecessorId is Guid predecessorId)
+                {
+                    dependencies.Add((predecessorId, created.Id));
+                }
+
+                CreateNodes(created, nodes, node.Id, request, run);
             }
 
             // the dependencies are drawn once all siblings exist, so a predecessor ordered after
             // its successor is found all the same
-            foreach (var (predecessorTemplateId, objectId) in dependencies)
+            foreach (var (predecessorNodeId, objectId) in dependencies)
             {
-                if (createdBy.TryGetValue(predecessorTemplateId, out var predecessorObjectId) && predecessorObjectId != objectId)
+                if (createdBy.TryGetValue(predecessorNodeId, out var predecessorObjectId) && predecessorObjectId != objectId)
                 {
                     Relate(WebExpress.WebApp.WebRelation.RelationEffect.BlocksCompletion, predecessorObjectId, objectId, currentUser, run);
                 }

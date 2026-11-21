@@ -103,25 +103,6 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Returns the child templates of a template, in their defined order.
-        /// </summary>
-        /// <param name="templateId">The id of the parent template.</param>
-        /// <returns>The active child templates. The collection may be empty.</returns>
-        public IEnumerable<Template> GetChildTemplates(Guid templateId)
-        {
-            if (templateId == Guid.Empty)
-            {
-                return [];
-            }
-
-            var query = new Query<Template>()
-                .Where(x => x.ParentId == templateId && x.State == TemplateState.Active)
-                .OrderByAsc(x => x.Order);
-
-            return ModelHub.GetTemplates(query);
-        }
-
-        /// <summary>
         /// Returns the field presets a template applies.
         /// </summary>
         /// <remarks>
@@ -218,57 +199,6 @@ namespace KleeneStar.Core.WebManager
             ModelHub.SetTemplateClasses(templateId, classIds);
 
             return this;
-        }
-
-        /// <summary>
-        /// Determines whether pointing a template's parent reference at a candidate would close a
-        /// cycle.
-        /// </summary>
-        /// <param name="templateId">The template that would carry the reference.</param>
-        /// <param name="candidateId">The template it would point at.</param>
-        /// <returns>True when the reference would be circular; otherwise false.</returns>
-        public bool WouldFormCycle(Guid templateId, Guid candidateId)
-        {
-            if (templateId == Guid.Empty || candidateId == Guid.Empty)
-            {
-                return false;
-            }
-
-            // pointing at itself is the shortest cycle there is
-            if (templateId == candidateId)
-            {
-                return true;
-            }
-
-            var visited = new HashSet<Guid> { candidateId };
-            var cursor = GetTemplate(candidateId);
-
-            // walking up from the candidate must not arrive back at the template
-            while (cursor is not null)
-            {
-                var next = cursor.ParentId;
-
-                if (!next.HasValue)
-                {
-                    return false;
-                }
-
-                if (next.Value == templateId)
-                {
-                    return true;
-                }
-
-                if (!visited.Add(next.Value))
-                {
-                    // the candidate already sits in a cycle of its own; it cannot be reached
-                    // from the template, so the new reference does not add one
-                    return false;
-                }
-
-                cursor = GetTemplate(next.Value);
-            }
-
-            return false;
         }
 
         /// <summary>

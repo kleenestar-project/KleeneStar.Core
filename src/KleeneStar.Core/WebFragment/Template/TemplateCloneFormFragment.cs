@@ -60,28 +60,14 @@ namespace KleeneStar.Core.WebFragment.Template
         /// <summary>
         /// Gets the input selection configuration for the template state field.
         /// </summary>
-        public ControlDataFormItemInputSelection TemplateState { get; } = new()
+        public StateInputSelection TemplateState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Template.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.TemplateStateExtensions.Id(global::KleeneStar.Model.Entities.TemplateState.Active).ToString(),
             Label = _ => "kleenestar.core:template.state.label",
             Placeholder = _ => "kleenestar.core:template.state.placeholder",
             Help = _ => "kleenestar.core:template.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.State>().ToString())};
-
-
-        /// <summary>
-        /// Gets the input selection configuration for the parent template of the copy.
-        /// </summary>
-        public ControlDataFormItemInputSelection ParentSelection { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.ParentId),
-            Label = _ => "kleenestar.core:template.parent.label",
-            Placeholder = _ => "kleenestar.core:template.parent.placeholder",
-            Help = _ => "kleenestar.core:template.parent.help",
-            StickySelection = _ => true,
-            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Candidates>().ToString())};
-
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -93,11 +79,10 @@ namespace KleeneStar.Core.WebFragment.Template
             Add(TemplateName);
             Add(Description);
             Add(Category);
-            Add(ParentSelection);
             Add(TemplateState);
 
-            // a copy stays bound to the class of its source, which the create endpoint carries
-            // over, so the class is not offered here either
+            // a copy stays bound to the class of its source and composes the same child list,
+            // both of which the create endpoint carries over, so neither is offered here
             this.DataService<global::KleeneStar.Core.WWW.Api._1_.Templates.Index>();
             ItemId = renderContext =>
             {

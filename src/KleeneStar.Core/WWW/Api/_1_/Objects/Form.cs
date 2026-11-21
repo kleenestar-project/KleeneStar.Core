@@ -107,7 +107,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             // a step reloaded for the same class and template (the wizard reloads a step whose
             // payload changed, going back as well as forth) starts from what was entered on it;
             // the template presets fill what was not
-            var values = new Dictionary<string, string>(WithDefaultSecurityLevel(Presets(templateId), classId, identityId), StringComparer.OrdinalIgnoreCase);
+            var values = new Dictionary<string, string>(WithDefaultSecurityLevel(TemplateSecurityLevels.ForClass(Presets(templateId), classId), classId, identityId), StringComparer.OrdinalIgnoreCase);
 
             foreach (var answer in Answers(payload, part, classId, templateId))
             {
@@ -419,8 +419,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
         /// <summary>
         /// Reads the template the payload names: a template id, or the value of a template card
-        /// offered under a further class of the template (<see cref="TemplateChoice"/>). The
-        /// "no template" entry reads as absent.
+        /// offered under a further class of the template (<see cref="TemplateChoice"/>), or the root
+        /// template of a hierarchy card. The "no template" entry reads as absent.
         /// </summary>
         /// <param name="payload">The payload.</param>
         /// <returns>The template id, or <see cref="Guid.Empty"/>.</returns>
@@ -428,11 +428,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var entry = payload.FirstOrDefault(x => string.Equals(x.Key, "TemplateId", StringComparison.OrdinalIgnoreCase));
 
-            return entry.Key is not null
-                && entry.Value.ValueKind == JsonValueKind.String
-                && TemplateChoice.TryParse(entry.Value.GetString(), out var id)
-                ? id
-                : Guid.Empty;
+            if (entry.Key is null || entry.Value.ValueKind != JsonValueKind.String)
+            {
+                return Guid.Empty;
+            }
+
+            // a hierarchy card fills the form from the root template of the hierarchy
+            if (TemplateChoice.TryParseHierarchy(entry.Value.GetString(), out var hierarchyId))
+            {
+                return CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId)?.RootTemplateId ?? Guid.Empty;
+            }
+
+            return TemplateChoice.TryParse(entry.Value.GetString(), out var id) ? id : Guid.Empty;
         }
 
         /// <summary>

@@ -121,18 +121,19 @@ namespace KleeneStar.Core.Test
 
         /// <summary>
         /// Tests that a database whose history names a retired migration id starts: the history
-        /// is rewritten into the ids describing the same schema, nothing is created twice and
-        /// the data stays.
+        /// is rewritten into the ids describing the same schema, the migrations after them are
+        /// applied, nothing is created twice and the data stays.
         /// </summary>
         [Fact]
         public void RetiredMigrationIdIsReplaced()
         {
+            var (retired, replacements) = DatabaseStartup.RetiredMigrations.First();
+
+            // the database holds the schema the retired id stood for, nothing newer
             using (var db = ModelHub.CreateDbContext())
             {
-                DatabaseStartup.Run(db, null, null);
+                db.Database.Migrate(replacements.Max(StringComparer.Ordinal));
             }
-
-            var (retired, replacements) = DatabaseStartup.RetiredMigrations.First();
 
             Execute
             (
@@ -146,7 +147,8 @@ namespace KleeneStar.Core.Test
                 DatabaseStartup.Run(db, null, null);
 
                 Assert.Empty(db.Database.GetPendingMigrations());
-                Assert.Equal(replacements.Order(), db.Database.GetAppliedMigrations().Order());
+                Assert.Equal(db.Database.GetMigrations().Order(), db.Database.GetAppliedMigrations().Order());
+                Assert.Subset(db.Database.GetAppliedMigrations().ToHashSet(), replacements.ToHashSet());
             }
 
             Assert.Equal(42L, Scalar("SELECT Id FROM Marker;"));

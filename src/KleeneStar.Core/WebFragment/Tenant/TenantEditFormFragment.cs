@@ -49,13 +49,13 @@ namespace KleeneStar.Core.WebFragment.Tenant
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection TenantState { get; } = new()
+        public StateInputSelection TenantState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Tenant.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.TenantStateExtensions.Id(global::KleeneStar.Model.Entities.TenantState.Active).ToString(),
             Label = _ => "kleenestar.core:setting.tenant.state.label",
             Placeholder = _ => "kleenestar.core:setting.tenant.state.placeholder",
             Help = _ => "kleenestar.core:setting.tenant.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Tenants.State>().ToString())};
 
         /// <summary>

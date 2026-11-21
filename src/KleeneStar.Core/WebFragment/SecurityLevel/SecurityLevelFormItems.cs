@@ -111,13 +111,13 @@ namespace KleeneStar.Core.WebFragment.SecurityLevel
         /// <returns>The input control.</returns>
         public static ControlDataFormItemInputSelection CreateState()
         {
-            return new ControlDataFormItemInputSelection()
+            return new StateInputSelection()
             {
                 Name = _ => nameof(SecurityLevelEntity.State),
+                DefaultValue = _ => global::KleeneStar.Model.Entities.SecurityLevelStateExtensions.Id(global::KleeneStar.Model.Entities.SecurityLevelState.Active).ToString(),
                 Label = _ => "kleenestar.core:securitylevel.state.label",
                 Placeholder = _ => "kleenestar.core:securitylevel.state.placeholder",
                 Help = _ => "kleenestar.core:securitylevel.state.help",
-                StickySelection = _ => true,
                 ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.SecurityLevels.State>().ToString())
             };
         }

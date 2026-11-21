@@ -27,6 +27,7 @@ using FieldEntity = KleeneStar.Model.Entities.Field;
 using IdentityEntity = KleeneStar.Model.Entities.Identity;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
 using PriorityEntity = KleeneStar.Model.Entities.Priority;
+using TemplateHierarchyEntity = KleeneStar.Model.Entities.TemplateHierarchy;
 using TemplateEntity = KleeneStar.Model.Entities.Template;
 using WorkspaceEntity = KleeneStar.Model.Entities.Workspace;
 
@@ -418,8 +419,7 @@ namespace KleeneStar.Core.WebFragment.Object
             foreach (var @class in catalog.Classes)
             {
                 var templates = catalog.TemplatesOf(@class.Id)
-                    .OrderBy(x => x.Order)
-                    .ThenBy(x => x.Name)
+                    .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
                     .ToList();
 
                 // the first template of a class is its default starting point and is marked
@@ -429,6 +429,12 @@ namespace KleeneStar.Core.WebFragment.Object
                 foreach (var template in templates)
                 {
                     TemplateSelection.Add(CreateTemplateCard(renderContext, catalog, @class, template, template == recommended));
+                }
+
+                // a hierarchy is offered under the class of its root object, after the templates
+                foreach (var (hierarchy, root, _) in catalog.HierarchiesOf(@class.Id))
+                {
+                    TemplateSelection.Add(CreateHierarchyCard(renderContext, catalog, @class, hierarchy, root));
                 }
             }
         }
@@ -477,6 +483,47 @@ namespace KleeneStar.Core.WebFragment.Object
             {
                 card.AddFooter(new ControlText { Text = _ => sla });
             }
+
+            return card;
+        }
+
+        /// <summary>
+        /// Creates the card of a hierarchy: the object is created from the root template, and the
+        /// nodes of the hierarchy with it.
+        /// </summary>
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="catalog">The data the wizard is built from.</param>
+        /// <param name="class">The class the root object is created in.</param>
+        /// <param name="hierarchy">The hierarchy the card stands for.</param>
+        /// <param name="root">The root template of the hierarchy.</param>
+        /// <returns>The card.</returns>
+        private static ControlTileCard CreateHierarchyCard(IRenderControlContext renderContext, Catalog catalog, ClassEntity @class, TemplateHierarchyEntity hierarchy, TemplateEntity root)
+        {
+            var nodes = catalog.NodeCount(hierarchy);
+            var categories = TemplateCategories.Parse(hierarchy.Category).ToList();
+            var card = new ControlTileCard(TemplateChoice.HierarchyValue(hierarchy.Id))
+            {
+                Header = _ => hierarchy.Name,
+                Icon = _ => hierarchy.Icon ?? root.Icon ?? @class.Icon,
+                Badge = _ => categories.Count > 0 ? string.Join(" · ", categories) : I18N.Translate(renderContext, "kleenestar.core:object.add.hierarchy.badge"),
+                BadgeColor = _ => new PropertyColorTile(CoreHub.AccentColor(hierarchy.Id)),
+                Chip = _ => "kleenestar.core:object.add.hierarchy.chip",
+                FilterValue = _ => @class.Id.ToString()
+            };
+
+            if (!ProseText.IsEmpty(hierarchy.Description))
+            {
+                card.Add(new ControlText { Text = _ => ProseText.ToPlainText(hierarchy.Description) });
+            }
+
+            card.AddFooter(new ControlText
+            {
+                Text = _ => I18N.Translate(renderContext, "kleenestar.core:object.add.hierarchy.root", root.Name)
+            });
+            card.AddFooter(new ControlText
+            {
+                Text = _ => Count(renderContext, "kleenestar.core:object.add.template.children", nodes)
+            });
 
             return card;
         }
@@ -571,6 +618,22 @@ namespace KleeneStar.Core.WebFragment.Object
             private IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> ClassesOfTemplates { get; init; }
 
             /// <summary>
+            /// Gets the active hierarchies whose root template is active, with the class their
+            /// root object is created in.
+            /// </summary>
+            public IReadOnlyList<(TemplateHierarchyEntity Hierarchy, TemplateEntity Root, Guid ClassId)> Hierarchies { get; private init; }
+
+            /// <summary>
+            /// Returns the hierarchies whose root object is created in a class.
+            /// </summary>
+            /// <param name="classId">The class.</param>
+            /// <returns>The hierarchies by name.</returns>
+            public IReadOnlyList<(TemplateHierarchyEntity Hierarchy, TemplateEntity Root, Guid ClassId)> HierarchiesOf(Guid classId)
+            {
+                return [.. Hierarchies.Where(x => x.ClassId == classId).OrderBy(x => x.Hierarchy.Name, StringComparer.CurrentCultureIgnoreCase)];
+            }
+
+            /// <summary>
             /// Returns the active templates serving a class, as the class they are bound to or
             /// as a further class.
             /// </summary>
@@ -612,9 +675,17 @@ namespace KleeneStar.Core.WebFragment.Object
                     .Where(x => x.State == TemplateState.Active)
                     .ToList();
                 var classesOfTemplates = CoreHub.TemplateManager.GetClassIds(templates);
+                var activeTemplates = templates.ToDictionary(x => x.Id);
+                var hierarchies = CoreHub.TemplateHierarchyManager
+                    .GetHierarchies(new Query<TemplateHierarchyEntity>())
+                    .Where(x => x.State == TemplateState.Active && activeTemplates.ContainsKey(x.RootTemplateId))
+                    .Select(x => (Hierarchy: x, Root: activeTemplates[x.RootTemplateId], ClassId: CoreHub.TemplateHierarchyManager.ResolveClassId(x.RootClassId, activeTemplates[x.RootTemplateId])))
+                    .Where(x => known.Contains(x.ClassId))
+                    .ToList();
 
                 return new Catalog
                 {
+                    Hierarchies = hierarchies,
                     Workspaces = [.. CoreHub.WorkspaceManager
                         .GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(new Query<WorkspaceEntity>()))
                         .Where(x => x.State == WorkspaceState.Active)
@@ -668,6 +739,17 @@ namespace KleeneStar.Core.WebFragment.Object
             public int PresetCount(TemplateEntity template)
             {
                 return CoreHub.TemplateManager.GetPresets(template.Id).Count;
+            }
+
+            /// <summary>
+            /// Returns the number of nodes of a hierarchy: the objects created with its root
+            /// object.
+            /// </summary>
+            /// <param name="hierarchy">The hierarchy.</param>
+            /// <returns>The number of nodes.</returns>
+            public int NodeCount(TemplateHierarchyEntity hierarchy)
+            {
+                return CoreHub.TemplateHierarchyManager.GetNodes(hierarchy.Id).Count;
             }
 
             /// <summary>

@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WebFragment.Template
             Table.Fill = _ => true;
 
             Icon = _ => new IconTable();
-            Title = _ => "kleenestar.core:view.table.title";
+            Title = _ => "kleenestar.core:template.view.title";
 
             // declares the endpoint the table loads from. The domain it serves cannot be derived
             // from that endpoint — it composes the table rather than deriving from it, so it

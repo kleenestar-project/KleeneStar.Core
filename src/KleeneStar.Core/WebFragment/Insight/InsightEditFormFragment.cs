@@ -65,9 +65,10 @@ namespace KleeneStar.Core.WebFragment.Insight
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection InsightState { get; } = new()
+        public StateInputSelection InsightState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Insight.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.InsightStateExtensions.Id(global::KleeneStar.Model.Entities.InsightState.Active).ToString(),
             Label = _ => "kleenestar.core:insight.state.label",
             Placeholder = _ => "kleenestar.core:insight.state.placeholder",
             Help = _ => "kleenestar.core:insight.state.help",

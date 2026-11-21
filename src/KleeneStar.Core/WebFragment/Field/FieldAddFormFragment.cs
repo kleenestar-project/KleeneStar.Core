@@ -166,13 +166,13 @@ namespace KleeneStar.Core.WebFragment.Field
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection FieldState { get; } = new()
+        public StateInputSelection FieldState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.FieldStateExtensions.Id(global::KleeneStar.Model.Entities.FieldState.Active).ToString(),
             Label = _ => "kleenestar.core:field.state.label",
             Placeholder = _ => "kleenestar.core:field.state.placeholder",
             Help = _ => "kleenestar.core:field.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.State>().ToString())};
 
         /// <summary>

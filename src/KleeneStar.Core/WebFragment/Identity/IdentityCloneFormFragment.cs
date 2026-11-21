@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
@@ -46,13 +47,13 @@ namespace KleeneStar.Core.WebFragment.Identity
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection IdentityState { get; } = new()
+        public StateInputSelection IdentityState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Identity.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.IdentityStateExtensions.Id(global::KleeneStar.Model.Entities.IdentityState.Active).ToString(),
             Label = _ => "kleenestar.core:setting.identity.state.label",
             Placeholder = _ => "kleenestar.core:setting.identity.state.placeholder",
             Help = _ => "kleenestar.core:setting.identity.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Identities.State>().ToString())};
 
         /// <summary>

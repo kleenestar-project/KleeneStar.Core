@@ -24,7 +24,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
     /// and option generation functionality for template records.
     /// </summary>
     /// <remarks>
-    /// The composed row source builds the template hierarchy through framework row models.
+    /// The rows are flat, one per template of the workspace.
     /// Filtering, sorting, paging and stored column layouts remain owned by the table endpoint.
     /// </remarks>
     [Title("kleenestar.core:template.table.header")]
@@ -41,8 +41,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
         }
 
         /// <summary>
-        /// Returns the template rows of the addressed workspace, nested along the composition
-        /// hierarchy.
+        /// Returns the template rows of the addressed workspace.
         /// </summary>
         /// <param name="request">The request.</param>
         /// <returns>The response carrying the table document.</returns>
@@ -69,7 +68,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
 
     /// <summary>
     /// The row source of the template overview: an ordinary REST table whose response the
-    /// enclosing endpoint nests before returning it.
+    /// enclosing endpoint returns.
     /// </summary>
     /// <remarks>
     /// It is a type of its own rather than a nested one because the framework resolves the table's
@@ -143,7 +142,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                 Template = new RestApiTableColumnTemplateTag()
             };
 
-            // the composition hierarchy is the row tree, so it needs no column of its own
             yield return new RestApiTableColumn()
             {
                 Id = "state",
@@ -153,7 +151,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
         }
 
         /// <summary>
-        /// Counts matching templates before nesting changes the number of root rows.
+        /// Counts the matching templates of the addressed workspace.
         /// </summary>
         /// <param name="query">The filtered query before paging.</param>
         /// <param name="context">The current data context.</param>
@@ -180,13 +178,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
             // a workspace is the set of templates whose class lives in that workspace
             query = query.Where(x => x.Class.WorkspaceId == id);
 
-            // the children of a composite template are created in the order it defines, so the
-            // rows follow that order too unless the caller sorted by a column of their own
             if (string.IsNullOrWhiteSpace(request.GetParameter("o")?.Value))
             {
-                query = query
-                    .OrderByAsc(x => x.Order)
-                    .OrderByAsc(x => x.Name);
+                query = query.OrderByAsc(x => x.Name);
             }
 
             var templates = CoreHub.TemplateManager.GetTemplates(query, context).ToList();
@@ -220,39 +214,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
                         }
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
+                    // a click on the row opens the edit dialog, beside the entry of the menu
+                    PrimaryAction = new ActionModal
+                    (
+                        "modal-form",
+                        _editFormUri?.BindParameters(request).BindParameters(new TemplateIdParameter(x.Id)),
+                        TypeModalSize.ExtraLarge
+                    ).ToJson(),
                     Uri = GetUri(x, request)?.ToString(),
                     Image = x.Icon?.Uri?.ToString()
-                }).ToDictionary(row => row.Id.ToString());
+                });
 
-            var roots = new List<RestApiTableRow>();
-            foreach (var template in templates)
-            {
-                var row = rows[template.Id.ToString()];
-                var parent = template.ParentId?.ToString();
-                var visited = new HashSet<string> { row.Id.ToString() };
-                var ancestor = template;
-                while (ancestor.ParentId is Guid ancestorId && visited.Add(ancestorId.ToString()))
-                {
-                    ancestor = templates.FirstOrDefault(item => item.Id == ancestorId);
-                    if (ancestor is null)
-                    {
-                        break;
-                    }
-                }
-                if (parent is not null && rows.TryGetValue(parent, out var parentRow) && ancestor is null)
-                {
-                    parentRow.Children = (parentRow.Children ?? []).Append(row).ToList();
-                }
-                else if (parent is not null && rows.TryGetValue(parent, out parentRow) && ancestor?.ParentId is null)
-                {
-                    parentRow.Children = (parentRow.Children ?? []).Append(row).ToList();
-                }
-                else
-                {
-                    roots.Add(row);
-                }
-            }
-            return roots;
+            return [.. rows];
         }
 
         /// <summary>
@@ -374,8 +347,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
 
         /// <summary>
         /// Retrieves a URI that represents the specified template row. A template has no detail
-        /// page of its own, so the row is not a link and its actions are reached through the
-        /// row's option menu instead.
+        /// page of its own, so the row is not a link; a click on it opens the edit dialog and the
+        /// other actions are reached through the row's option menu.
         /// </summary>
         private static IUri GetUri(Model.Entities.Template row, IRequest request)
         {

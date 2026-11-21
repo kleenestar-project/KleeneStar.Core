@@ -52,13 +52,13 @@ namespace KleeneStar.Core.WebFragment.Sla
         /// <summary>
         /// Gets the selection control for the lifecycle state.
         /// </summary>
-        public ControlDataFormItemInputSelection SlaState { get; } = new()
+        public StateInputSelection SlaState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.SlaPolicy.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.SlaPolicyStateExtensions.Id(global::KleeneStar.Model.Entities.SlaPolicyState.Active).ToString(),
             Label = _ => "kleenestar.core:sla.state.label",
             Placeholder = _ => "kleenestar.core:sla.state.placeholder",
             Help = _ => "kleenestar.core:sla.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.State>().ToString())
         };
 

@@ -137,15 +137,19 @@ namespace KleeneStar.Core
         /// that describe the same schema now.
         /// </summary>
         /// <remarks>
-        /// <c>20261120173108_InitialCreate</c> holds the same schema as
-        /// <c>20261121082301_InitialCreate</c>; only the id differs.
+        /// A history that recorded <c>20261121092836_TemplateHierarchies</c> holds the whole chain
+        /// <c>20261121082301_InitialCreate</c>, <c>20261121084614_TemplateChildren</c>,
+        /// <c>20261121092836_TemplateHierarchies</c>, whose schema is the schema of
+        /// <c>20261121143700_InitialCreate</c>; the two earlier ids stay in the history as
+        /// unknown entries. A history ending at an earlier id of that chain holds an older schema
+        /// and is not mapped.
         /// </remarks>
         public static readonly IReadOnlyDictionary<string, string[]> RetiredMigrations =
             new Dictionary<string, string[]>(StringComparer.Ordinal)
             {
-                ["20261120173108_InitialCreate"] =
+                ["20261121092836_TemplateHierarchies"] =
                 [
-                    "20261121082301_InitialCreate"
+                    "20261121143700_InitialCreate"
                 ]
             };
 

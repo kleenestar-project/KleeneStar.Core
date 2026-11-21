@@ -23,10 +23,13 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
         private static readonly Guid AccountTemplateId = Guid.Parse("57A0C000-0000-4000-8000-000000000006");
         private static readonly Guid DeskTemplateId = Guid.Parse("57A0C000-0000-4000-8000-000000000007");
         private static readonly Guid AgentId = Guid.Parse("57A0C000-0000-4000-8000-000000000008");
+        private static readonly Guid AccountEntryId = Guid.Parse("57A0C000-0000-4000-8000-000000000009");
+        private static readonly Guid DeskEntryId = Guid.Parse("57A0C000-0000-4000-8000-00000000000A");
+        private static readonly Guid HierarchyId = Guid.Parse("57A0C000-0000-4000-8000-00000000000B");
 
         /// <summary>
         /// Seeds an HR and an IT workspace, an order class in HR and a task class in IT, and an
-        /// onboarding template whose account request is filed at the IT desk while the desk
+        /// onboarding hierarchy whose account request is filed at the IT desk while the desk
         /// set-up stays in HR and waits for the account.
         /// </summary>
         /// <param name="database">The per-test in-memory database name.</param>
@@ -45,8 +48,13 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
                     db.Identities.Add(new Identity { Id = AgentId, Name = "Agent", UserName = "agent", Email = "agent@example.com", PasswordHash = "x" });
 
                     db.Templates.Add(new TemplateEntity(OnboardingTemplateId) { Name = "Onboarding", ClassId = OrderClassId, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
-                    db.Templates.Add(new TemplateEntity(AccountTemplateId) { Name = "Create account", ClassId = TaskClassId, ParentId = OnboardingTemplateId, AssigneeId = AgentId, Order = 1, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
-                    db.Templates.Add(new TemplateEntity(DeskTemplateId) { Name = "Set up desk", ClassId = OrderClassId, ParentId = OnboardingTemplateId, PredecessorId = AccountTemplateId, Order = 2, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
+                    db.Templates.Add(new TemplateEntity(AccountTemplateId) { Name = "Create account", ClassId = TaskClassId, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
+                    db.Templates.Add(new TemplateEntity(DeskTemplateId) { Name = "Set up desk", ClassId = OrderClassId, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
+
+                    // the onboarding hierarchy references both templates; the desk set-up waits for the account
+                    db.TemplateHierarchies.Add(new TemplateHierarchy(HierarchyId) { Name = "Onboarding", WorkspaceId = HrWorkspaceId, RootTemplateId = OnboardingTemplateId, State = TemplateState.Active, Created = DateTime.UtcNow, Updated = DateTime.UtcNow });
+                    db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = AccountEntryId, HierarchyId = HierarchyId, TemplateId = AccountTemplateId, AssigneeId = AgentId, Order = 1 });
+                    db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = DeskEntryId, HierarchyId = HierarchyId, TemplateId = DeskTemplateId, PredecessorId = AccountEntryId, Order = 2 });
 
                     db.SaveChanges();
                 }
@@ -67,6 +75,7 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
 
             publish("parent", RelationEffect.AggregatesProgress, 1);
             publish("blocks", RelationEffect.BlocksCompletion, 2);
+            publish("references", RelationEffect.None, 3);
         }
 
         /// <summary>
@@ -83,18 +92,18 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
         }
 
         /// <summary>
-        /// Instantiates the children of the onboarding template below an order.
+        /// Instantiates the nodes of the onboarding hierarchy below an order.
         /// </summary>
         /// <param name="order">The order.</param>
         /// <param name="run">The run the objects are tracked by.</param>
         private static void CreateChildren(ObjectEntity order, ObjectCreationRun run)
         {
             var method = typeof(global::KleeneStar.Core.WWW.Api._1_.Objects.Index)
-                .GetMethod("CreateChildren", BindingFlags.Static | BindingFlags.NonPublic);
+                .GetMethod("CreateNodes", BindingFlags.Static | BindingFlags.NonPublic);
 
             Assert.NotNull(method);
 
-            method!.Invoke(null, [order, OnboardingTemplateId, null, new HashSet<Guid> { OnboardingTemplateId }, run]);
+            method!.Invoke(null, [order, CoreHub.TemplateHierarchyManager.GetNodes(HierarchyId), null, null, run]);
         }
 
         /// <summary>
@@ -143,6 +152,105 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
 
             // the order now reports the progress of the whole structure
             Assert.True(CoreHub.ObjectProgressManager.GetProgress(order.Id).Aggregated);
+        }
+
+        /// <summary>
+        /// The nodes reference templates: one template may stand in a hierarchy twice and both
+        /// nodes create an object; a template serving several classes creates its object in the
+        /// class the node chose; an archived template creates nothing, nor do the nodes below it;
+        /// a nested node is created below the object of its parent node.
+        /// </summary>
+        [Fact]
+        public void CreateChildren_FollowsTheReferences()
+        {
+            var database = nameof(CreateChildren_FollowsTheReferences);
+            Seed(database);
+
+            var trainingId = Guid.NewGuid();
+            var retiredId = Guid.NewGuid();
+
+            using (var db = CoreHubFixture.CreateDbContext(database))
+            {
+                // the training serves the order class and, further, the task class of IT
+                db.Templates.Add(new TemplateEntity(trainingId) { Name = "Training", ClassId = OrderClassId, State = TemplateState.Active, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
+                db.Templates.Add(new TemplateEntity(retiredId) { Name = "Retired step", ClassId = OrderClassId, State = TemplateState.Archived, Icon = ImageIcon.FromString("/kleenestar/assets/icons/task.svg") });
+                db.TemplateClasses.Add(new TemplateClass { TemplateId = trainingId, ClassId = TaskClassId });
+                var secondDesk = Guid.NewGuid();
+                var retired = Guid.NewGuid();
+                db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { HierarchyId = HierarchyId, TemplateId = trainingId, ClassId = TaskClassId, Order = 3 });
+                db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = secondDesk, HierarchyId = HierarchyId, TemplateId = DeskTemplateId, Order = 4 });
+                db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { HierarchyId = HierarchyId, ParentNodeId = secondDesk, TemplateId = AccountTemplateId, Order = 5 });
+                db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = retired, HierarchyId = HierarchyId, TemplateId = retiredId, Order = 6 });
+                db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { HierarchyId = HierarchyId, ParentNodeId = retired, TemplateId = DeskTemplateId, Order = 7 });
+                db.SaveChanges();
+            }
+
+            var order = Order();
+            var run = ObjectCreationRun.Claim(null, OnboardingTemplateId, Guid.Empty, out _);
+
+            CreateChildren(order, run);
+
+            var objects = CoreHub.ObjectManager.GetObjects(new WebExpress.WebIndex.Queries.Query<ObjectEntity>()).ToList();
+            var training = Assert.Single(objects, x => x.Summary == "Training");
+
+            Assert.Equal(TaskClassId, training.ClassId);
+            Assert.Equal(ItWorkspaceId, training.WorkspaceId);
+            Assert.Equal(2, objects.Count(x => x.Summary == "Set up desk"));
+            Assert.DoesNotContain(objects, x => x.Summary == "Retired step");
+
+            // the second desk set-up carries an account request of its own, related below it
+            var accounts = objects.Where(x => x.Summary == "Create account").Select(x => x.Id).ToList();
+            var desks = objects.Where(x => x.Summary == "Set up desk").Select(x => x.Id).ToList();
+            Assert.Equal(2, accounts.Count);
+            Assert.Contains(desks, desk => CoreHub.ObjectRelationManager.GetRelations(desk).Any(r => r.TypeKey == "parent" && r.SourceObjectId == desk && r.TargetObjectId is Guid target && accounts.Contains(target)));
+        }
+
+        /// <summary>
+        /// A node that is a link only is created where its class lives, without a place below the
+        /// parent and without the aggregating relation, and is related as the node says; a node
+        /// that is both a sub-object and a link carries both relations.
+        /// </summary>
+        [Fact]
+        public void CreateChildren_LinksAsTheNodeSays()
+        {
+            var database = nameof(CreateChildren_LinksAsTheNodeSays);
+            Seed(database);
+
+            using (var db = CoreHubFixture.CreateDbContext(database))
+            {
+                foreach (var node in db.TemplateHierarchyNodes.Where(x => x.HierarchyId == HierarchyId))
+                {
+                    if (node.Id == AccountEntryId)
+                    {
+                        node.AsChild = false;
+                        node.RelationTypeKey = "references";
+                        node.RelationInverse = true;
+                    }
+                    else
+                    {
+                        node.RelationTypeKey = "references";
+                    }
+                }
+
+                db.SaveChanges();
+            }
+
+            var order = Order();
+            var run = ObjectCreationRun.Claim(null, OnboardingTemplateId, Guid.Empty, out _);
+
+            CreateChildren(order, run);
+
+            var account = Single("Create account");
+            var desk = Single("Set up desk");
+            var relations = CoreHub.ObjectRelationManager.GetRelations(order.Id).ToList();
+
+            Assert.Null(account.ParentId);
+            Assert.DoesNotContain(relations, x => x.TypeKey == "parent" && x.TargetObjectId == account.Id);
+            Assert.Contains(relations, x => x.TypeKey == "references" && x.SourceObjectId == account.Id && x.TargetObjectId == order.Id);
+
+            Assert.Equal(order.Id, desk.ParentId);
+            Assert.Contains(relations, x => x.TypeKey == "parent" && x.TargetObjectId == desk.Id);
+            Assert.Contains(relations, x => x.TypeKey == "references" && x.SourceObjectId == order.Id && x.TargetObjectId == desk.Id);
         }
 
         /// <summary>

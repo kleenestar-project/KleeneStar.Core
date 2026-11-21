@@ -64,18 +64,6 @@ namespace KleeneStar.Core.WebManager
         IEnumerable<Template> GetTemplates(IQuery<Template> query, IQueryContext context);
 
         /// <summary>
-        /// Returns the child templates of a template, in their defined order.
-        /// </summary>
-        /// <remarks>
-        /// The children compose the template: creating an object from the parent also creates one
-        /// object per active child. Archived children are omitted, so retiring a child stops it
-        /// from being created without breaking the templates that already reference it.
-        /// </remarks>
-        /// <param name="templateId">The id of the parent template.</param>
-        /// <returns>The active child templates. The collection may be empty.</returns>
-        IEnumerable<Template> GetChildTemplates(Guid templateId);
-
-        /// <summary>
         /// Returns the field presets a template applies.
         /// </summary>
         /// <remarks>
@@ -129,15 +117,6 @@ namespace KleeneStar.Core.WebManager
         /// <param name="classIds">The further classes.</param>
         /// <returns>The current instance for method chaining.</returns>
         ITemplateManager SetFurtherClasses(Guid templateId, IEnumerable<Guid> classIds);
-
-        /// <summary>
-        /// Determines whether pointing a template's parent reference at a candidate would close a
-        /// cycle, so the caller can reject the change before it is persisted.
-        /// </summary>
-        /// <param name="templateId">The template that would carry the reference.</param>
-        /// <param name="candidateId">The template it would point at.</param>
-        /// <returns>True when the reference would be circular; otherwise false.</returns>
-        bool WouldFormCycle(Guid templateId, Guid candidateId);
 
         /// <summary>
         /// Adds a new template to the collection.

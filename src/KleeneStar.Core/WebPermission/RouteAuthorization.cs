@@ -20,7 +20,7 @@ namespace KleeneStar.Core.WebPermission
     /// <list type="bullet">
     /// <item><b>The resource</b> is the most specific one the route names: an object (by key),
     /// else a class (directly, or through a field, form, workflow, status, priority, agreement,
-    /// calendar, security level or template of it), else a workspace (by key).</item>
+    /// calendar, security level, template or template hierarchy of it), else a workspace (by key).</item>
     /// <item><b>The permission</b> follows from the area the page lives in (its namespace under
     /// <c>WWW</c>): the class administration areas and the workspace's own dialogs
     /// <em>administer</em> (<see cref="ClassUpdatePermission"/> /
@@ -46,7 +46,7 @@ namespace KleeneStar.Core.WebPermission
         {
             "class", "classes", "field", "fields", "form", "forms", "priority", "priorities",
             "status", "statuses", "sla", "slas", "calendar", "calendars", "securitylevel",
-            "securitylevels", "workflow", "workflows", "template", "templates", "relations", "approvalpolicies", "planning", "catalogs"
+            "securitylevels", "workflow", "workflows", "template", "templates", "templatehierarchy", "relations", "approvalpolicies", "planning", "catalogs"
         };
 
         /// <summary>
@@ -355,6 +355,12 @@ namespace KleeneStar.Core.WebPermission
             classId ??= Parse(request.GetParameter<TemplateIdParameter>()?.Value) is { } templateId
                 ? CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId
                 : null;
+
+            // a hierarchy is administered with the class of its root template
+            classId ??= Parse(request.GetParameter<TemplateHierarchyIdParameter>()?.Value) is { } hierarchyId
+                && CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId) is { } hierarchy
+                    ? hierarchy.RootTemplate?.ClassId ?? CoreHub.TemplateManager.GetTemplate(hierarchy.RootTemplateId)?.ClassId
+                    : null;
 
             return classId is { } id ? CoreHub.ClassManager.GetClass(id) : null;
         }

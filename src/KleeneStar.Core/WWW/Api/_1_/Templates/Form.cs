@@ -14,7 +14,8 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WWW.Api._1_.Templates
 {
     /// <summary>
-    /// Renders the presets step of the template wizard as an html fragment.
+    /// Renders a dynamic step of the template wizard as an html fragment: the presets
+    /// (<c>?part=presets</c>) or the security levels (<c>?part=securitylevel</c>).
     /// </summary>
     /// <remarks>
     /// The step depends on the classes chosen in the first step of the same dialog, so the
@@ -23,6 +24,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
     /// of the edited template (<c>?id=</c>), and builds the inputs through
     /// <see cref="TemplatePresetForm"/>. An input starts from the answer the payload carries for
     /// it, else from the stored preset of the edited template.
+    /// <para>
+    /// The security level step shows one tile selection per served class
+    /// (<see cref="SecurityLevelTiles.CreateForTemplate"/>), preselected with the answer of the
+    /// payload, else with the stored choice (<see cref="TemplateSecurityLevels"/>), else with the
+    /// class default. A step without any class that has assignable levels answers 204, which the
+    /// wizard skips.
+    /// </para>
     /// </remarks>
     [Title("kleenestar.core:template.preset.api.title")]
     [Cache]
@@ -32,6 +40,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
         /// The name of the presets part.
         /// </summary>
         public const string PartPresets = "presets";
+
+        /// <summary>
+        /// The name of the security level part.
+        /// </summary>
+        public const string PartSecurityLevel = "securitylevel";
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -80,6 +93,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
                 return new ResponseNoContent();
             }
 
+            if (string.Equals(request.GetParameter("part")?.Value, PartSecurityLevel, StringComparison.OrdinalIgnoreCase))
+            {
+                return SecurityLevels(request, payload, template, classIds);
+            }
+
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             if (template is not null)
@@ -115,6 +133,50 @@ namespace KleeneStar.Core.WWW.Api._1_.Templates
             }
 
             TemplatePresetForm.Seed(renderContext, inputs, values);
+
+            return new ResponseOK { Content = group.Render(renderContext, null)?.ToString() ?? string.Empty }
+                .AddHeaderContentType("text/html; charset=utf-8");
+        }
+
+        /// <summary>
+        /// Renders the security level step: one tile selection per served class that has levels
+        /// the caller may assign.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <param name="payload">The wizard payload.</param>
+        /// <param name="template">The edited template, or null.</param>
+        /// <param name="classIds">The served classes the caller administers.</param>
+        /// <returns>The rendered step, or 204 when no class offers a level.</returns>
+        private static IResponse SecurityLevels(IRequest request, IReadOnlyDictionary<string, JsonElement> payload, Model.Entities.Template template, IReadOnlyList<Guid> classIds)
+        {
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var stored = template is not null && CoreHub.TemplateManager.GetStoredPresets(template.Id).TryGetValue(TemplateSecurityLevels.PresetKey, out var raw)
+                ? TemplateSecurityLevels.Parse(raw)
+                : new Dictionary<Guid, Guid?>();
+            var answers = payload.ToDictionary(x => x.Key, x => (object)x.Value, StringComparer.OrdinalIgnoreCase);
+            var renderContext = new RenderControlFormContext(null, null, request as Request, null);
+            var group = new ControlFormItemGroupVertical();
+
+            foreach (var classId in classIds)
+            {
+                var @class = CoreHub.ClassManager.GetClass(classId);
+                var value = TemplateSecurityLevels.TryReadAnswer(answers, classId, out var answer) && !string.IsNullOrWhiteSpace(answer)
+                    ? answer
+                    : stored.TryGetValue(classId, out var level) || stored.TryGetValue(Guid.Empty, out level)
+                        ? (level ?? Guid.Empty).ToString()
+                        : TemplateSecurityLevels.DefaultValue;
+                var tiles = SecurityLevelTiles.CreateForTemplate(renderContext, @class, value, identityId);
+
+                if (tiles is not null)
+                {
+                    group.Items.Add(tiles);
+                }
+            }
+
+            if (group.Items.Count == 0)
+            {
+                return new ResponseNoContent();
+            }
 
             return new ResponseOK { Content = group.Render(renderContext, null)?.ToString() ?? string.Empty }
                 .AddHeaderContentType("text/html; charset=utf-8");

@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
 using WebExpress.WebApp.WebControl;
@@ -62,13 +63,13 @@ namespace KleeneStar.Core.WebFragment.NavigatorLink
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection LinkState { get; } = new()
+        public StateInputSelection LinkState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.NavigatorLink.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.NavigatorLinkStateExtensions.Id(global::KleeneStar.Model.Entities.NavigatorLinkState.Active).ToString(),
             Label = _ => "kleenestar.core:setting.navigatorlink.state.label",
             Placeholder = _ => "kleenestar.core:setting.navigatorlink.state.placeholder",
             Help = _ => "kleenestar.core:setting.navigatorlink.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.NavigatorLinks.State>().ToString())
         };
 

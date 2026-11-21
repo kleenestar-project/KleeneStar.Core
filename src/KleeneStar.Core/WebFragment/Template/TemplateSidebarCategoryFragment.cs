@@ -155,8 +155,15 @@ namespace KleeneStar.Core.WebFragment.Template
             var query = new Query<Model.Entities.Template>()
                 .Where(x => x.Class.WorkspaceId == workspace.Id);
 
+            // the hierarchies of the workspace are filtered by the same categories
+            var hierarchies = CoreHub.TemplateHierarchyManager
+                .GetHierarchies(new Query<Model.Entities.TemplateHierarchy>().Where(x => x.WorkspaceId == workspace.Id))
+                .Select(x => x.Category);
+
             return [.. _templateManager.GetTemplates(query)
-                .SelectMany(x => TemplateCategories.Parse(x.Category))
+                .Select(x => x.Category)
+                .Concat(hierarchies)
+                .SelectMany(TemplateCategories.Parse)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)];
         }

@@ -49,13 +49,13 @@ namespace KleeneStar.Core.WebFragment.Workflow
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlDataFormItemInputSelection WorkflowState { get; } = new()
+        public StateInputSelection WorkflowState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Workflow.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.WorkflowStateExtensions.Id(global::KleeneStar.Model.Entities.WorkflowState.Active).ToString(),
             Label = _ => "kleenestar.core:workflow.state.label",
             Placeholder = _ => "kleenestar.core:workflow.state.placeholder",
             Help = _ => "kleenestar.core:workflow.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.State>().ToString())};
 
         /// <summary>

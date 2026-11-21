@@ -32,13 +32,14 @@ namespace KleeneStar.Core.WebFragment.Template
     ///   <item><c>classes</c>: the classes of the workspace the caller administers, as tiles with
     ///   several selectable (<see cref="TemplatePresetForm.ClassesField"/>). The first selected
     ///   class owns the template; on an edit the owning class stays first while it is selected.</item>
-    ///   <item><c>template</c>: name, category and description. The description is the
+    ///   <item><c>template</c>: name, category, description and state. The description is the
     ///   description the objects start with.</item>
-    ///   <item><c>structure</c>: the parent template, on an edit the assignee and the predecessor,
-    ///   and the state.</item>
     ///   <item><c>presets</c>: the values the objects start with, rendered by
     ///   <c>/api/1/templates/form?part=presets</c> from the chosen classes
     ///   (<see cref="TemplatePresetForm"/>).</item>
+    ///   <item><c>securitylevel</c>: the security level per served class, rendered by
+    ///   <c>/api/1/templates/form?part=securitylevel</c> (<see cref="TemplateSecurityLevels"/>);
+    ///   skipped where no class has a level the caller may assign.</item>
     /// </list>
     /// The steps are built per request, because the class tiles and the edited record are.
     /// </remarks>
@@ -119,18 +120,9 @@ namespace KleeneStar.Core.WebFragment.Template
                 Subtitle = _ => "kleenestar.core:template.wizard.step.template.subtitle",
                 SummarySource = _ => nameof(TemplateEntity.Name)
             };
-            general.Add(CreateName(template), CreateCategory(), CreateDescription());
+            general.Add(CreateName(template), CreateCategory(), CreateDescription(), CreateState());
 
             yield return general;
-
-            var structure = new ControlDataWizardPage("structure")
-            {
-                Title = _ => "kleenestar.core:template.wizard.step.structure.title",
-                Subtitle = _ => "kleenestar.core:template.wizard.step.structure.subtitle"
-            };
-            structure.Add(CreateStructureItems(template));
-
-            yield return structure;
 
             yield return new ControlDataWizardPage("presets")
             {
@@ -140,6 +132,19 @@ namespace KleeneStar.Core.WebFragment.Template
                 {
                     var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.Form>()?
                         .Add(new UriQuery("part", global::KleeneStar.Core.WWW.Api._1_.Templates.Form.PartPresets));
+
+                    return template is null ? uri : uri?.Add(new UriQuery("id", template.Id.ToString()));
+                }
+            };
+
+            yield return new ControlDataWizardPage("securitylevel")
+            {
+                Title = _ => "kleenestar.core:template.wizard.step.securitylevel.title",
+                Subtitle = _ => "kleenestar.core:template.wizard.step.securitylevel.subtitle",
+                Uri = _ =>
+                {
+                    var uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.Form>()?
+                        .Add(new UriQuery("part", global::KleeneStar.Core.WWW.Api._1_.Templates.Form.PartSecurityLevel));
 
                     return template is null ? uri : uri?.Add(new UriQuery("id", template.Id.ToString()));
                 }
@@ -283,56 +288,18 @@ namespace KleeneStar.Core.WebFragment.Template
         }
 
         /// <summary>
-        /// Creates the inputs of the structure step. A template being created has no siblings
-        /// yet to wait for and no record the candidate lists could exclude, so it is asked for
-        /// its parent and state only.
+        /// Creates the state input, which decides whether the template is offered.
         /// </summary>
-        /// <param name="template">The edited template, or null.</param>
-        /// <returns>The inputs.</returns>
-        private static IEnumerable<IControlFormItem> CreateStructureItems(TemplateEntity template)
+        /// <returns>The input.</returns>
+        private static ControlDataFormItemInputSelection CreateState()
         {
-            yield return new ControlDataFormItemInputSelection()
-            {
-                Name = _ => nameof(TemplateEntity.ParentId),
-                Label = _ => "kleenestar.core:template.parent.label",
-                Placeholder = _ => "kleenestar.core:template.parent.placeholder",
-                Help = _ => "kleenestar.core:template.parent.help",
-                StickySelection = _ => true,
-                ServiceFactory = _ => DataServiceDescriptor.QueryData((template is null
-                    ? CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_.Selection>()
-                    : CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Candidates>())?.ToString())
-            };
-
-            if (template is not null)
-            {
-                yield return new ControlDataFormItemInputSelection()
-                {
-                    Name = _ => nameof(TemplateEntity.AssigneeId),
-                    Label = _ => "kleenestar.core:template.assignee.label",
-                    Placeholder = _ => "kleenestar.core:template.assignee.placeholder",
-                    Help = _ => "kleenestar.core:template.assignee.help",
-                    StickySelection = _ => true,
-                    ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Assignees>()?.ToString())
-                };
-
-                yield return new ControlDataFormItemInputSelection()
-                {
-                    Name = _ => nameof(TemplateEntity.PredecessorId),
-                    Label = _ => "kleenestar.core:template.predecessor.label",
-                    Placeholder = _ => "kleenestar.core:template.predecessor.placeholder",
-                    Help = _ => "kleenestar.core:template.predecessor.help",
-                    StickySelection = _ => true,
-                    ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._templateid_.Predecessors>()?.ToString())
-                };
-            }
-
-            yield return new ControlDataFormItemInputSelection()
+            return new StateInputSelection()
             {
                 Name = _ => nameof(TemplateEntity.State),
+                DefaultValue = _ => global::KleeneStar.Model.Entities.TemplateStateExtensions.Id(global::KleeneStar.Model.Entities.TemplateState.Active).ToString(),
                 Label = _ => "kleenestar.core:template.state.label",
                 Placeholder = _ => "kleenestar.core:template.state.placeholder",
                 Help = _ => "kleenestar.core:template.state.help",
-                StickySelection = _ => true,
                 ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.State>()?.ToString())
             };
         }

@@ -109,6 +109,87 @@ namespace KleeneStar.Core.WebControl
         }
 
         /// <summary>
+        /// Creates the tile selection of the template wizard for one served class
+        /// (<see cref="TemplateSecurityLevels"/>), or <c>null</c> when the class has no active
+        /// level the caller may assign.
+        /// </summary>
+        /// <remarks>
+        /// Tiles: <c>template.securitylevel.default</c> (value <see cref="TemplateSecurityLevels.DefaultValue"/>,
+        /// naming the default level of the class), the unclassified tile and the assignable levels,
+        /// as in <see cref="Create(IRenderControlContext, Guid, Guid?, Guid, bool)"/>. A level the
+        /// template keeps and the caller cannot assign is added as a tile of its own. The input is
+        /// named <see cref="TemplateSecurityLevels.FieldPrefix"/><c>{class id}</c> and labelled
+        /// with the class name.
+        /// </remarks>
+        /// <param name="renderContext">The context in which the control is rendered.</param>
+        /// <param name="class">The class.</param>
+        /// <param name="value">The preselected value: <see cref="TemplateSecurityLevels.DefaultValue"/>, the empty guid or a level id.</param>
+        /// <param name="identityId">The identity the selection is rendered for.</param>
+        /// <returns>The selection, or <c>null</c>.</returns>
+        public static ControlFormItemInputTile CreateForTemplate(IRenderControlContext renderContext, Class @class, string value, Guid identityId)
+        {
+            var assignable = CoreHub.SecurityLevelManager
+                .GetAssignableSecurityLevels(@class.Id, identityId)
+                .Where(x => x.State == SecurityLevelState.Active)
+                .ToList();
+
+            if (assignable.Count == 0)
+            {
+                return null;
+            }
+
+            var levels = assignable;
+
+            if (Guid.TryParse(value, out var keptId) && keptId != Guid.Empty && !assignable.Any(x => x.Id == keptId)
+                && CoreHub.SecurityLevelManager.GetSecurityLevel(keptId) is { } kept && kept.ClassId == @class.Id)
+            {
+                levels = [.. assignable, kept];
+            }
+
+            var fallback = CoreHub.SecurityLevelManager.GetDefaultSecurityLevel(@class.Id);
+            var defaultCard = new ControlTileCard(TemplateSecurityLevels.DefaultValue)
+            {
+                Header = _ => I18N.Translate(renderContext, "kleenestar.core:template.securitylevel.default"),
+                Icon = _ => new IconShieldHalved(),
+                Badge = _ => fallback?.Name ?? I18N.Translate(renderContext, "kleenestar.core:securitylevel.none.label"),
+                BadgeColor = _ => new PropertyColorTile(TypeColorTile.Info)
+            };
+
+            defaultCard.Add(new ControlText
+            {
+                Text = _ => I18N.Translate(renderContext, "kleenestar.core:template.securitylevel.default.description")
+            });
+
+            var groupNames = GroupNames(levels);
+            var tiles = new List<IControlTileCard>
+            {
+                defaultCard,
+                CreateUnclassifiedCard(renderContext, false)
+            };
+
+            tiles.AddRange(levels
+                .OrderBy(x => x.Rank)
+                .ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(x => CreateLevelCard(renderContext, x, false, assignable.Any(a => a.Id == x.Id), groupNames)));
+
+            var selection = new PresetInputTile(string.IsNullOrWhiteSpace(value) ? TemplateSecurityLevels.DefaultValue : value)
+            {
+                Name = _ => TemplateSecurityLevels.FieldPrefix + @class.Id,
+                Label = _ => I18N.Translate(renderContext, "kleenestar.core:template.securitylevel.class", @class.Name),
+                Help = _ => "kleenestar.core:template.securitylevel.help",
+                Searchable = _ => true,
+                SearchPlaceholder = _ => "kleenestar.core:securitylevel.object.search",
+                EmptyText = _ => "kleenestar.core:securitylevel.object.empty",
+                Columns = _ => 2,
+                Required = _ => true
+            };
+
+            selection.Add(tiles);
+
+            return selection;
+        }
+
+        /// <summary>
         /// Creates the tile standing for "unclassified", carrying the empty guid.
         /// </summary>
         /// <param name="renderContext">The context in which the control is rendered.</param>

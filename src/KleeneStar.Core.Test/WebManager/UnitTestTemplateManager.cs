@@ -156,34 +156,21 @@ namespace KleeneStar.Core.Test.WebManager
         }
 
         /// <summary>
-        /// Verifies that an update writes the assignee, the predecessor and the owning class, and
-        /// that the empty guid of a "none" entry is written as no reference.
+        /// Verifies that an update writes the owning class.
         /// </summary>
         [Fact]
-        public void UpdateTemplate_WritesReferences()
+        public void UpdateTemplate_WritesTheOwningClass()
         {
-            Seed(nameof(UpdateTemplate_WritesReferences));
-            var second = AddClass(nameof(UpdateTemplate_WritesReferences), "Problem");
+            Seed(nameof(UpdateTemplate_WritesTheOwningClass));
+            var second = AddClass(nameof(UpdateTemplate_WritesTheOwningClass), "Problem");
 
-            var sibling = Sample("Sibling");
             var template = Sample("Initial");
-            CoreHub.TemplateManager.AddTemplate(sibling);
             CoreHub.TemplateManager.AddTemplate(template);
 
-            template.PredecessorId = sibling.Id;
-            template.ParentId = Guid.Empty;
             template.ClassId = second;
             CoreHub.TemplateManager.UpdateTemplate(template);
 
-            var loaded = CoreHub.TemplateManager.GetTemplate(template.Id);
-            Assert.Equal(sibling.Id, loaded.PredecessorId);
-            Assert.Null(loaded.ParentId);
-            Assert.Equal(second, loaded.ClassId);
-
-            template.PredecessorId = Guid.Empty;
-            CoreHub.TemplateManager.UpdateTemplate(template);
-
-            Assert.Null(CoreHub.TemplateManager.GetTemplate(template.Id).PredecessorId);
+            Assert.Equal(second, CoreHub.TemplateManager.GetTemplate(template.Id).ClassId);
         }
 
         /// <summary>

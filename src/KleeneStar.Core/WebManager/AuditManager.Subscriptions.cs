@@ -117,6 +117,7 @@ namespace KleeneStar.Core.WebManager
             Configuration<SecurityLevel>(h => CoreHub.SecurityLevelManager.SecurityLevelAdded += h, h => CoreHub.SecurityLevelManager.SecurityLevelUpdated += h, h => CoreHub.SecurityLevelManager.SecurityLevelRemoved += h);
             Configuration<Form>(h => CoreHub.FormManager.FormAdded += h, h => CoreHub.FormManager.FormUpdated += h, h => CoreHub.FormManager.FormRemoved += h);
             Configuration<Template>(h => CoreHub.TemplateManager.TemplateAdded += h, h => CoreHub.TemplateManager.TemplateUpdated += h, h => CoreHub.TemplateManager.TemplateRemoved += h);
+            Configuration<TemplateHierarchy>(h => CoreHub.TemplateHierarchyManager.HierarchyAdded += h, h => CoreHub.TemplateHierarchyManager.HierarchyUpdated += h, h => CoreHub.TemplateHierarchyManager.HierarchyRemoved += h);
             Configuration<Priority>(h => CoreHub.PriorityManager.PriorityAdded += h, h => CoreHub.PriorityManager.PriorityUpdated += h, h => CoreHub.PriorityManager.PriorityRemoved += h);
             Configuration<Workflow>(h => CoreHub.WorkflowManager.WorkflowAdded += h, h => CoreHub.WorkflowManager.WorkflowUpdated += h, h => CoreHub.WorkflowManager.WorkflowRemoved += h);
             Configuration<Status>(h => CoreHub.StatusManager.StatusAdded += h, h => CoreHub.StatusManager.StatusUpdated += h, h => CoreHub.StatusManager.StatusRemoved += h);

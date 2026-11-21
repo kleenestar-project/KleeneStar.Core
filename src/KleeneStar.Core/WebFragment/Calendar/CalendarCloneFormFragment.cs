@@ -73,13 +73,13 @@ namespace KleeneStar.Core.WebFragment.Calendar
         /// <summary>
         /// Gets the state selection control.
         /// </summary>
-        public ControlDataFormItemInputSelection CalendarState { get; } = new()
+        public StateInputSelection CalendarState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Calendar.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.CalendarStateExtensions.Id(global::KleeneStar.Model.Entities.CalendarState.Active).ToString(),
             Label = _ => "kleenestar.core:calendar.state.label",
             Placeholder = _ => "kleenestar.core:calendar.state.placeholder",
             Help = _ => "kleenestar.core:calendar.state.help",
-            StickySelection = _ => true,
             ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.State>().ToString())};
 
         /// <summary>

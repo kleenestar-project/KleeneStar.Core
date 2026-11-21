@@ -56,6 +56,7 @@ namespace KleeneStar.Core
         private static IdentityManager _identityManager;
         private static GroupManager _groupManager;
         private static TemplateManager _templateManager;
+        private static TemplateHierarchyManager _templateHierarchyManager;
         private static ObjectViewManager _objectViewManager;
         private static SlaManager _slaManager;
         private static CalendarManager _calendarManager;
@@ -259,6 +260,12 @@ namespace KleeneStar.Core
         /// Gets the template manager responsible for managing templates within the workspace.
         /// </summary>
         public static ITemplateManager TemplateManager => _templateManager ??= ComponentHub.GetComponentManager<TemplateManager>();
+
+        /// <summary>
+        /// Gets the manager of the template hierarchies, the work structures offered beside the
+        /// templates.
+        /// </summary>
+        public static ITemplateHierarchyManager TemplateHierarchyManager => _templateHierarchyManager ??= ComponentHub.GetComponentManager<TemplateHierarchyManager>();
 
         /// <summary>
         /// Gets the object view manager responsible for managing the persisted tabs that
