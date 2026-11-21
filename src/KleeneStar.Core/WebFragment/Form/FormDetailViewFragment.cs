@@ -1,4 +1,5 @@
 using KleeneStar.Core.WebParameter;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -14,10 +15,16 @@ namespace KleeneStar.Core.WebFragment.Form
     /// class within a ControlView. This fragment is only rendered for standard forms. Additional
     /// forms do not have these predefined views and will display an empty or custom layout instead.
     /// </summary>
+    /// <remarks>
+    /// The editor is offered only where the form's class reads its forms - a class rendered as
+    /// prose asks for no fields and shows none, so <see cref="FormProseNoticeFragment"/> takes
+    /// this fragment's place there. See <see cref="FormRendererCondition"/>.
+    /// </remarks>
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
+    [Condition<FormFieldRendererCondition>]
     [Cache]
-    public sealed class FormDetailViewFragment : FragmentControlRestFormEditor
+    public sealed class FormDetailViewFragment : FragmentControlDataFormEditor
     {
         /// <summary>
         /// Initializes a new instance of the class.
@@ -26,20 +33,27 @@ namespace KleeneStar.Core.WebFragment.Form
         public FormDetailViewFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            RestUri = renderContext => GetUri(renderContext);
+            ServiceFactory = renderContext => DataServiceDescriptor.QueryData(GetUri(renderContext).ToString());
+
+            // the editor is the whole page rather than a block among others, so it takes the
+            // height the content region offers instead of growing with the form it edits:
+            // otherwise the page scrolls around it and carries the form name above and the
+            // save state below off the screen while the user is still working in the middle
+            Fill = _ => true;
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <remarks>
-        /// The three predefined views (create, edit, view) are only rendered for standard forms.
-        /// Additional forms do not display these tabs as they serve as flexible UI masks with
-        /// their own layouts.
-        /// </remarks>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);

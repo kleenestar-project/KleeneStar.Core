@@ -49,7 +49,7 @@ namespace KleeneStar.Core.WWW.Class._classid_
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = @class?.Workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                         .BindParameters(new WorkspaceKeyParameter(workspace?.Key))
                         .BindParameters(renderContext.Request)
                 })

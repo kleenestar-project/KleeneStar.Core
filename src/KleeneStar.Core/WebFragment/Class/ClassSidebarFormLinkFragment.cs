@@ -20,16 +20,19 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.SecurityLevels._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Priorities._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Slas._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendars._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Relations._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendar._calendarid_.Index>]
+    [Condition<ClassStructuredRendererCondition>]
     [Cache]
     public sealed class ClassSidebarFormLinkFragment : FragmentControlSidebarItemLink
     {
@@ -45,20 +48,27 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassSidebarFormLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconListFunction(TypeIconTheme.Light);
+            Icon = _ => new IconListFunction();
             Text = _ => "kleenestar.core:form.link.label";
             Uri = renderContext => GetUri(renderContext);
             Active = renderContext => IsActive(renderContext)
                 ? TypeActive.Active
                 : TypeActive.None;
+            Badge = renderContext => GetBadge(renderContext);
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);
@@ -100,10 +110,9 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? parsedForm
                     : Guid.Empty;
 
-                var form = CoreHub.FormManager.GetForm(formId)
-                    ?? throw new InvalidOperationException($"Form with ID '{formId}' not found.");
-
-                return form.ClassId;
+                // an id from the url may address a form that no longer exists; the class
+                // is then simply unresolved rather than the render being aborted
+                return CoreHub.FormManager.GetForm(formId)?.ClassId ?? Guid.Empty;
             }
             else if (workflowParameter != null)
             {
@@ -111,10 +120,7 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var workflow = CoreHub.WorkflowManager.GetWorkflow(workflowId)
-                    ?? throw new InvalidOperationException($"Workflow with ID '{workflowId}' not found.");
-
-                return workflow.ClassId;
+                return CoreHub.WorkflowManager.GetWorkflow(workflowId)?.ClassId ?? Guid.Empty;
             }
 
             throw new InvalidOperationException("One of the parameters 'class','form' or 'workflow' must be set.");
@@ -166,6 +172,32 @@ namespace KleeneStar.Core.WebFragment.Class
 
             // bind the classId into the main URI
             return _uri.BindParameters(new ClassIdParameter(classId));
+        }
+
+        /// <summary>
+        /// Computes the trailing sidebar badge for the 'forms' link: the number of forms
+        /// defined on the resolved class. Returns <c>null</c> when no class can be resolved or
+        /// the class has no forms, so an empty collection leaves the link badge-free rather
+        /// than showing a noisy zero.
+        /// </summary>
+        /// <param name="renderContext">
+        /// The render context used to resolve the class identifier whose forms are counted.
+        /// Cannot be null.
+        /// </param>
+        /// <returns>
+        /// The element count as a string, or <c>null</c> when there is nothing to display.
+        /// </returns>
+        private static string GetBadge(IRenderControlContext renderContext)
+        {
+            var classId = ResolveClassId(renderContext);
+            if (classId == Guid.Empty)
+            {
+                return null;
+            }
+
+            var count = CoreHub.FormManager.GetForms(new ClassIdParameter(classId)).Count();
+
+            return count > 0 ? count.ToString() : null;
         }
     }
 }

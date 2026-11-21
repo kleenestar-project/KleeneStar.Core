@@ -73,6 +73,40 @@ namespace KleeneStar.Core.WebManager
         IReadOnlyList<SavedSearch> GetRecent(Guid ownerId, int count);
 
         /// <summary>
+        /// Returns the active saved searches other identities shared with the given one - those
+        /// whose grants carry <c>SavedSearchReadPermission</c> for it - ordered by name. The
+        /// identity's own saved searches are not among them.
+        /// </summary>
+        /// <param name="identityId">The identity the searches are shared with.</param>
+        /// <returns>The shared saved searches; empty for nobody.</returns>
+        IReadOnlyList<SavedSearch> GetSharedWith(Guid identityId);
+
+        /// <summary>
+        /// Determines whether an identity may act on a saved search.
+        /// </summary>
+        /// <remarks>
+        /// The owner may do everything. Anybody else needs a grant on the saved search that
+        /// carries the permission: a saved search nobody shared is private, which is the
+        /// opposite reading of <c>IPermissionManager.IsGranted</c>, where an unadministered
+        /// resource is open. A deleted saved search is refused to everybody.
+        /// </remarks>
+        /// <param name="savedSearch">The saved search.</param>
+        /// <param name="identityId">The identity acting; <see cref="Guid.Empty"/> is nobody and is refused.</param>
+        /// <param name="permission">The saved-search permission the action needs.</param>
+        /// <returns><see langword="true"/> when the action may proceed.</returns>
+        bool IsGranted(SavedSearch savedSearch, Guid identityId, Type permission);
+
+        /// <summary>
+        /// Stores the column layout the results table shows a saved search with. Quiet like
+        /// <see cref="SetStarred"/>: it fires on every column the reader moves, hides or resizes,
+        /// so it raises <see cref="SavedSearchUpdated"/> but no notification.
+        /// </summary>
+        /// <param name="savedSearchId">The saved search.</param>
+        /// <param name="columns">The layout (<c>WebRestApi.TableLayout</c>), or null to clear it.</param>
+        /// <returns>The saved search, or <see langword="null"/> when none exists.</returns>
+        SavedSearch SetColumns(Guid savedSearchId, string columns);
+
+        /// <summary>
         /// Adds a saved search and raises <see cref="SavedSearchAdded"/>.
         /// </summary>
         /// <param name="savedSearch">The saved search to add. Cannot be null.</param>

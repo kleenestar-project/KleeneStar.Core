@@ -22,13 +22,74 @@ namespace KleeneStar.Core.WebManager
         const string TableLayoutScope = "rest-table-layout";
 
         /// <summary>
-        /// Resolves the identity that owns the current request, or
-        /// <see cref="Guid.Empty"/> when the request is unauthenticated and
-        /// no fallback admin identity is configured.
+        /// Resolves the identity that owns the current request - the user its session names -
+        /// or <see cref="Guid.Empty"/> when nobody is signed in.
         /// </summary>
+        /// <remarks>
+        /// There is no fallback identity, and there must not be one: every per-user record in
+        /// the application is owned by what this answers - a stored table layout, a saved
+        /// search, a favourite, a comment, a notification - and answering with an account that
+        /// did not act would file all of it under that person's name.
+        /// </remarks>
         /// <param name="request">The current HTTP request.</param>
         /// <returns>The current identity id (may be <see cref="Guid.Empty"/>).</returns>
         Guid GetCurrentIdentityId(IRequest request);
+
+        /// <summary>
+        /// Returns the credential the request is authenticated by: the sign-in grant or the
+        /// personal access token behind <see cref="GetCurrentIdentityId"/>.
+        /// </summary>
+        /// <param name="request">The current HTTP request. May be null, which answers from the
+        /// request being served on this call chain.</param>
+        /// <returns>The credential, or <see langword="null"/> when nobody is signed in.</returns>
+        WebIdentity.SessionCredential GetCurrentCredential(IRequest request);
+
+        /// <summary>
+        /// Decides whether a verified credential may still act: the stored account is
+        /// <see cref="Model.Entities.IdentityState.Active"/>, and the grant of a sign-in is not
+        /// revoked (<see cref="IIdentitySessionManager.Accepts"/>) or the personal access token is
+        /// an active row of its owner whose scope allows the request
+        /// (<see cref="IAccessTokenManager.Accepts"/>). Asked by
+        /// <see cref="WebIdentity.SessionValidatorBase"/> on every authenticated request.
+        /// </summary>
+        /// <param name="credential">The verified credential.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the credential may act.</returns>
+        bool Accepts(WebIdentity.SessionCredential credential, IRequest request);
+
+        /// <summary>
+        /// Acts as the supplied identity for the life of the returned scope: everything asking
+        /// <see cref="GetCurrentIdentityId"/> without a request answers it until the scope is
+        /// closed.
+        /// </summary>
+        /// <remarks>
+        /// Inside a request nothing needs this - the session names the user, and the request
+        /// carries it. Outside one, something acting on a person's behalf has to say so:
+        /// scheduled work, an import, a test standing in for a signed-in caller. Saying it here
+        /// keeps the alternative out of the managers, which is passing an identity through
+        /// every layer that might one day want to record who acted.
+        /// <para>
+        /// Scopes nest and restore what they found, so a scope may be opened without knowing
+        /// what its caller did. It is an <em>ambient</em> identity, not an authorization: it
+        /// answers "on whose behalf", never "who is allowed".
+        /// </para>
+        /// </remarks>
+        /// <param name="identityId">The identity to act as. <see cref="Guid.Empty"/> acts as
+        /// nobody, which is how a scope disowns whatever it inherited.</param>
+        /// <returns>The scope. Closing it restores the identity of the enclosing one.</returns>
+        IDisposable BeginIdentity(Guid identityId);
+
+        /// <summary>
+        /// Gets a value indicating whether anybody is acting on this call chain - a request is
+        /// being answered, or a <see cref="BeginIdentity"/> scope says on whose behalf this runs.
+        /// </summary>
+        /// <remarks>
+        /// Without either, the system acts on its own behalf - a background job, the start-up,
+        /// the seeder - and a caller-shaped narrowing such as the permission filter of the object
+        /// reads has nobody to narrow for. <see cref="GetCurrentIdentityId"/> alone cannot tell
+        /// that apart from an anonymous caller: both answer <see cref="Guid.Empty"/>.
+        /// </remarks>
+        bool HasCaller { get; }
 
         /// <summary>
         /// Returns the value stored under (owner, scope, key), or

@@ -1,4 +1,5 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebRestApi;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -15,13 +16,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
     /// Provides CRUD operations for workflow state items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Status>
+    public sealed class Index : global::KleeneStar.Core.WebRestApi.RestApiCrudClassStructure<Model.Entities.Status>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to, which decides who may change it.
+        /// </summary>
+        /// <param name="item">The record.</param>
+        /// <returns>The class id.</returns>
+        protected override System.Guid? ClassOf(Model.Entities.Status item)
+        {
+            return item?.ClassId;
         }
 
         /// <summary>
@@ -168,7 +179,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Status existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            // the class is a reference the record cannot be stored without. Left to the
+            // database it surfaces as a foreign key violation the caller cannot act on, so
+            // it is named here instead.
+            return base.Validate(existingItem, payload, request)
+                .ValidateClass(payload, request, existingItem?.ClassId)
+                .ValidateStatusCategory(payload, request, existingItem?.CategoryId);
         }
 
         /// <summary>
@@ -200,6 +216,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
             };
 
             fieldMap.BindTo(newItem);
+
+            BindCategory(fieldMap, newItem);
 
             CoreHub.StatusManager.Add(newItem);
 
@@ -239,6 +257,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
 
             fieldMap.BindTo(newItem);
 
+            BindCategory(fieldMap, newItem);
+
+            // a clone stays in the class of its original when the payload names none
+            if (newItem.ClassId == Guid.Empty)
+            {
+                newItem.ClassId = existingItem?.ClassId ?? Guid.Empty;
+            }
+
             CoreHub.StatusManager.Add(newItem);
 
             return new RestApiCrudResultCreate();
@@ -259,6 +285,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Status existingItem, RestApiCrudFormData payload, IRequest request)
         {
             var res = base.Update(existingItem, payload, request);
+
+            BindCategory(payload, existingItem);
 
             CoreHub.StatusManager.Update(existingItem);
 
@@ -283,5 +311,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Statuses
 
             return base.Delete(existingItem, request);
         }
+
+        /// <summary>
+        /// Binds the category the status belongs to from the payload.
+        /// </summary>
+        /// <remarks>
+        /// The category selection submits its value under the name of the navigation
+        /// property, while the reference the record carries is the foreign key. The binder
+        /// matches by property name and therefore does not see it under that name.
+        /// </remarks>
+        /// <param name="fieldMap">The payload carrying the reference.</param>
+        /// <param name="item">The item to bind it to.</param>
+        private static void BindCategory(RestApiCrudFormData fieldMap, Model.Entities.Status item)
+        {
+            if (fieldMap.TryGetGuid(nameof(Model.Entities.Status.Category), out var categoryId))
+            {
+                item.CategoryId = categoryId;
+            }
+        }
+
     }
 }

@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex;
+using WebExpress.WebIndex.Queries;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WebRestApi
 {
@@ -27,6 +29,13 @@ namespace KleeneStar.Core.WebRestApi
         protected virtual string TableLayoutKey => GetType().FullName;
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// tables of the application query the database. A text search there selects a
+        /// superset of what the index would find (see <see cref="WqlQueryMode.Translatable"/>).
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Retrieves the column collection presented to the client. The default
         /// implementation calls <see cref="RetrieveDefaultColumns"/> and applies
         /// the layout previously stored for the current user (if any).
@@ -48,6 +57,52 @@ namespace KleeneStar.Core.WebRestApi
         {
             CoreHub.SessionManager.SetTableLayout(request, TableLayoutKey, columns);
         }
+
+        /// <summary>
+        /// Applies a WQL statement to the query and records it as part of the current
+        /// identity's query history.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the one place in the application where a WQL query is known to have been
+        /// <em>run</em> rather than typed, which is what makes it the right place to record
+        /// one. The framework reaches it only after the parser accepted the expression, and
+        /// the prompt's own endpoints cannot stand in for it: <c>analyze</c> fires on every
+        /// keystroke and again for the pre-submit validation, so it cannot tell a finished
+        /// query from a half-typed one.
+        /// </para>
+        /// <para>
+        /// The subject is the indexed type rather than this table, so the prompt that offered
+        /// the query finds it again: the global object search, an issue list and an asset
+        /// inventory all write WQL against the same attributes and share one history, while
+        /// two prompts over different entities keep theirs apart. See
+        /// <see cref="WebManager.IWqlHistoryManager"/>.
+        /// </para>
+        /// <para>
+        /// The text recorded is the one carried on the request, not the parsed statement
+        /// rewritten: the history puts an expression back into the input, and it has to be the
+        /// expression that was submitted.
+        /// </para>
+        /// </remarks>
+        /// <param name="wqlStatement">The parsed statement.</param>
+        /// <param name="query">The query to filter.</param>
+        /// <param name="request">The triggering request.</param>
+        /// <returns>The filtered query.</returns>
+        protected override IQuery<TIndexItem> Filter(IWqlStatement<TIndexItem> wqlStatement, IQuery<TIndexItem> query, IRequest request)
+        {
+            if (wqlStatement is not null && !wqlStatement.HasErrors)
+            {
+                CoreHub.WqlHistoryManager.Record(request, WqlHistorySubject, request?.GetParameter("wql")?.Value);
+            }
+
+            return base.Filter(wqlStatement, query, request);
+        }
+
+        /// <summary>
+        /// Returns the subject the table's queries are recorded and read back under. Defaults
+        /// to the queried type, which is what the matching WQL prompt names as well.
+        /// </summary>
+        protected virtual string WqlHistorySubject => typeof(TIndexItem).FullName;
 
         /// <summary>
         /// Returns the built-in column definitions for the table. Subclasses

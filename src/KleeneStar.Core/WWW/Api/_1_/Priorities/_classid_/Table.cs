@@ -1,4 +1,5 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -11,6 +12,8 @@ using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebApp.WebControl;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
 
@@ -27,6 +30,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
         private readonly IUri _editFormUri;
         private readonly IUri _cloneFormUri;
         private readonly IUri _deleteFormUri;
+        private readonly IUri _moveUri;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -36,6 +40,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
             _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Priority._priorityid_.Edit>();
             _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Priority._priorityid_.Clone>();
             _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Priority._priorityid_.Delete>();
+            _moveUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.Move>();
         }
 
         /// <summary>
@@ -124,7 +129,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
                              Content = x.Name
                         },
                         new() {
-                            Content = x.Description
+                            Content = ProseText.ToPlainText(x.Description)
                         },
                         new() {
                             Content = x.State.ToString()
@@ -232,6 +237,25 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
         /// <param name="request">
         /// The request object containing the criteria for retrieving options. Cannot be null.
         /// </param>
+        /// <summary>
+        /// Builds the address that moves the specified priority in the given direction.
+        /// </summary>
+        /// <remarks>
+        /// Add mutates the instance it is called on, so the cached uri must not be used directly:
+        /// every option would otherwise append to the same accumulating query.
+        /// </remarks>
+        /// <param name="row">The priority the option belongs to.</param>
+        /// <param name="direction">The direction to move in.</param>
+        /// <returns>The address, or null when the endpoint is unavailable.</returns>
+        private IUri MoveUri(Model.Entities.Priority row, string direction)
+        {
+            return _moveUri is null ? null : new UriEndpoint(_moveUri).Add
+            (
+                new UriQuery("id", row.Id.ToString()),
+                new UriQuery("direction", direction)
+            );
+        }
+
         private IEnumerable<RestApiOption> GetOptions(Model.Entities.Priority row, IRequest request)
         {
             var editUri = _editFormUri?
@@ -244,7 +268,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
                 .BindParameters(request)
                 .BindParameters(new PriorityIdParameter(row.Id));
 
-            var iconTheme = request?.ApplicationContext?.DefaultTheme?.IconTheme ?? TypeIconTheme.Light;
 
             yield return new RestApiOptionHeader(request)
             {
@@ -253,20 +276,36 @@ namespace KleeneStar.Core.WWW.Api._1_.Priorities._classid_
 
             yield return new RestApiOptionEdit(request)
             {
-                Icon = new IconPen(iconTheme),
+                Icon = new IconPen(),
                 PrimaryAction = new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
             };
 
             yield return new RestApiOptionClone(request)
             {
-                Icon = new IconClone(iconTheme),
+                Icon = new IconClone(),
                 PrimaryAction = new ActionModal("modal-form", cloneUri, TypeModalSize.ExtraLarge)
+            };
+
+            yield return new RestApiOptionSeparator(request);
+
+            yield return new RestApiOptionCustom(request)
+            {
+                Text = I18N.Translate(request, "kleenestar.core:order.move.up.label"),
+                Icon = new IconArrowUp(),
+                PrimaryAction = new ActionRequest(MoveUri(row, "up"), "PUT")
+            };
+
+            yield return new RestApiOptionCustom(request)
+            {
+                Text = I18N.Translate(request, "kleenestar.core:order.move.down.label"),
+                Icon = new IconArrowDown(),
+                PrimaryAction = new ActionRequest(MoveUri(row, "down"), "PUT")
             };
 
             yield return new RestApiOptionSeparator(request);
             yield return new RestApiOptionDelete(request)
             {
-                Icon = new IconTrash(iconTheme),
+                Icon = new IconTrash(),
                 PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
             };
         }

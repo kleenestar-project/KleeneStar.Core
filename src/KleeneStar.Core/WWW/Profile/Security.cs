@@ -11,6 +11,11 @@ namespace KleeneStar.Core.WWW.Profile
     /// <summary>
     /// Security page — password, two-factor authentication, recovery codes, login alerts.
     /// </summary>
+    /// <remarks>
+    /// The password card is <see cref="WebFragment.Profile.ProfilePasswordFormFragment"/>: the
+    /// form for an internal account, a pointer to its source for an external one. The rows
+    /// below it describe what is not built yet.
+    /// </remarks>
     [Title("kleenestar.core:profile.security.title")]
     [WebIcon<IconShieldHalved>]
     [Scope<IScopeGeneral>]
@@ -53,7 +58,6 @@ namespace KleeneStar.Core.WWW.Profile
                 .AddColumn("")
                 .AddColumn("");
 
-            AddRow(table, renderContext, "kleenestar.core:profile.security.password.label", "kleenestar.core:profile.security.password.help");
             AddRow(table, renderContext, "kleenestar.core:profile.security.twofa.label", "kleenestar.core:profile.security.twofa.help");
             AddRow(table, renderContext, "kleenestar.core:profile.security.recovery.label", "kleenestar.core:profile.security.recovery.help");
             AddRow(table, renderContext, "kleenestar.core:profile.security.sso.label", "kleenestar.core:profile.security.sso.help");

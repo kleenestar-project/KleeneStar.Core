@@ -89,14 +89,16 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(objectKey);
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == objectKey.Value);
+            // through the object manager, so a key the caller may not read - by its grants
+            // or its security level - has nothing to show
+            var obj = CoreHub.ObjectManager.GetObjectByKey(objectKey.Value);
             if (obj is null)
             {
                 return [];
             }
 
-            return GetComments(obj.Id);
+            // the thread a caller reads is the one the audience rule leaves them
+            return WebPermission.CommentAudience.Filter(obj, GetComments(obj.Id)).ToList();
         }
 
         /// <summary>
@@ -149,7 +151,7 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Add(comment);
             CommentAdded?.Invoke(this, comment);
-            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.comment.created");
+            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.comment.created", CoreHub.ObjectManager.GetObject(comment.ObjectId));
 
             return this;
         }
@@ -173,7 +175,7 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Update(comment);
             CommentUpdated?.Invoke(this, comment);
-            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.comment.updated");
+            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.comment.updated", CoreHub.ObjectManager.GetObject(comment.ObjectId));
 
             return this;
         }
@@ -201,7 +203,7 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Update(existing);
             CommentUpdated?.Invoke(this, existing);
-            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.comment.deleted");
+            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.comment.deleted", CoreHub.ObjectManager.GetObject(existing.ObjectId));
 
             return this;
         }
@@ -246,7 +248,7 @@ namespace KleeneStar.Core.WebManager
             db.SaveChanges();
 
             CommentUpdated?.Invoke(this, comment);
-            TryAddNotification("kleenestar.core:notification.title.pinned", "kleenestar.core:notification.comment.pinned");
+            TryAddNotification("kleenestar.core:notification.title.pinned", "kleenestar.core:notification.comment.pinned", CoreHub.ObjectManager.GetObject(comment.ObjectId));
 
             return comment.IsPinned;
         }
@@ -367,11 +369,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="titleKey">The i18n key of the notification title.</param>
         /// <param name="messageKey">The i18n key of the notification message.</param>
-        private static void TryAddNotification(string titleKey, string messageKey)
+        private static void TryAddNotification(string titleKey, string messageKey, object subject)
         {
             try
             {
-                CoreHub.AddNotification(titleKey, messageKey, 5000);
+                CoreHub.AddNotification(titleKey, messageKey, subject);
             }
             catch
             {

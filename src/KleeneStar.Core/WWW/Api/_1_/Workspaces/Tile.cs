@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebIcon;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WWW.Workspaces._workspacekey_;
 using KleeneStar.Model;
@@ -12,9 +13,11 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebIcon;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 {
@@ -54,6 +57,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         }
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Retrieves a collection of tile items representing classes that match the 
         /// specified query and workspace context.
         /// </summary>
@@ -76,12 +85,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IEnumerable<RestApiTileItem> RetrieveItems(IQuery<Model.Entities.Workspace> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.WorkspaceManager.GetWorkspaces(query, context)
+            return CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                 .Select(x => new RestApiTileItem()
                 {
                     Id = x.Id.ToString(),
                     Title = x.Name,
-                    Text = $"{x.Description}\n{x.AccessModifier} | {I18N.Translate(request, x.Sealed ? "kleenestar.core:workspace.state.sealed" : "kleenestar.core:workspace.state.open")}",
+                    Text = $"{ProseText.ToPlainText(x.Description)}\n{x.AccessModifier} | {I18N.Translate(request, x.Sealed ? "kleenestar.core:workspace.state.sealed" : "kleenestar.core:workspace.state.open")}",
                     Image = x.Icon?.Uri?.ToString()
                     //Options = GetOptions(x, request)
                 });

@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 
@@ -122,7 +121,7 @@ namespace KleeneStar.Core.Test.WebManager
             var policy = SamplePolicy();
             CoreHub.SlaManager.Add(policy);
 
-            SlaPolicy? raised = null;
+            SlaPolicy raised = null;
             CoreHub.SlaManager.SlaRemoved += (_, p) => raised = p;
 
             // act
@@ -157,13 +156,18 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ReservedSlaNames_BlocksRouterSegments()
         {
-            Assert.Contains("add",    KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
-            Assert.Contains("edit",   KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
+            Assert.Contains("add", KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
+            Assert.Contains("edit", KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
             Assert.Contains("delete", KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
-            Assert.Contains("api",    KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
+            Assert.Contains("api", KleeneStar.Core.WebManager.SlaManager.ReservedSlaNames);
         }
 
-        private static SlaPolicy SamplePolicy(string? name = null) => new()
+        /// <summary>
+        /// Creates a sample SLA policy for testing purposes.
+        /// </summary>
+        /// <param name="name">The name of the policy.</param>
+        /// <returns>The sample SLA policy.</returns>
+        private static SlaPolicy SamplePolicy(string name = null) => new()
         {
             Id = Guid.NewGuid(),
             Name = name ?? "P1 · Enterprise",
@@ -171,7 +175,7 @@ namespace KleeneStar.Core.Test.WebManager
             State = SlaPolicyState.Active,
             Priority = SlaPriority.Critical,
             CalendarId = null,
-            Notifications = SlaNotificationChannels.Email | SlaNotificationChannels.Slack,
+            Notifications = SlaNotificationChannels.Email | SlaNotificationChannels.InApp,
             Targets =
             {
                 new SlaTarget { Name = "First response", Kind = SlaTargetKind.Response,   TargetValue = 30, Unit = SlaTargetUnit.Minutes },

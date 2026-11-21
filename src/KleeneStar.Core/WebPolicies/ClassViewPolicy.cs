@@ -9,6 +9,7 @@ namespace KleeneStar.Core.WebPolicies
     /// </summary>
     [Name("class_view_policy")]
     [Permission<ClassReadPermission>()]
+    [Permission<SecurityLevelReadPermission>()]
     public sealed class ClassViewPolicy : IIdentityPolicy
     {
     }

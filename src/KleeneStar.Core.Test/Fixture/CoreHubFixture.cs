@@ -1,6 +1,6 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Model;
-using KleeneStar.Model.Config;
+using KleeneStar.Model.Settings;
 using System;
 using System.Reflection;
 using WebExpress.WebCore;
@@ -19,15 +19,30 @@ namespace KleeneStar.Core.Test
         private static readonly (string FieldName, Type ManagerType)[] _managers =
         [
             ("_workspaceManager", typeof(WorkspaceManager)),
+            ("_workspaceTemplateManager", typeof(WorkspaceTemplateManager)),
             ("_classManager",     typeof(ClassManager)),
             ("_fieldManager",     typeof(FieldManager)),
+            ("_securityLevelManager", typeof(SecurityLevelManager)),
             ("_formManager",      typeof(FormManager)),
             ("_priorityManager",  typeof(PriorityManager)),
             ("_workflowManager",  typeof(WorkflowManager)),
             ("_statusManager",    typeof(StatusManager)),
             ("_objectManager",    typeof(ObjectManager)),
-            ("_dashboardManager", typeof(DashboardManager)),
+            ("_insightManager", typeof(InsightManager)),
+            ("_kanbanBoardManager", typeof(KanbanBoardManager)),
+            ("_kindDashboardManager", typeof(KindDashboardManager)),
             ("_tenantManager",    typeof(TenantManager)),
+            ("_navigatorLinkManager", typeof(NavigatorLinkManager)),
+            ("_maintenanceManager", typeof(MaintenanceManager)),
+            ("_brandingManager", typeof(BrandingManager)),
+            ("_objectKindManager", typeof(ObjectKindManager)),
+            ("_objectRendererManager", typeof(ObjectRendererManager)),
+            ("_authenticationSourceManager", typeof(AuthenticationSourceManager)),
+            ("_insightViewTypeManager", typeof(InsightViewTypeManager)),
+            ("_objectExportManager", typeof(ObjectExportManager)),
+            ("_databaseSeedManager", typeof(DatabaseSeedManager)),
+            ("_customQuickfilterManager", typeof(CustomQuickfilterManager)),
+            ("_permissionManager", typeof(PermissionManager)),
             ("_identityManager",  typeof(IdentityManager)),
             ("_groupManager",     typeof(GroupManager)),
             ("_slaManager",       typeof(SlaManager)),
@@ -37,12 +52,34 @@ namespace KleeneStar.Core.Test
             ("_watcherManager",   typeof(WatcherManager)),
             ("_shareManager",     typeof(ShareManager)),
             ("_objectTagManager", typeof(ObjectTagManager)),
+            ("_objectDraftManager", typeof(ObjectDraftManager)),
+            ("_appearanceManager", typeof(AppearanceManager)),
             ("_valueManager",     typeof(ValueManager)),
+            ("_commitManager",    typeof(CommitManager)),
             ("_templateManager",  typeof(TemplateManager)),
+            ("_templateHierarchyManager", typeof(TemplateHierarchyManager)),
             ("_objectViewManager",typeof(ObjectViewManager)),
-            ("_objectLinkManager",typeof(ObjectLinkManager)),
+            ("_objectRelationManager",typeof(ObjectRelationManager)),
+            ("_objectImpactManager",  typeof(ObjectImpactManager)),
+            ("_objectOperationManager", typeof(ObjectOperationManager)),
+            ("_objectProgressManager",typeof(ObjectProgressManager)),
+            ("_blueprintManager",   typeof(BlueprintManager)),
+            ("_approvalManager",    typeof(ApprovalManager)),
+            ("_planningManager",    typeof(PlanningManager)),
+            ("_valueCatalogManager", typeof(ValueCatalogManager)),
+            ("_workflowGuardManager", typeof(WorkflowGuardManager)),
+            ("_workflowValidatorManager",typeof(WorkflowValidatorManager)),
+            ("_workflowPostFunctionManager",typeof(WorkflowPostFunctionManager)),
+            ("_objectRelationTypeManager",typeof(ObjectRelationTypeManager)),
             ("_sessionManager",   typeof(SessionManager)),
+            ("_wqlHistoryManager", typeof(WqlHistoryManager)),
+            ("_notificationCenterManager", typeof(NotificationCenterManager)),
+            ("_identitySessionManager", typeof(IdentitySessionManager)),
+            ("_accessTokenManager", typeof(AccessTokenManager)),
+            ("_credentialManager", typeof(CredentialManager)),
             ("_savedSearchManager",typeof(SavedSearchManager)),
+            ("_sprintManager",    typeof(SprintManager)),
+            ("_auditManager",     typeof(AuditManager)),
         ];
 
         /// <summary>
@@ -57,7 +94,11 @@ namespace KleeneStar.Core.Test
         /// </param>
         public static void Initialize(string connectionString)
         {
-            ModelHub.DatabaseConfig = new DbConfig
+            // the path index is a process-wide switch; a new database starts with it off, so a
+            // test that rebuilt it for its own store cannot leak a 'ready' index into the next
+            KleeneStar.Core.WebManager.ObjectPathIndex.Disable();
+
+            ModelHub.DatabaseSettings = new DatabaseSettings
             {
                 Assembly = "KleeneStar.Core.Test",
                 ConnectionString = connectionString

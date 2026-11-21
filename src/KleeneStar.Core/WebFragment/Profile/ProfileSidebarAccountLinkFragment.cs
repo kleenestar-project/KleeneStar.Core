@@ -1,4 +1,4 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -14,14 +14,16 @@ namespace KleeneStar.Core.WebFragment.Profile
     /// <summary>
     /// Sidebar link to the account page (email, language, time zone, regional formats).
     /// </summary>
-    [Section<SectionSidebarPrimary>]
+    [Section<SectionSidebarPreferences>]
+    [Order(1)]
     [Scope<global::KleeneStar.Core.WWW.Profile.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Account>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tenant>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Appearance>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Notifications>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Security>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Integrations>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Data>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Delete>]
@@ -40,7 +42,7 @@ namespace KleeneStar.Core.WebFragment.Profile
         public ProfileSidebarAccountLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconEnvelope(TypeIconTheme.Light);
+            Icon = _ => new IconEnvelope();
             Text = _ => "kleenestar.core:profile.account.title";
             Uri = _ => _uri;
             Active = renderContext => ProfileSidebarUriHelper.IsActive(renderContext, _uri)

@@ -1,33 +1,23 @@
-using KleeneStar.Model;
-using KleeneStar.Model.Entities;
-using System.Collections.Generic;
-using WebExpress.WebApp.WebRestApi;
+using KleeneStar.Core.WebAttribute;
 using WebExpress.WebCore.WebAttribute;
-using WebExpress.WebCore.WebMessage;
-using WebExpress.WebIndex.Queries;
+using WebExpress.WebCore.WebRestApi;
 
 namespace KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_
 {
     /// <summary>
-    /// Provides CRUD operations for template items via a REST API.
+    /// Provides a index for template items. Declaring the workspace-key segment here is what
+    /// turns the folder into a route variable, so the sibling endpoints (table, quickfilter)
+    /// receive the addressed workspace instead of a literal path segment.
     /// </summary>
+    [WorkspaceKeySegment]
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Template>
+    public sealed class Index : IRestApi
     {
         /// <summary>
-        /// Creates a new instance of an object that implements the IQueryContext interface.
+        /// Initializes a new instance of the class.
         /// </summary>
-        protected override IQueryContext CreateContext()
+        public Index()
         {
-            return ModelHub.CreateDbContext();
-        }
-
-        /// <summary>
-        /// Retrieves a queryable collection of templates that match the specified query criteria.
-        /// </summary>
-        protected override IEnumerable<Model.Entities.Template> Retrieve(IQuery<Model.Entities.Template> query, IQueryContext context, IRequest request)
-        {
-            return CoreHub.TemplateManager.GetTemplates(query, context);
         }
     }
 }

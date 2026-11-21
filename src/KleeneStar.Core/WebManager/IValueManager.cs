@@ -1,4 +1,4 @@
-using KleeneStar.Model.Entities;
+﻿using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using WebExpress.WebCore.WebComponent;
@@ -42,6 +42,18 @@ namespace KleeneStar.Core.WebManager
         /// <param name="fieldId">The field id.</param>
         /// <returns>The value, or <c>null</c> when no entry matches.</returns>
         Value GetValue(Guid objectId, Guid fieldId);
+
+        /// <summary>
+        /// Returns the payloads of the supplied fields for every supplied object in one read,
+        /// for a list that needs a few fields of each of its records. A write staged by an open
+        /// commit scope is answered the way <see cref="GetValue(Guid, Guid)"/> answers it.
+        /// </summary>
+        /// <param name="objectIds">The ids of the objects.</param>
+        /// <param name="fieldIds">The ids of the fields.</param>
+        /// <returns>
+        /// The payload per (object, field) pair. A pair without a value is not in the map.
+        /// </returns>
+        IReadOnlyDictionary<(Guid ObjectId, Guid FieldId), string> GetData(IEnumerable<Guid> objectIds, IEnumerable<Guid> fieldIds);
 
         /// <summary>
         /// Returns every value attached to the object with the supplied id, in field

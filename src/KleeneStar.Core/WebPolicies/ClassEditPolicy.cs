@@ -13,6 +13,10 @@ namespace KleeneStar.Core.WebPolicies
     [Permission<ClassReadPermission>()]
     [Permission<ClassUpdatePermission>()]
     [Permission<ClassClonePermission>()]
+    [Permission<SecurityLevelReadPermission>()]
+    [Permission<SecurityLevelCreatePermission>()]
+    [Permission<SecurityLevelUpdatePermission>()]
+    [Permission<SecurityLevelClonePermission>()]
     public sealed class ClassEditPolicy : IIdentityPolicy
     {
     }

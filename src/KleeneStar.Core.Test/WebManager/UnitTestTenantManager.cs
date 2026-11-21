@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 using WebExpress.WebIndex.Queries;
 
@@ -68,7 +67,7 @@ namespace KleeneStar.Core.Test.WebManager
             var tenant = Sample("DeleteMe");
             CoreHub.TenantManager.Add(tenant);
 
-            Tenant? raised = null;
+            Tenant raised = null;
             CoreHub.TenantManager.TenantRemoved += (_, t) => raised = t;
 
             CoreHub.TenantManager.Remove(tenant.Id);

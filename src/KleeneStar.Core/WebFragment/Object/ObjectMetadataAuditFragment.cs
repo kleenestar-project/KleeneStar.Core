@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.Internationalization;
@@ -12,19 +12,24 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
-    /// Headline-metadata fragment that renders the audit trail of the current object on
-    /// <see cref="WWW.Object._objectkey_.Index"/> in plain text: who created it, who last
-    /// updated it, and when the last update happened.
+    /// Headline-metadata fragment that renders the audit trail of the current object in plain
+    /// text - who created it, who last updated it, and when the last update happened - on the
+    /// reading views and on the reduced view <see cref="WWW.Issue._objectkey_.Preview"/> a
+    /// master-detail pane shows.
     /// </summary>
     /// <remarks>
     /// Creator and updater are resolved from the object's
     /// <see cref="Model.Entities.Object.CreatorId"/> / <see cref="Model.Entities.Object.UpdaterId"/>
     /// through the <see cref="IIdentityManager"/> (an unknown identity renders as an em dash).
     /// The timestamp is taken from <see cref="Model.Entities.Object.Updated"/>. The fragment is
-    /// purely informational and carries no interactive controls.
+    /// purely informational and carries no interactive controls, which is why the reduced view
+    /// takes it as it stands: three small lines are the whole of what the lifecycle card of the
+    /// property column would have said in a pane that never receives that column.
     /// </remarks>
     [Section<SectionHeadlineMetadata>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Order(1)]
     [Cache]
     public sealed class ObjectMetadataAuditFragment : FragmentControlPanel

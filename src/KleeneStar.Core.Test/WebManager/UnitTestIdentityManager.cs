@@ -1,5 +1,4 @@
-using KleeneStar.Core.Test;
-using KleeneStar.Model.Entities;
+﻿using KleeneStar.Model.Entities;
 using WebExpress.WebIndex.Queries;
 
 namespace KleeneStar.Core.Test.WebManager
@@ -69,7 +68,7 @@ namespace KleeneStar.Core.Test.WebManager
             var identity = Sample("DeleteMe", "del@kleenestar.test");
             CoreHub.IdentityManager.Add(identity);
 
-            Identity? raised = null;
+            Identity raised = null;
             CoreHub.IdentityManager.IdentityRemoved += (_, i) => raised = i;
 
             CoreHub.IdentityManager.Remove(identity.Id);
@@ -104,9 +103,72 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ReservedIdentityNames_BlocksRouterSegments()
         {
-            Assert.Contains("admin",  KleeneStar.Core.WebManager.IdentityManager.ReservedIdentityNames);
+            Assert.Contains("admin", KleeneStar.Core.WebManager.IdentityManager.ReservedIdentityNames);
             Assert.Contains("system", KleeneStar.Core.WebManager.IdentityManager.ReservedIdentityNames);
-            Assert.Contains("api",    KleeneStar.Core.WebManager.IdentityManager.ReservedIdentityNames);
+            Assert.Contains("api", KleeneStar.Core.WebManager.IdentityManager.ReservedIdentityNames);
+        }
+
+        /// <summary>
+        /// Verifies the lookup a sign-in goes through: the account is found under its user
+        /// name and under its e-mail address, in either casing, because a person types one
+        /// string into the login form and means the account either way.
+        /// </summary>
+        [Fact]
+        public void GetIdentityByLogin_MatchesUserNameAndEmail()
+        {
+            Seed(nameof(GetIdentityByLogin_MatchesUserNameAndEmail));
+
+            var identity = Sample("Alice Engineer", "alice@kleenestar.test");
+            identity.UserName = "alice.engineer";
+            CoreHub.IdentityManager.Add(identity);
+
+            Assert.Equal(identity.Id, CoreHub.IdentityManager.GetIdentityByLogin("alice.engineer")?.Id);
+            Assert.Equal(identity.Id, CoreHub.IdentityManager.GetIdentityByLogin("ALICE.ENGINEER")?.Id);
+            Assert.Equal(identity.Id, CoreHub.IdentityManager.GetIdentityByLogin("alice@kleenestar.test")?.Id);
+            Assert.Equal(identity.Id, CoreHub.IdentityManager.GetIdentityByLogin("  alice.engineer  ")?.Id);
+        }
+
+        /// <summary>
+        /// Verifies what the lookup refuses: a name nobody carries, an empty one, and an
+        /// account that is not active - a locked account may neither sign in nor be
+        /// attributed with anything afterwards.
+        /// </summary>
+        [Fact]
+        public void GetIdentityByLogin_RefusesUnknownAndInactive()
+        {
+            Seed(nameof(GetIdentityByLogin_RefusesUnknownAndInactive));
+
+            var locked = Sample("Locked Account", "locked@kleenestar.test");
+            locked.UserName = "locked";
+            locked.State = IdentityState.Locked;
+            CoreHub.IdentityManager.Add(locked);
+
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin("locked"));
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin("locked@kleenestar.test"));
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin("nobody"));
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin(null));
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin("   "));
+        }
+
+        /// <summary>
+        /// Verifies that the identity a display name is not enough to sign in with: the
+        /// lookup answers the user name and the e-mail address only.
+        /// </summary>
+        /// <remarks>
+        /// Display names are neither unique nor stable - two people may share one, and anybody
+        /// may change theirs - so a sign-in that accepted them would let one account be reached
+        /// under another's name.
+        /// </remarks>
+        [Fact]
+        public void GetIdentityByLogin_IgnoresTheDisplayName()
+        {
+            Seed(nameof(GetIdentityByLogin_IgnoresTheDisplayName));
+
+            var identity = Sample("Alice Engineer", "alice@kleenestar.test");
+            identity.UserName = "alice.engineer";
+            CoreHub.IdentityManager.Add(identity);
+
+            Assert.Null(CoreHub.IdentityManager.GetIdentityByLogin("Alice Engineer"));
         }
 
         /// <summary>

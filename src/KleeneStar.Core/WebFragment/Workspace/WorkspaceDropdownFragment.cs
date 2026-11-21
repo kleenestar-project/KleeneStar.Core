@@ -19,7 +19,8 @@ namespace KleeneStar.Core.WebFragment.Workspace
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Policy<WorkspaceViewPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
+    [Order(0)]
     [Cache]
     public sealed class WorkspaceDropdownFragment : WorkspaceDropdownControl, IFragmentControl<WorkspaceDropdownControl>, IFragmentControlNavigationItem
     {
@@ -40,17 +41,27 @@ namespace KleeneStar.Core.WebFragment.Workspace
         {
             FragmentContext = fragmentContext;
             Text = _ => "kleenestar.core:workspace.dropdown.label";
+            // a glyph like the per-kind menus beside it (the overview page shows an image icon)
+            Icon = _ => new WebExpress.WebUI.WebIcon.IconLayerGroup();
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            if (!FragmentContext.Conditions.Check(renderContext?.Request))
+            // a caller who may neither read a workspace nor create one would open an empty menu
+            if (!FragmentContext.Conditions.Check(renderContext?.Request)
+                || !global::KleeneStar.Core.WebPermission.RouteAuthorization.MayListWorkspaces(renderContext?.Request))
             {
                 return null;
             }

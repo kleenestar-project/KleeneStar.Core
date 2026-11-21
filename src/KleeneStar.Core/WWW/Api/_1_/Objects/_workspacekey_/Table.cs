@@ -1,4 +1,5 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,9 +30,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         /// </summary>
         public Table()
         {
-            _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Object._objectkey_.Edit>();
-            _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Object._objectkey_.Clone>();
-            _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Object._objectkey_.Delete>();
+            // this table lists the issue kind only (see RetrieveRows), so the edit / clone /
+            // delete modals target the issue action pages that host the generic object CRUD
+            _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Edit>();
+            _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Clone>();
+            _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Delete>();
         }
 
         /// <summary>
@@ -108,7 +111,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
             var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);
             var id = workspace?.Id ?? System.Guid.Empty;
 
-            query = query.WhereEquals(x => x.WorkspaceId, id);
+            // the tab views live on the issue overview, so they present the issue kind only
+            query = query
+                .WhereEquals(x => x.WorkspaceId, id)
+                .WhereEquals(x => x.Kind, Model.Entities.ObjectKind.Issue);
 
             return CoreHub.ObjectManager.GetObjects(query, context)
                 .Select(x => new RestApiTableRow
@@ -123,7 +129,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
                             Content = x.Summary
                         },
                         new() {
-                            Content = x.Description
+                            Content = ProseText.ToPlainText(x.Description)
                         },
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
@@ -222,8 +228,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
         /// </returns>
         private static IUri GetUri(Model.Entities.Object row, IRequest request)
         {
-            return CoreHub.GetUri<Object._objectkey_.Index>()?
-                .BindParameters(new ObjectKeyParameter(row?.Key))
+            return global::KleeneStar.Core.CoreHub.ObjectKindManager
+                .ResolveDetailUri(row)?
                 .BindParameters(request);
         }
 

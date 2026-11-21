@@ -3,9 +3,12 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
+using WebExpress.WebCore.WebParameter;
 using WebExpress.WebCore.WebRestApi;
 using WebExpress.WebIndex.Queries;
 
@@ -15,13 +18,34 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
     /// Provides CRUD operations for class items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Class>
+    public sealed class Index : RestApiCrudClassStructure<Model.Entities.Class>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to - here, the class itself.
+        /// </summary>
+        /// <param name="item">The class.</param>
+        /// <returns>The class id.</returns>
+        protected override Guid? ClassOf(Model.Entities.Class item)
+        {
+            return item?.Id;
+        }
+
+        /// <summary>
+        /// A class is created beneath a workspace, so creating one is judged on the workspace
+        /// the payload names (<c>WorkspaceId</c>): only its administrators add classes to it.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> when the class may be created.</returns>
+        protected override bool MayCreate(IRequest request)
+        {
+            return ContentAuthorization.MayAdministerWorkspace(ContentAuthorization.ReadPayloadGuid(request, "workspaceid"), request);
         }
 
         /// <summary>
@@ -69,7 +93,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// </returns>
         protected override IRestApiCrudResultRetrieve RetrieveForCreate(IRequest request)
         {
-            return RetrieveForCreate(request);
+            // the base answer, not this method again: the override used to call itself and
+            // overflowed the stack on the first create-mode load
+            return base.RetrieveForCreate(request);
         }
 
         /// <summary>
@@ -101,7 +127,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
                 Sealed = data.Sealed,
                 InheritedId = data.InheritedId,
                 ParentId = data.ParentId,
-                AccessModifier = data.AccessModifier
+                AccessModifier = data.AccessModifier,
+                Kind = data.Kind,
+                Renderer = data.Renderer,
+
+                // a copy follows the blueprint its original follows - it is the same structure -
+                // but is not a blueprint itself, which is a decision of its own
+                BlueprintId = data.BlueprintId
             };
 
             return RetrieveForClone(request, newItem);
@@ -159,6 +191,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// is the currently persisted entity and proposedItem contains the incoming values to 
         /// validate.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The name is demanded on a create whether the payload mentions it or not, and
+        /// refused when another class of the same workspace already carries it. The
+        /// availability endpoint (<see cref="_workspacekey_.UniqueName"/>) serves the form
+        /// while it is being filled in; it is advice, not a gate, and every caller that is not
+        /// the form skips it. A name is unique <b>per workspace</b>: the relation types hold
+        /// their accepted classes by name, and that name has to be unambiguous where it is
+        /// resolved, which is among the classes of one workspace - two workspaces may both
+        /// have an <c>Invoice</c>.
+        /// </para>
+        /// <para>
+        /// A create also needs the workspace the class is filed in. The add form carries it in
+        /// a hidden input; a caller that leaves it out is told so here rather than by the
+        /// foreign key, which used to answer with a bare <em>error creating resource</em>. A
+        /// clone takes the workspace of its original, so it need not say.
+        /// </para>
+        /// </remarks>
         /// <param name="existingItem">
         /// The currently persisted item (null for create).
         /// </param>
@@ -173,7 +223,214 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Class existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            var result = AvatarStorage.Validate(payload, nameof(Model.Entities.Class.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
+            var creating = existingItem is null;
+            var cloning = IsClone(request);
+
+            var (workspace, workspaceSent) = payload.TryRead(nameof(Model.Entities.Class.WorkspaceId));
+            var (name, nameSent) = payload.TryRead(nameof(Model.Entities.Class.Name));
+
+            // a clone stays in the workspace of its original; a fresh class has to be told
+            // where it belongs
+            var workspaceId = ResolveWorkspace(workspace, workspaceSent, existingItem);
+
+            if (creating && workspaceId == Guid.Empty)
+            {
+                result.Add(Translate(request, "kleenestar.core:class.workspace.validation.required"), nameof(Model.Entities.Class.WorkspaceId));
+            }
+
+            if (creating || cloning || nameSent)
+            {
+                ValidateName(result, name, nameSent, existingItem, workspaceId, cloning, request);
+            }
+
+            var (submitted, rendererSent) = payload.TryRead(nameof(Model.Entities.Class.Renderer));
+            var (kind, kindSent) = payload.TryRead(nameof(Model.Entities.Class.Kind));
+
+            // a field the payload does not carry is unchanged, so each side of the pairing is
+            // taken from the payload where it is there and from the persisted class where it
+            // is not. Both are checked, not just a submitted renderer: moving a class to a
+            // kind that does not offer the renderer it already names produces exactly the
+            // pairing the gate exists to keep out, and the dialogs send both fields anyway
+            if (rendererSent || kindSent)
+            {
+                ValidateRenderer
+                (
+                    result,
+                    kindSent ? kind : existingItem?.Kind,
+                    global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(rendererSent ? submitted : existingItem?.Renderer),
+                    request
+                );
+            }
+
+            ValidateBlueprint(result, payload, existingItem, request);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Validates the blueprint a class follows and whether it is a blueprint itself.
+        /// </summary>
+        /// <remarks>
+        /// A class follows a class marked as blueprint, and only one in a workspace the caller may
+        /// read: the structure is copied into the follower, so following a blueprint would
+        /// otherwise disclose a structure the caller cannot see. A blueprint follows nothing -
+        /// chains would make a change travel through classes whose administrators never agreed to
+        /// pass it on - and a class does not follow itself.
+        /// </remarks>
+        /// <param name="result">The validation result to add to.</param>
+        /// <param name="payload">The payload.</param>
+        /// <param name="existingItem">The class being edited, or null while one is created.</param>
+        /// <param name="request">The request.</param>
+        private static void ValidateBlueprint(IRestApiValidationResult result, RestApiCrudFormData payload, Model.Entities.Class existingItem, IRequest request)
+        {
+            var blueprintSent = payload.TryGetGuidReference(nameof(Model.Entities.Class.BlueprintId), out var submittedBlueprint);
+            var blueprintId = blueprintSent ? submittedBlueprint : existingItem?.BlueprintId;
+            var (flag, flagSent) = payload.TryRead(nameof(Model.Entities.Class.IsBlueprint));
+            var isBlueprint = flagSent
+                ? string.Equals(flag, bool.TrueString, StringComparison.OrdinalIgnoreCase)
+                : existingItem?.IsBlueprint == true;
+
+            if (blueprintId is not Guid id)
+            {
+                return;
+            }
+
+            var blueprint = CoreHub.ClassManager.GetClass(id);
+
+            if (blueprint is null
+                || !blueprint.IsBlueprint
+                || blueprint.Id == existingItem?.Id
+                || blueprint.BlueprintId is not null
+                || isBlueprint
+                || !WebPermission.ContentVisibility.MayRead(blueprint.WorkspaceId))
+            {
+                result.Add(Translate(request, "kleenestar.core:class.blueprint.invalid"), nameof(Model.Entities.Class.BlueprintId));
+            }
+        }
+
+        /// <summary>
+        /// Resolves the workspace a class will belong to once the request is applied: the one
+        /// the payload names, else the one the persisted class - or, for a clone, the original
+        /// - already belongs to.
+        /// </summary>
+        /// <param name="submitted">The workspace id the payload carries, if any.</param>
+        /// <param name="sent">Whether the payload carried the field at all.</param>
+        /// <param name="existingItem">The persisted class on an update or a clone, otherwise null.</param>
+        /// <returns>The workspace id, or <see cref="Guid.Empty"/> when none can be told.</returns>
+        private static Guid ResolveWorkspace(string submitted, bool sent, Model.Entities.Class existingItem)
+        {
+            if (sent && Guid.TryParse(submitted, out var id) && id != Guid.Empty)
+            {
+                return id;
+            }
+
+            return existingItem?.WorkspaceId ?? Guid.Empty;
+        }
+
+        /// <summary>
+        /// Checks the submitted name: present, and not carried by another class of the same
+        /// workspace.
+        /// </summary>
+        /// <param name="result">The result the errors are collected in.</param>
+        /// <param name="name">The submitted name.</param>
+        /// <param name="sent">Whether the payload carried the field at all.</param>
+        /// <param name="existingItem">The persisted class on an update or a clone, otherwise null.</param>
+        /// <param name="workspaceId">The workspace the class will belong to.</param>
+        /// <param name="cloning">Whether the request clones <paramref name="existingItem"/>.</param>
+        /// <param name="request">The request, for the culture the messages are written in.</param>
+        private static void ValidateName(IRestApiValidationResult result, string name, bool sent, Model.Entities.Class existingItem, Guid workspaceId, bool cloning, IRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                // a field the payload carried has already been reported blank by the entity's
+                // own ValidateRequired; saying it twice reads as two separate faults
+                if (!sent)
+                {
+                    result.Add(Translate(request, "kleenestar.core:class.name.validation.required"), nameof(Model.Entities.Class.Name));
+                }
+
+                return;
+            }
+
+            // a create without a workspace is refused for that reason already; checking the
+            // name against nowhere would only add a second, misleading complaint
+            if (workspaceId == Guid.Empty)
+            {
+                return;
+            }
+
+            // the class being edited never counts against itself; a clone is a new class and
+            // competes with every one there is, its original included
+            var self = existingItem is not null && !cloning
+                ? existingItem.Id
+                : Guid.Empty;
+
+            if (!_workspacekey_.UniqueName.IsAvailable(workspaceId, name, self))
+            {
+                result.Add(Translate(request, "kleenestar.core:class.name.validation.taken"), nameof(Model.Entities.Class.Name));
+            }
+        }
+
+        /// <summary>
+        /// Tells a clone request from an update: both carry an existing item, but only the
+        /// clone addresses it through the id query parameter of a POST.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns><see langword="true"/> for a clone.</returns>
+        private static bool IsClone(IRequest request)
+        {
+            return request?.Method == RequestMethod.POST
+                && !string.IsNullOrWhiteSpace(request.GetParameter<ParameterId>()?.Value);
+        }
+
+        /// <summary>
+        /// Checks the renderer the class will carry against the object type it will carry. An
+        /// unset renderer is always accepted - it is the class saying "follow the object
+        /// type" - and so is one the type offers; anything else is refused, naming what the
+        /// type does offer, because a renderer no fragment is gated on would leave the object
+        /// with no reading view at all.
+        /// </summary>
+        /// <remarks>
+        /// Either half may be the reason a pairing is refused, because either half may be the
+        /// one moving: naming the mask on a class of the blog type is the same fault as moving
+        /// a form-rendered class to the blog type, and both are answered with the renderers
+        /// that type does offer.
+        /// </remarks>
+        /// <param name="result">The result the errors are collected in.</param>
+        /// <param name="kind">The object-kind key the class will carry.</param>
+        /// <param name="renderer">The renderer key the class will carry.</param>
+        /// <param name="request">The request, for the culture the message is written in.</param>
+        private static void ValidateRenderer(IRestApiValidationResult result, string kind, string renderer, IRequest request)
+        {
+            if (global::KleeneStar.Core.CoreHub.ObjectRendererManager.IsOffered(kind, renderer))
+            {
+                return;
+            }
+
+            var offered = string.Join
+            (
+                ", ",
+                global::KleeneStar.Core.CoreHub.ObjectRendererManager.GetRenderers(kind)
+                    .Select(x => Translate(request, x.Label))
+            );
+
+            result.Add
+            (
+                string.Format(Translate(request, "kleenestar.core:class.renderer.validation.unsupported"), offered),
+                nameof(Model.Entities.Class.Renderer)
+            );
+        }
+
+        /// <summary>
+        /// Translates a key in the language of the request.
+        /// </summary>
+        /// <param name="request">The request carrying the culture, or null.</param>
+        /// <param name="key">The internationalization key.</param>
+        /// <returns>The translated text.</returns>
+        private static string Translate(IRequest request, string key)
+        {
+            return request is null ? I18N.Translate(key) : I18N.Translate(request, key);
         }
 
         /// <summary>
@@ -205,6 +462,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
             };
 
             fieldMap.BindTo(newItem);
+
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
+            // the picker's 'follow the object type' entry travels as a token because an option
+            // cannot carry an empty value; it becomes the unset state here, before persistence
+            newItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(newItem.Renderer);
 
             CoreHub.ClassManager.Add(newItem);
 
@@ -247,12 +511,53 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
 
             fieldMap.BindTo(newItem);
 
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
+            newItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(newItem.Renderer);
+
+            // a clone lives where its original lives; the clone form does not carry the
+            // workspace, and a class without one is refused by the foreign key
+            if (newItem.WorkspaceId == Guid.Empty)
+            {
+                newItem.WorkspaceId = existingItem.WorkspaceId;
+            }
+
             CoreHub.ClassManager.Add(newItem);
 
             // automatically create the standard form for the cloned class
             CoreHub.FormManager.CreateStandardForm(newItem.Id);
 
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Model.Entities.Class item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item?.Id, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Model.Entities.Class item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item?.Id, request);
         }
 
         /// <summary>
@@ -270,6 +575,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Class existingItem, RestApiCrudFormData payload, IRequest request)
         {
             var res = base.Update(existingItem, payload, request);
+
+            existingItem.Renderer = global::KleeneStar.Core.WebManager.ObjectRendererManager.Unwrap(existingItem.Renderer);
+
+            // an emptied picture binds null; the record then carries its generated icon
+            existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
 
             CoreHub.ClassManager.Update(existingItem);
 

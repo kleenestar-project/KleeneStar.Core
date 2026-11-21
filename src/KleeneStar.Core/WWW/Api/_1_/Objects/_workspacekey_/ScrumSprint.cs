@@ -1,3 +1,5 @@
+using KleeneStar.Model;
+using KleeneStar.Model.Entities;
 using System.Collections.Generic;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
@@ -7,66 +9,69 @@ using WebExpress.WebIndex.Queries;
 namespace KleeneStar.Core.WWW.Api._1_.Objects._workspacekey_
 {
     /// <summary>
-    /// REST API scrum sprint endpoint for the objects of a workspace.
+    /// REST API scrum sprint endpoint for the objects of a workspace. Returns the
+    /// active sprint overview — name, goal, timeframe, points progress and burn-down —
+    /// built by the base class from the sprints and items of the workspace.
     /// </summary>
-    /// <remarks>
-    /// Returns the currently active sprint board. Until a dedicated Sprint entity exists in
-    /// the model layer, this endpoint reports an empty set of sprints and items so the UI
-    /// renders an empty board instead of failing.
-    /// </remarks>
     [Title("kleenestar.core:object.view.scrum.sprint.title")]
     [Cache]
-    public sealed class ScrumSprint : RestApiScrumSprint<Model.Entities.Object, Model.Entities.Object>
+    public sealed class ScrumSprint : RestApiScrumSprint<Sprint, Model.Entities.Object>
     {
         /// <summary>
-        /// Retrieves a collection of sprints that match the specified query criteria.
+        /// Returns a <see cref="KleeneStarDbContext"/> so the managers can run their
+        /// queries against the real database.
         /// </summary>
-        /// <param name="query">
-        /// The query used to filter and select sprints. Defines the criteria that
-        /// sprints must meet to be included in the result.
-        /// </param>
-        /// <param name="context">
-        /// The context in which the query is executed. Provides additional information
-        /// or services required for query evaluation.
-        /// </param>
-        /// <param name="request">
-        /// The request details associated with the operation. May include user
-        /// information, authentication, or other request-specific data.
-        /// </param>
-        /// <returns>
-        /// An enumerable collection of sprints that satisfy the query criteria. The
-        /// collection is empty if no sprints match. The current implementation always
-        /// returns an empty collection because the model layer does not yet expose a
-        /// dedicated sprint entity.
-        /// </returns>
-        protected override IEnumerable<Model.Entities.Object> RetrieveSprints(IQuery<Model.Entities.Object> query, IQueryContext context, IRequest request)
+        protected override IQueryContext CreateContext()
         {
-            return [];
+            return ModelHub.CreateDbContext();
         }
 
         /// <summary>
-        /// Retrieves a collection of Scrum items that match the specified query criteria.
+        /// Returns the sprints of the workspace addressed by the request route.
         /// </summary>
-        /// <param name="query">
-        /// The query that defines the criteria for selecting Scrum items. Cannot be null.
-        /// </param>
-        /// <param name="context">
-        /// The context in which the query is executed, providing additional
-        /// information or constraints. Cannot be null.
-        /// </param>
-        /// <param name="request">
-        /// The request object containing details about the current API request.
-        /// Cannot be null.
-        /// </param>
-        /// <returns>
-        /// An enumerable collection of Scrum items that satisfy the query
-        /// criteria. The collection is empty if no items match. The current
-        /// implementation always returns an empty collection because the model
-        /// layer does not yet expose sprint board item metadata.
-        /// </returns>
+        /// <param name="query">The query criteria (unused; the route scopes the set).</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The sprints of the workspace.</returns>
+        protected override IEnumerable<Sprint> RetrieveSprints(IQuery<Sprint> query, IQueryContext context, IRequest request)
+        {
+            var workspace = ScrumProjection.GetWorkspace(request);
+
+            return workspace is null
+                ? []
+                : CoreHub.SprintManager.GetSprintsForWorkspace(workspace.Id);
+        }
+
+        /// <summary>
+        /// Returns the active objects of the workspace addressed by the request route.
+        /// </summary>
+        /// <param name="query">The query criteria (unused; the route scopes the set).</param>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The active objects of the workspace.</returns>
         protected override IEnumerable<Model.Entities.Object> RetrieveItems(IQuery<Model.Entities.Object> query, IQueryContext context, IRequest request)
         {
-            return [];
+            return ScrumProjection.GetItems(request);
+        }
+
+        /// <summary>
+        /// Converts a sprint entity into the REST sprint DTO.
+        /// </summary>
+        /// <param name="sprint">The sprint entity.</param>
+        /// <returns>The REST sprint DTO.</returns>
+        protected override RestApiScrumSprintItem ToRestSprint(Sprint sprint)
+        {
+            return ScrumProjection.ToRestSprint(sprint);
+        }
+
+        /// <summary>
+        /// Converts an object entity into the REST item DTO.
+        /// </summary>
+        /// <param name="item">The object entity.</param>
+        /// <returns>The REST item DTO.</returns>
+        protected override RestApiScrumItem ToRestItem(Model.Entities.Object item)
+        {
+            return ScrumProjection.ToRestItem(item);
         }
     }
 }

@@ -3,6 +3,7 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -22,6 +23,66 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Answers a read; the reads that prepare a change (the new, edit, clone and delete
+        /// dialogs) only for an administrator.
+        /// </summary>
+        /// <remarks>
+        /// Tenants bind workspaces to customers, so removing or renaming one changes what a customer sees. The administrators are those of the accounts (<see cref="AccountAuthorization"/>),
+        /// the only installation-wide administration there is.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            var preparesChange = request?.GetParameter("mode")?.Value is "edit" or "delete" or "clone" or "new";
+
+            return !preparesChange || AccountAuthorization.IsAdministrator(request)
+                ? base.Retrieve(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates or clones an entry of the tenants, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes an entry of the tenants, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Removes an entry of the tenants, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Delete(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>
@@ -168,7 +229,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Tenant existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            return AvatarStorage.Validate(payload, nameof(Model.Entities.Tenant.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
         }
 
         /// <summary>
@@ -200,6 +261,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
             };
 
             fieldMap.BindTo(newItem);
+
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
 
             CoreHub.TenantManager.Add(newItem);
 
@@ -239,9 +303,41 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
 
             fieldMap.BindTo(newItem);
 
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
             CoreHub.TenantManager.Add(newItem);
 
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Model.Entities.Tenant item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item?.Id, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Model.Entities.Tenant item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item?.Id, request);
         }
 
         /// <summary>
@@ -259,6 +355,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Tenant existingItem, RestApiCrudFormData payload, IRequest request)
         {
             var res = base.Update(existingItem, payload, request);
+
+            // an emptied picture binds null; the record then carries its generated icon
+            existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
 
             CoreHub.TenantManager.Update(existingItem);
 

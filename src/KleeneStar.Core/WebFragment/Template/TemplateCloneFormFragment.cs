@@ -1,7 +1,10 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +19,19 @@ namespace KleeneStar.Core.WebFragment.Template
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Template._templateid_.Clone>]
     [Cache]
-    public sealed class TemplateCloneFormFragment : FragmentControlRestFormClone
+    public sealed class TemplateCloneFormFragment : FragmentControlDataFormClone
     {
         /// <summary>
         /// Gets the input control configuration for the template name field.
         /// </summary>
-        public ControlRestFormItemInputUnique TemplateName { get; } = new()
+        public ControlDataFormItemInputUnique TemplateName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Template.Name),
             Label = _ => "kleenestar.core:template.name.label",
             Placeholder = _ => "kleenestar.core:template.name.placeholder",
             Help = _ => "kleenestar.core:template.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input control for editing the template description.
@@ -40,13 +42,14 @@ namespace KleeneStar.Core.WebFragment.Template
             Label = _ => "kleenestar.core:template.description.label",
             Placeholder = _ => "kleenestar.core:template.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
-        /// Gets the input control for specifying the category of the template.
+        /// Gets the tag input for the categories of the template (<see cref="TemplateCategories"/>).
         /// </summary>
-        public ControlFormItemInputText Category { get; } = new()
+        public ControlFormItemInputTag Category { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Template.Category),
             Label = _ => "kleenestar.core:template.category.label",
@@ -55,30 +58,16 @@ namespace KleeneStar.Core.WebFragment.Template
         };
 
         /// <summary>
-        /// Gets the configuration for the class selection input used in the form.
-        /// </summary>
-        public ControlRestFormItemInputSelection ClassSelection { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Template.ClassId),
-            Label = _ => "kleenestar.core:template.class.label",
-            Placeholder = _ => "kleenestar.core:template.class.placeholder",
-            Help = _ => "kleenestar.core:template.class.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Index>()
-        };
-
-        /// <summary>
         /// Gets the input selection configuration for the template state field.
         /// </summary>
-        public ControlRestFormItemInputSelection TemplateState { get; } = new()
+        public StateInputSelection TemplateState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Template.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.TemplateStateExtensions.Id(global::KleeneStar.Model.Entities.TemplateState.Active).ToString(),
             Label = _ => "kleenestar.core:template.state.label",
             Placeholder = _ => "kleenestar.core:template.state.placeholder",
             Help = _ => "kleenestar.core:template.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -90,10 +79,11 @@ namespace KleeneStar.Core.WebFragment.Template
             Add(TemplateName);
             Add(Description);
             Add(Category);
-            Add(ClassSelection);
             Add(TemplateState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Templates._workspacekey_.Index>();
+            // a copy stays bound to the class of its source and composes the same child list,
+            // both of which the create endpoint carries over, so neither is offered here
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Templates.Index>();
             ItemId = renderContext =>
             {
                 var templateId = renderContext.Request.GetParameter<TemplateIdParameter>();

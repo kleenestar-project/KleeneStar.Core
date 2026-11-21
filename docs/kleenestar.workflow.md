@@ -64,19 +64,19 @@ The data model of Managed Workflows in **KleeneStar** is anchored locally at the
 ║                                          │ 1                    │ *       │          ║
 ║          ┌───────────┐ *           * ┌───▼───┐ 1          * ┌───▼───┐ 0,1 │          ║
 ║          │ Workspace ├───────────────► Class ◄──────────────┤ Field ├─────┘          ║
-║          └─────┬─────┘               └───▲───┘              └───▲───┘                ║
-║                │ 1                       │ 1                    │ 1                  ║
-║                └────────────────────┐    │                      │                    ║
-║                                     │ *  │ *                    │ *                  ║
-║    ┌───────────┐  ┌──────┐ *    2 ┌─▼────┴─┐ 1            * ┌───┴───┐                ║
-║    │ Dashboard │  │ Link ├────────► Object ├────────────────► Value │                ║
-║    └─────┬─────┘  └──────┘        └─▲────▲─┘                └───▲───┘                ║
-║          │ 1                        │ 1  │ 1                    │ 1                  ║
-║          │              ┌───────────┘    │                      │                    ║
-║          │ *            │ *              │ *                    │ *                  ║
-║     ┌────▼───┐     ┌────┴────┐      ┌────┴────┐         ┌───────┴───────┐            ║
-║     │ Widget │     │ Comment │      │ Version │         │ FileReference │            ║
-║     └────────┘     └─────────┘      └─────────┘         └───────────────┘            ║
+║          └─────┬─────┘               └───▲───┘              └─▲───▲─┘                ║
+║                │ 1                       │ 1                  │ 1 │ 1                ║
+║                └────────────────────┐    │              ┌─────┘   └──────┐           ║
+║                                     │ *  │ *            │ *              │ *         ║
+║    ┌─────────┐    ┌──────┐ *    2 ┌─▼────┴─┐ 1    * ┌───┴───┐        ┌───┴────┐      ║
+║    │ Insight │    │ Link ├────────► Object ◄────────┤ Value │        │ Change │      ║
+║    └────┬────┘    └──────┘        └─▲──▲──▲┘        └───────┘        └───┬────┘      ║
+║         │ 1                       1 │  │ 1│ 1                            │ *         ║
+║         │              ┌────────────┘  │  └──────────────┐    ┌──────────┘           ║
+║         │ *            │ *             │ *               │ *  │ 1                    ║
+║  ┌──────▼──────┐  ┌────┴────┐    ┌─────┴─────────┐     ┌─┴────▼─┐                    ║
+║  │ InsightView │  │ Comment │    │ FileReference │     │ Commit │                    ║
+║  └─────────────┘  └─────────┘    └───────────────┘     └────────┘                    ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
@@ -85,7 +85,7 @@ The data model of Managed Workflows in **KleeneStar** is anchored locally at the
 
 The application follows a modular, decoupled architectural principle. At its center is the `WorkflowManager`, exclusively responsible for the life cycle and management of all workflows. It manages a collection of versioned workflow instances and provides a controlled interface for all interactions.
 
-Each workflow instance contains central characteristics such as name, associated class, versioning status, and access modifiers. New workflows are created exclusively through the `WorkflowManager` to ensure data integrity and consistent access rules.
+Each workflow instance contains central characteristics such as name, associated class, versioning status and access modifiers. New workflows are created exclusively through the `WorkflowManager` to ensure data integrity and consistent access rules.
 
 The `WorkflowManager` performs server-side tasks such as persistent storage of all workflows. At system startup, stored workflows are loaded, state machines initialized, and event subscriptions activated. For every request, the `WorkflowManager` enforces an authorization check for the user. Access is governed by policies that may include context-sensitive filters, time-limited permissions, or audit requirements. This creates a flexible and fine-grained implementation of differentiated read and write rights.
 
@@ -209,14 +209,14 @@ The mockups serve as visual templates for the final UI design. They show how nav
 
 ### Class Management (Page)
 
-The Class Management page forms the central administrative interface for all class types within a workspace and is closely integrated with **KleeneStar**’s Workflow Manager. In addition to structured class maintenance, including functions such as create, edit, clone, archive, and delete, it serves as the starting point for assigning and controlling versioned workflows.
+The Class Management page forms the central administrative interface for all class types within a workspace and is closely integrated with **KleeneStar**'s Workflow Manager. In addition to structured class maintenance, including functions such as create, edit, clone, archive and delete, it serves as the starting point for assigning and controlling versioned workflows.
 
-The tabular overview displays important attributes per class such as name, description, and status. Additionally, there is direct access to each class’s associated workflows: via the options menu, the Manage Workflows function is available to create, version, activate, or archive workflows.
+The tabular overview displays important attributes per class such as name, description and status. Additionally, there is direct access to each class’s associated workflows: via the options menu, the Manage Workflows function is available to create, version, activate or archive workflows.
 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Classes                                                           │║
@@ -261,7 +261,7 @@ Status maintenance is accessed directly from Class Management via the "Manage St
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / Status                                                 │║
@@ -300,7 +300,7 @@ The modal for creating and editing status values in Status Management is used to
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔StatusAddEditModal══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Status / Edit Status                                             │║     │║
@@ -341,7 +341,7 @@ In the modal, the fields name, category, and description are automatically prefi
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔StatusCloneModal════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Clone Status                                                         │║     │║
@@ -384,7 +384,7 @@ When the modal opens, the name of the status to be deleted is displayed clearly 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔StatusDeleteModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Delete Status                                                        │║     │║
@@ -427,7 +427,7 @@ Published workflows directly affect the process control of the associated object
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / Workflows                                              │║
@@ -469,10 +469,12 @@ In the visual view, workflows can be designed intuitively via drag-and-drop, whi
 
 The Workflow Designer enables visual modeling of a class’s state machine with drag-and-drop support, direct editing of state and transition properties, and embedded validation and publication control. States are arranged as nodes on a canvas, and transitions are represented as directed edges. A properties panel provides context-sensitive settings, including labels, guards, validators, and post functions. Changes to the draft are revision-safe. Before publication, the designer consistently checks the reachability of all end states and reference integrity to forms.
 
+The designer **is** the page rather than a block on it, and takes the height the content region offers (`ControlDataWorkflow.Fill`, set by `WorkflowDetailViewFragment`): the canvas and the properties pane end where the pane does and scroll on their own, instead of a fixed frame leaving the rest of the page empty below it. The viewport arithmetic this used to be (`100vh` minus a guessed chrome height) is gone — it was never applied anyway, because the rule it fed was keyed on the controller class the framework strips at mount, and the designer sat at the graph editor's 400px floor.
+
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│  / Service Desk / Incident / Incident Draft / Designer                             │║
@@ -511,7 +513,7 @@ The tabular workflow management allows faithful maintenance of states and transi
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│  / Service Desk / Incident / Incident Draft / Designer                             │║
@@ -550,7 +552,7 @@ The modal for creating and editing transitions in workflow management is used to
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkflowAddEditModal════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Workflow / Edit Workflow                                         │║     │║
@@ -591,7 +593,7 @@ Configuration is carried out via a structured interface that supports both simpl
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkflowGuardModal══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Guard / Edit Guard                                               │║     │║
@@ -632,7 +634,7 @@ Within the modal, simple validation rules can be defined, such as whether a part
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkflowValidatorModal══════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Validator / Edit Validator                                       │║     │║
@@ -673,7 +675,7 @@ Within the modal, simple actions can be selected and configured directly, for ex
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkflowPostfunctionModal═══════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Postfunction / Edit Postfunction                                 │║     │║
@@ -712,7 +714,7 @@ Cloning a workflow enables quick reuse of proven process models within the same 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkflowCloneModa═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Clone Workflow                                                       │║     │║
@@ -753,7 +755,7 @@ Active workflows (Active) cannot be deleted directly. They must first be archive
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]                     │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔═WorkflowDeleteModal════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Wo║│ Delete Workflow                                                      │║     │║
@@ -875,6 +877,15 @@ Workflow management is performed via the following endpoints:
 The API communicates the outcome of each request using standardized HTTP status codes. In case of errors, common responses include **400 Bad Request**, which indicates issues such as invalid definitions, incorrect mappings, or missing required attributes. A **401 Unauthorized** response signals missing or invalid authentication credentials, while **403 Forbidden** denotes insufficient permissions, for example when required roles like `workflow_update` or `workflow_publish` are not granted. If a requested workflow, class, or workspace cannot be found, the API returns **404 Not Found**. A **409 Conflict** may occur due to version mismatches (e.g., ETag conflicts), attempts to delete active workflows, or publication actions that interfere with the current state. Additionally, **422 Unprocessable Entity** is used when rule violations, guard conditions, validator failures, or unresolvable status mappings prevent successful processing.
 
 For successful operations, the API returns **201 Created** when new resources are generated via POST requests, such as drafts, clones, or triggers. A **200 OK** response confirms successful execution of GET, PUT, or POST requests, including validation or simulation reports. When an operation is initiated for asynchronous processing, such as publishing workflows in large environments, the API responds with **202 Accepted**. Finally, **204 No Content** is returned when DELETE operations complete successfully or when no response body is required.
+
+## Moving Objects on the Kanban Board
+
+The Kanban board of the issue and asset overviews is a second place to execute a transition, beside the state dropdown on the object page, and it asks the workflow the same questions: a drop is a state change, not a repositioning.
+
+- **The board offers the statuses of its classes.** A board spans every class of its kind in the workspace, and statuses are defined per class, so the board addresses a status by its **name** across classes (`KanbanStatusCatalog`): the `Open` of the incident class and the `Open` of the problem class are one entry, and a drop resolves it back to the status of the dropped card's own class. Only statuses a class's workflow takes part in are listed. A board whose classes have no workflow offers none and moves cards on screen only.
+- **A column holds statuses.** By default a column holds every status of its status category. An administrator can assign a column its own statuses through the column menu (*Column statuses*, stored in `KanbanBoardColumn.Statuses`); a status assigned to a column is placed there ahead of its category, and is no longer offered by the column of its category. A column that follows its category keeps following it through renames and reorders - only a changed assignment is stored.
+- **A card says where it may go.** Its allowed statuses are the ones the state dropdown would offer the same person: reachable by an active transition and let through by the guards (`IWorkflowManager.GetOfferedStatuses`), none for a caller who may not execute transitions on the object. A drop into a column with exactly one fitting status moves the card at once; with several the board asks which; with none the card stays where it was.
+- **The drop runs the transition.** `IWorkflowManager.ExecuteTransition` checks reachability, guards and validators again and runs the post functions, inside one commit. A refusal returns the card, and the board shows the reason there (a `RestApiRefusal`, translated into the language of the request). A transition that needs a screen (a validator demanding a note) cannot be completed by a drop and is refused like any other move a validator stops.
 
 ## Workflow Events
 

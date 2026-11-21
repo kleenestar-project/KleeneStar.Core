@@ -1,5 +1,7 @@
 ﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebCore.Internationalization;
@@ -16,7 +18,6 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
     /// </summary>
     [WebIcon<IconUserShield>]
     [Title("kleenestar.core:workspace.permissions.title")]
-    //[Policy<WorkspaceAdminPolicy>]
     [Scope<IScopeGeneral>]
     public sealed class Permissions : IPage<VisualTreeWebApp>, IScope
     {
@@ -42,6 +43,15 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
         {
             var keyParameter = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
             var workspace = _workspaceManager.GetWorkspaceByKey(keyParameter?.Value);
+
+            // administering who may do what in a workspace is the workspace's own grant; the
+            // redirect a refusal throws ends the page before the assignment surface is rendered
+            PageAuthorization.Demand
+            (
+                renderContext.Request,
+                typeof(WorkspaceManageProfilesPermission),
+                PageAuthorization.ChainOf(workspace)
+            );
 
             // display workspace name in the modal header
             if (workspace != null)

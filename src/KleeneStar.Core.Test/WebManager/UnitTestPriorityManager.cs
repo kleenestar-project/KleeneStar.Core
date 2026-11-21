@@ -1,4 +1,4 @@
-using KleeneStar.Core.Test;
+using WebExpress.WebIndex.Queries;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 
@@ -103,7 +103,7 @@ namespace KleeneStar.Core.Test.WebManager
             var priority = Sample("DeleteMe");
             CoreHub.PriorityManager.Add(priority);
 
-            Priority? raised = null;
+            Priority raised = null;
             CoreHub.PriorityManager.PriorityRemoved += (_, p) => raised = p;
 
             CoreHub.PriorityManager.Remove(priority.Id);
@@ -111,6 +111,121 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Null(CoreHub.PriorityManager.GetPriority(priority.Id));
             Assert.NotNull(raised);
             Assert.Equal(priority.Id, raised.Id);
+        }
+
+        /// <summary>
+        /// Verifies that <c>Reorder</c> applies the given order, which is what a dragged row set
+        /// arrives as.
+        /// </summary>
+        [Fact]
+        public void Reorder_AppliesGivenOrder()
+        {
+            Seed(nameof(Reorder_AppliesGivenOrder));
+
+            var a = Sample("Alpha");
+            var b = Sample("Bravo");
+            var c = Sample("Charlie");
+            CoreHub.PriorityManager.Add(a);
+            CoreHub.PriorityManager.Add(b);
+            CoreHub.PriorityManager.Add(c);
+
+            CoreHub.PriorityManager.Reorder([c.Id, a.Id, b.Id]);
+
+            Assert.Equal
+            (
+                ["Charlie", "Alpha", "Bravo"],
+                Ordered().Select(p => p.Name)
+            );
+        }
+
+        /// <summary>
+        /// Verifies that <c>Move</c> swaps a priority with the entry above it.
+        /// </summary>
+        [Fact]
+        public void Move_Up_SwapsWithPredecessor()
+        {
+            Seed(nameof(Move_Up_SwapsWithPredecessor));
+
+            var a = Sample("Alpha");
+            var b = Sample("Bravo");
+            CoreHub.PriorityManager.Add(a);
+            CoreHub.PriorityManager.Add(b);
+            CoreHub.PriorityManager.Reorder([a.Id, b.Id]);
+
+            CoreHub.PriorityManager.Move(b.Id, up: true);
+
+            Assert.Equal(["Bravo", "Alpha"], Ordered().Select(p => p.Name));
+        }
+
+        /// <summary>
+        /// Verifies that <c>Move</c> swaps a priority with the entry below it.
+        /// </summary>
+        [Fact]
+        public void Move_Down_SwapsWithSuccessor()
+        {
+            Seed(nameof(Move_Down_SwapsWithSuccessor));
+
+            var a = Sample("Alpha");
+            var b = Sample("Bravo");
+            CoreHub.PriorityManager.Add(a);
+            CoreHub.PriorityManager.Add(b);
+            CoreHub.PriorityManager.Reorder([a.Id, b.Id]);
+
+            CoreHub.PriorityManager.Move(a.Id, up: false);
+
+            Assert.Equal(["Bravo", "Alpha"], Ordered().Select(p => p.Name));
+        }
+
+        /// <summary>
+        /// Verifies that moving beyond either end leaves the order untouched, so a repeated click
+        /// cannot wrap an entry around to the other end.
+        /// </summary>
+        /// <param name="up">The direction to move.</param>
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Move_AtBoundary_DoesNothing(bool up)
+        {
+            Seed(nameof(Move_AtBoundary_DoesNothing) + up);
+
+            var a = Sample("Alpha");
+            var b = Sample("Bravo");
+            CoreHub.PriorityManager.Add(a);
+            CoreHub.PriorityManager.Add(b);
+            CoreHub.PriorityManager.Reorder([a.Id, b.Id]);
+
+            CoreHub.PriorityManager.Move(up ? a.Id : b.Id, up);
+
+            Assert.Equal(["Alpha", "Bravo"], Ordered().Select(p => p.Name));
+        }
+
+        /// <summary>
+        /// Verifies that moving an unknown priority is a no-op.
+        /// </summary>
+        [Fact]
+        public void Move_UnknownId_DoesNothing()
+        {
+            Seed(nameof(Move_UnknownId_DoesNothing));
+
+            CoreHub.PriorityManager.Add(Sample("Alpha"));
+
+            CoreHub.PriorityManager.Move(Guid.NewGuid(), up: true);
+
+            Assert.Equal(["Alpha"], Ordered().Select(p => p.Name));
+        }
+
+        /// <summary>
+        /// Returns the priorities of the test class in their display order.
+        /// </summary>
+        /// <returns>The ordered priorities.</returns>
+        private static IEnumerable<Priority> Ordered()
+        {
+            return CoreHub.PriorityManager
+                .GetPriorities(new Query<Priority>())
+                .Where(p => p.ClassId == ClassId)
+                .OrderBy(p => p.Order)
+                .ThenBy(p => p.Name)
+                .ToList();
         }
 
         /// <summary>

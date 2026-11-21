@@ -26,7 +26,7 @@ namespace KleeneStar.Core.WebFragment.Sla
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.core:sla.add.label";
-            Icon = _ => new IconPlus(TypeIconTheme.Light);
+            Icon = _ => new IconPlus();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
             BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);
             PrimaryAction = renderContext => new ActionModal

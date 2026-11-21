@@ -1,4 +1,4 @@
-using KleeneStar.Model;
+﻿using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -18,6 +18,14 @@ namespace KleeneStar.Core.WebManager
     /// responsibility of the consumer because it depends on the
     /// <see cref="Field.FieldType"/> the value is bound to.
     /// </summary>
+    /// <remarks>
+    /// The manager owns no write path of its own. Every mutation is handed to the
+    /// <see cref="ICommitManager"/>, which writes the value row and the commit describing it in
+    /// one transaction — that is what makes it impossible for a field to change without the
+    /// history saying so. The public surface is unchanged: a write still takes effect as far as
+    /// every reader is concerned, because a write staged by an open commit scope is merged into
+    /// the object-scoped reads below.
+    /// </remarks>
     public sealed class ValueManager : IValueManager
     {
         private readonly IComponentHub _componentHub;
@@ -72,11 +80,64 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The value, or <c>null</c> when no entry matches.</returns>
         public Value GetValue(Guid objectId, Guid fieldId)
         {
+            // a write made inside an open commit scope is not in the store yet, but the code that
+            // made it must still read it back as its own
+            if (CoreHub.CommitManager is CommitManager commitManager &&
+                commitManager.TryGetStagedValue(objectId, fieldId, out var staged))
+            {
+                return staged;
+            }
+
             var query = new Query<Value>()
                 .Where(x => x.ObjectId == objectId && x.FieldId == fieldId)
                 .WithPaging(0, 1);
 
             return ModelHub.GetValues(query).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Returns the payloads of the supplied fields for every supplied object in one read.
+        /// </summary>
+        /// <param name="objectIds">The ids of the objects.</param>
+        /// <param name="fieldIds">The ids of the fields.</param>
+        /// <returns>
+        /// The payload per (object, field) pair. A pair without a value is not in the map.
+        /// </returns>
+        public IReadOnlyDictionary<(Guid ObjectId, Guid FieldId), string> GetData(IEnumerable<Guid> objectIds, IEnumerable<Guid> fieldIds)
+        {
+            var objects = objectIds?.Distinct().ToList() ?? [];
+            var fields = fieldIds?.Distinct().ToList() ?? [];
+            var result = new Dictionary<(Guid ObjectId, Guid FieldId), string>();
+
+            foreach (var (objectId, fieldId, data) in ModelHub.GetValueData(objects, fields))
+            {
+                result.TryAdd((objectId, fieldId), data);
+            }
+
+            // a write made inside an open commit scope is not in the store yet, but the code that
+            // made it must still read it back as its own
+            if (CoreHub.CommitManager is CommitManager commitManager)
+            {
+                foreach (var objectId in objects)
+                {
+                    foreach (var fieldId in fields)
+                    {
+                        if (commitManager.TryGetStagedValue(objectId, fieldId, out var staged))
+                        {
+                            if (staged is null)
+                            {
+                                result.Remove((objectId, fieldId));
+                            }
+                            else
+                            {
+                                result[(objectId, fieldId)] = staged.Data;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -89,7 +150,11 @@ namespace KleeneStar.Core.WebManager
             var query = new Query<Value>()
                 .WhereEquals(x => x.ObjectId, objectId);
 
-            return ModelHub.GetValues(query).ToList();
+            var persisted = ModelHub.GetValues(query).ToList();
+
+            return CoreHub.CommitManager is CommitManager commitManager
+                ? [.. commitManager.OverlayValues(objectId, persisted)]
+                : persisted;
         }
 
         /// <summary>
@@ -116,25 +181,42 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Adds the supplied value to the database and raises <see cref="ValueAdded"/>.
-        /// Returns the manager instance to allow chaining. Values are sub-resources of an
-        /// object save and intentionally do not emit their own UI notification — the
-        /// owning object's create/update notification already covers the operation.
+        /// Records the supplied value as a change on its object and raises
+        /// <see cref="ValueAdded"/>. Returns the manager instance to allow chaining. Values are
+        /// sub-resources of an object save and intentionally do not emit their own UI
+        /// notification — the owning object's create/update notification already covers the
+        /// operation.
         /// </summary>
+        /// <remarks>
+        /// The row is written by the <see cref="ICommitManager"/> together with the commit that
+        /// describes it: inside an open scope when the caller opened one, and as a commit of its
+        /// own otherwise. A write that carries the payload the field already holds is dropped,
+        /// so an unchanged save does not appear in the history as an edit.
+        /// </remarks>
         /// <param name="value">The value to add.</param>
         /// <returns>The current manager instance.</returns>
         public IValueManager Add(Value value)
         {
             ArgumentNullException.ThrowIfNull(value);
 
-            ModelHub.Add(value);
+            if (value.Id == Guid.Empty)
+            {
+                value.Id = Guid.NewGuid();
+            }
+
+            var previous = GetValue(value.ObjectId, value.FieldId)?.Data;
+
+            Commits().StageWrite(value, previous, Guid.Empty);
+
             ValueAdded?.Invoke(this, value);
 
             return this;
         }
 
         /// <summary>
-        /// Persists the supplied value's payload change. Raises <see cref="ValueUpdated"/>.
+        /// Records the supplied value's payload change on its object. Raises
+        /// <see cref="ValueUpdated"/>. See the remarks on <see cref="Add(Value)"/> for how and
+        /// when the row reaches the store.
         /// </summary>
         /// <param name="value">The value to update.</param>
         /// <returns>The current manager instance.</returns>
@@ -142,14 +224,17 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(value);
 
-            ModelHub.Update(value);
+            var previous = GetValue(value.ObjectId, value.FieldId)?.Data;
+
+            Commits().StageWrite(value, previous, Guid.Empty);
+
             ValueUpdated?.Invoke(this, value);
 
             return this;
         }
 
         /// <summary>
-        /// Removes the value identified by the supplied id from the data store. Raises
+        /// Records the removal of the value identified by the supplied id. Raises
         /// <see cref="ValueRemoved"/>. No-op when the value does not exist.
         /// </summary>
         /// <param name="valueId">The value id.</param>
@@ -160,11 +245,25 @@ namespace KleeneStar.Core.WebManager
 
             if (existing is not null)
             {
-                ModelHub.Remove(existing);
+                Commits().StageRemoval(existing, Guid.Empty);
                 ValueRemoved?.Invoke(this, existing);
             }
 
             return this;
+        }
+
+        /// <summary>
+        /// Returns the commit manager the writes are routed through.
+        /// </summary>
+        /// <returns>The commit manager.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the commit manager is not available. A value write that cannot be recorded
+        /// must fail rather than quietly leave a gap in the history.
+        /// </exception>
+        private static CommitManager Commits()
+        {
+            return CoreHub.CommitManager as CommitManager
+                ?? throw new InvalidOperationException("The commit manager is not available; value writes cannot be recorded.");
         }
 
         /// <summary>

@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 
 namespace KleeneStar.Core.Test.WebManager
@@ -128,7 +127,7 @@ namespace KleeneStar.Core.Test.WebManager
             var comment = SampleComment();
             CoreHub.CommentManager.Add(comment);
 
-            Comment? raised = null;
+            Comment raised = null;
             CoreHub.CommentManager.CommentRemoved += (_, c) => raised = c;
 
             CoreHub.CommentManager.Remove(comment.Id);
@@ -263,7 +262,12 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Equal(parent.Id, loaded.ParentCommentId);
         }
 
-        private static Comment SampleComment(string? content = null) => new()
+        /// <summary>
+        /// SampleComment creates a new comment with the given content or a default body.
+        /// </summary>
+        /// <param name="content">The content of the comment.</param>
+        /// <returns>The sample comment.</returns>
+        private static Comment SampleComment(string content = null) => new()
         {
             Id = Guid.NewGuid(),
             ObjectId = ObjectId,

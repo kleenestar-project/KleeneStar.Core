@@ -1,6 +1,9 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +19,19 @@ namespace KleeneStar.Core.WebFragment.Group
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Settings.Groups.Add>]
     [Cache]
-    public sealed class GroupAddFormFragment : FragmentControlRestFormAdd
+    public sealed class GroupAddFormFragment : FragmentControlDataFormAdd
     {
         /// <summary>
         /// Gets the input text control for specifying the name of the group.
         /// </summary>
-        public ControlRestFormItemInputUnique GroupName { get; } = new()
+        public ControlDataFormItemInputUnique GroupName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Group.Name),
             Label = _ => "kleenestar.core:setting.group.name.label",
             Placeholder = _ => "kleenestar.core:setting.group.name.placeholder",
             Help = _ => "kleenestar.core:setting.group.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Groups.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Groups.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the group.
@@ -40,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Group
             Label = _ => "kleenestar.core:setting.group.description.label",
             Placeholder = _ => "kleenestar.core:setting.group.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
@@ -53,7 +56,7 @@ namespace KleeneStar.Core.WebFragment.Group
             Add(GroupName);
             Add(Description);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Groups.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Groups.Index>();
         }
 
         /// <summary>
@@ -74,3 +77,4 @@ namespace KleeneStar.Core.WebFragment.Group
         }
     }
 }
+

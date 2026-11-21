@@ -1,4 +1,5 @@
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -26,8 +27,7 @@ namespace KleeneStar.Core.WebFragment.Sla
         /// </summary>
         public ControlAdvancedSearch Search { get; } = new(ContentId)
         {
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.Wql>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.Wql>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.

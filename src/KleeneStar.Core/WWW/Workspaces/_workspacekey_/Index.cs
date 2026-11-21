@@ -15,7 +15,7 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
     /// </summary>
     [WebIcon<WorkspaceIcon>]
     [WorkspaceKeySegment]
-    [Policy<WorkspaceAdminPolicy>]
+    //[Policy<WorkspaceAdminPolicy>] - a page-level policy refuses everybody; see PageAuthorization
     [Scope<IScopeGeneral>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopeGeneral
@@ -40,9 +40,10 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            // a workspace opens on the document overview, which shows its home page
             throw new RedirectException
             (
-                CoreHub.GetUri<Objects._workspacekey_.Index>()
+                CoreHub.GetUri<Documents._workspacekey_.Index>()
                     .BindParameters(renderContext.Request)
             );
         }

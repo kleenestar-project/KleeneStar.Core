@@ -40,7 +40,9 @@ namespace KleeneStar.Core.WWW.Attachments
 
             var attachment = CoreHub.AttachmentManager.GetAttachment(id);
 
-            if (attachment is null)
+            // a file is as visible as the object it hangs on - its permissions and its security
+            // level - and one the caller may not see is answered as not there at all
+            if (attachment is null || CoreHub.ObjectManager.GetObject(attachment.ObjectId) is null)
             {
                 return new ResponseNotFound();
             }

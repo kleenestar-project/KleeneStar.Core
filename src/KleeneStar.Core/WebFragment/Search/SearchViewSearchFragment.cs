@@ -1,4 +1,6 @@
+using KleeneStar.Core.WebControl;
 using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -14,10 +16,10 @@ namespace KleeneStar.Core.WebFragment.Search
     /// and drives the results table through the table's <c>BindSearch</c> binding.
     /// </summary>
     /// <remarks>
-    /// This is the page-local search element that drives the results table. The application
-    /// header no longer carries a standalone search field — global search is reached from the
-    /// search entry below the recently opened objects in the header object dropdown
-    /// (<c>ObjectDropdownControl</c>).
+    /// This is the page-local search element that drives the results table. The header carries
+    /// the global search box (<c>SearchBoxControl</c>), whose suggestions open an object
+    /// directly; a term submitted there reaches this page as the <c>q</c> parameter, which the
+    /// field below opens with.
     /// </remarks>
     [Section<SectionViewHeaderPrimary>]
     [Scope<SearchViewFragment>]
@@ -31,11 +33,20 @@ namespace KleeneStar.Core.WebFragment.Search
         public static readonly string ContentId = "id_4B7E1C9A6D2F40538192A3B4C5D6E7F0";
 
         /// <summary>
-        /// Gets the search control used to query objects across all workspaces.
+        /// The query parameter a search term arrives in when the page is opened from the header
+        /// search box. Read by the results table as well, which opens on the same term.
         /// </summary>
-        public ControlAdvancedSearch Search { get; } = new ControlAdvancedSearch(ContentId)
+        public const string QueryParameter = "q";
+
+        /// <summary>
+        /// Gets the search control used to query objects across all workspaces. It opens on
+        /// the query of the saved search the page runs and carries the buttons that save and
+        /// share it (<see cref="SavedSearchAdvancedSearch"/>).
+        /// </summary>
+        public ControlAdvancedSearch Search { get; } = new SavedSearchAdvancedSearch(ContentId)
         {
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Wql>()
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Objects.Wql>().ToString()),
+            Value = renderContext => renderContext?.Request?.GetParameter(QueryParameter)?.Value
         };
 
         /// <summary>
@@ -49,11 +60,17 @@ namespace KleeneStar.Core.WebFragment.Search
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);

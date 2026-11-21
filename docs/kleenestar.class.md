@@ -9,6 +9,7 @@ Classes bundle:
 - Linking rules to other classes with cardinality and consistency constraints.
 - Validation and business rules for cross-field consistency.
 - Schema versions including declarative migration paths for compatible and incompatible changes.
+- The presentation of their objects, in two orthogonal parts: the object kind (`Class.Kind`) decides in which overview the objects appear, and the [renderer](kleenestar.renderer.md) (`Class.Renderer`) decides how a single one of them is read and written — as prose in the WYSIWYG editor, or through the structured input mask the class's forms describe.
 
 ## Lifecycle and States
 
@@ -62,19 +63,19 @@ Concrete data instances are represented as Object and are always assigned to a C
 ║                                          │ 1                    │ *       │          ║
 ║          ┌───────────┐ *           * ┌───▼───┐ 1          * ┌───▼───┐ 0,1 │          ║
 ║          │ Workspace ├───────────────► Class ◄──────────────┤ Field ├─────┘          ║
-║          └─────┬─────┘               └───▲───┘              └───▲───┘                ║
-║                │ 1                       │ 1                    │ 1                  ║
-║                └────────────────────┐    │                      │                    ║
-║                                     │ *  │ *                    │ *                  ║
-║    ┌───────────┐  ┌──────┐ *    2 ┌─▼────┴─┐ 1            * ┌───┴───┐                ║
-║    │ Dashboard │  │ Link ├────────► Object ├────────────────► Value │                ║
-║    └─────┬─────┘  └──────┘        └─▲────▲─┘                └───▲───┘                ║
-║          │ 1                        │ 1  │ 1                    │ 1                  ║
-║          │              ┌───────────┘    │                      │                    ║
-║          │ *            │ *              │ *                    │ *                  ║
-║     ┌────▼───┐     ┌────┴────┐      ┌────┴────┐         ┌───────┴───────┐            ║
-║     │ Widget │     │ Comment │      │ Version │         │ FileReference │            ║
-║     └────────┘     └─────────┘      └─────────┘         └───────────────┘            ║
+║          └─────┬─────┘               └───▲───┘              └─▲───▲─┘                ║
+║                │ 1                       │ 1                  │ 1 │ 1                ║
+║                └────────────────────┐    │              ┌─────┘   └──────┐           ║
+║                                     │ *  │ *            │ *              │ *         ║
+║    ┌─────────┐    ┌──────┐ *    2 ┌─▼────┴─┐ 1    * ┌───┴───┐        ┌───┴────┐      ║
+║    │ Insight │    │ Link ├────────► Object ◄────────┤ Value │        │ Change │      ║
+║    └────┬────┘    └──────┘        └─▲──▲──▲┘        └───────┘        └───┬────┘      ║
+║         │ 1                       1 │  │ 1│ 1                            │ *         ║
+║         │              ┌────────────┘  │  └──────────────┐    ┌──────────┘           ║
+║         │ *            │ *             │ *               │ *  │ 1                    ║
+║  ┌──────▼──────┐  ┌────┴────┐    ┌─────┴─────────┐     ┌─┴────▼─┐                    ║
+║  │ InsightView │  │ Comment │    │ FileReference │     │ Commit │                    ║
+║  └─────────────┘  └─────────┘    └───────────────┘     └────────┘                    ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
@@ -200,7 +201,7 @@ Additionally, the sidebar contains an "Add Class" feature that allows new classe
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk                                                                     │║
@@ -238,14 +239,14 @@ Additionally, the sidebar contains an "Add Class" feature that allows new classe
 
 This page serves as the central management hub for all classes defined in the system. It provides a comprehensive overview of the available class types and offers functions for creation, editing, and organization.
 
-The main area contains a tabular list of all classes. Each row shows key attributes such as name, description, and status. For better orientation with large inventories, search and filter functions are integrated directly into the interface. The page supports functions such as editing, cloning, deleting, and archiving classes, as well as managing permissions. New class definitions can be created via the "Add Class" button.
+The main area contains a tabular list of all classes. Each row shows key attributes such as name, description, object type, and status. The object type is drawn as a chip (the framework's tag column) rather than as a word among the prose, because it is the one fact a reader scans the list for: it says in which overview — page tree, timeline, work-item views — the objects of the class appear. For better orientation with large inventories, search and filter functions are integrated directly into the interface. The page supports functions such as editing, cloning, deleting, and archiving classes, as well as managing permissions. New class definitions can be created via the "Add Class" button.
 
 The page is accessible via the "Manage Classes" option in the workspace editing settings dropdown. It forms the basis for the structured maintenance of class types within a workspace context. Changes to classes have an immediate impact on the available object types and their behavior in the respective workspace.
 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Classes                                                           │║
@@ -288,7 +289,7 @@ The page is accessed via the "Manage Classes" entry.
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Classes                                                           │║
@@ -332,10 +333,14 @@ When adding a class ("Add Class"), users start by entering basic information suc
 
 When editing a class ("Edit Class"), all existing information is pre-populated. Users can adjust name, description, type, and fields. Changes are saved via the "Save" button, while "Cancel" aborts the process.
 
+**The name of a class is unique within its workspace**, and only there: two workspaces may both have an `Invoice` — the seeded finance and procurement workspaces do — but within one workspace the name has to be unambiguous, because the class list, the relation types (which hold their accepted classes by name) and every object of the class address it by that name. The comparison ignores case. The rule is enforced twice, for two different readers: the name inputs of the add, edit and clone dialogs are availability-checking inputs (`ControlDataFormItemInputUnique` over `/api/1/classes/{workspacekey}/uniquename`) that report *taken* while the name is being typed — the edit dialog names the class being edited, which never counts against itself — and `/api/1/classes` refuses a duplicate, a nameless create and a create without a workspace in its validation, which every caller passes whether or not it opened a dialog. The add dialog carries the workspace of the page it is opened from in a hidden input; a clone stays in the workspace of its original.
+
+In the edit dialog the name is not one of the fields in the body: it stands **on the title bar**, the way a document is titled by its own name in the prose editor and an issue by its summary. The form renders it into its `header`, which every framework dialog lifts onto its title bar, so the dialog is titled by the class it edits, and the availability verdict is drawn beside the name.
+
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ClassAddEditModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Class / Edit Class                                               │║     │║
@@ -379,7 +384,7 @@ After confirmation, the new class is created and automatically integrated into t
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ClassCloneModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Clone Class                                                          │║     │║
@@ -418,7 +423,7 @@ The dialog clearly indicates which class is to be deleted by explicitly naming t
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔═ClassDeleteModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Delete Class                                                         │║     │║
@@ -457,7 +462,7 @@ Assignments are displayed in a tabular overview and can be adjusted or removed a
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ClassPermissionsModal═══════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│  Manage Permissions for Class 'Incident'                             │║     │║
@@ -604,4 +609,4 @@ This permission model ensures that class management remains modular, secure, and
 
 ## Conclusion
 
-The document "KleeneStar Class Management" outlines the conceptual framework for modeling and maintaining class definitions within modular workspaces. It defines key functional elements such as inheritance, abstraction, subclass composition, and blueprint-based field generation, and positions them within a flexible, UI-integrated lifecycle. As a high-level specification, the document intentionally leaves certain implementation aspects open. Topics like persistence mechanisms, concurrent schema updates, validation strategies, and version control are not defined in detail and must be addressed during implementation. Similarly, advanced features such as asynchronous import/export, audit integration, and plugin-driven schema augmentation are acknowledged but not elaborated. The focus lies on structural clarity, extensibility, and contributor empowerment. The proposed model supports recursive composition, dynamic UI rendering, and permission-aware operations, while remaining adaptable to diverse project needs. 
+The document "KleeneStar Class Management" outlines the conceptual framework for modeling and maintaining class definitions within modular workspaces. It defines key functional elements such as inheritance, abstraction, subclass composition, and blueprint-based field generation, and positions them within a flexible, UI-integrated lifecycle. As a high-level specification, the document intentionally left certain implementation aspects open. Several of them have since been settled by the reference implementation and are no longer open: **persistence** is EF Core through the provider-agnostic `KleeneStarDbContext` with a provider assembly per database and its own migrations (`KleeneStar.Model.Sqlite`); **validation** is the gate of `/api/1/classes` — the renderer has to be one the object type offers, the name has to be present and unique within the workspace, a create has to name its workspace — beside the framework's `Validate…` attributes; **audit integration** is the installation-wide, hash-chained log described in [kleenestar.audit.md](kleenestar.audit.md), which subscribes to the class manager's events centrally; and **plugin-driven schema augmentation** exists in the shape of [workspace templates](kleenestar.workspacetemplate.md) — a template is a class in a plugin that says which classes a workspace starts with, and the shipped ones live in the `KleeneStar.Templates` plugin. What remains open: concurrent schema updates, version control of class definitions, and asynchronous import/export. The focus lies on structural clarity, extensibility, and contributor empowerment. The proposed model supports recursive composition, dynamic UI rendering, and permission-aware operations, while remaining adaptable to diverse project needs. 

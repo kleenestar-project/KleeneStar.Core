@@ -1,6 +1,12 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebFragment.Object;
+using KleeneStar.Core.WebParameter;
+using System.Linq;
+using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +22,30 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Classes._workspacekey_.Add>]
     [Cache]
-    public sealed class ClassAddFormFragment : FragmentControlRestFormAdd
+    public sealed class ClassAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the workspace the class is created in. The page
+        /// the form is shown on is workspace scoped, so the workspace is taken from the
+        /// route and travels with the payload; the create endpoint refuses a class that
+        /// names none, and the foreign key used to refuse it less helpfully.
+        /// </summary>
+        public ControlFormItemInputHidden WorkspaceId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Class.WorkspaceId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the class.
         /// </summary>
-        public ControlRestFormItemInputUnique ClassName { get; } = new()
+        public ControlDataFormItemInputUnique ClassName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.Name),
             Label = _ => "kleenestar.core:class.name.label",
             Placeholder = _ => "kleenestar.core:class.name.placeholder",
             Help = _ => "kleenestar.core:class.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the class.
@@ -40,20 +56,20 @@ namespace KleeneStar.Core.WebFragment.Class
             Label = _ => "kleenestar.core:class.description.label",
             Placeholder = _ => "kleenestar.core:class.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the input selection control for the inherited class.
         /// </summary>
-        public ControlRestFormItemInputSelection InheritedSelection { get; } = new()
+        public ControlDataFormItemInputSelection InheritedSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.InheritedId),
             Label = _ => "kleenestar.core:class.inherited.label",
             Placeholder = _ => "kleenestar.core:class.inherited.placeholder",
             Help = _ => "kleenestar.core:class.inherited.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Inherited>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Inherited>().ToString())};
 
         /// <summary>
         /// Gets the checkbox control for the abstract flag.
@@ -69,14 +85,13 @@ namespace KleeneStar.Core.WebFragment.Class
         /// <summary>
         /// Gets the input selection control for the parent class.
         /// </summary>
-        public ControlRestFormItemInputSelection ParentSelection { get; } = new()
+        public ControlDataFormItemInputSelection ParentSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.ParentId),
             Label = _ => "kleenestar.core:class.parent.label",
             Placeholder = _ => "kleenestar.core:class.parent.placeholder",
             Help = _ => "kleenestar.core:class.parent.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Parent>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_.Parent>().ToString())};
 
         /// <summary>
         /// Gets the tag input control for specifying the allowed children classes.
@@ -90,17 +105,39 @@ namespace KleeneStar.Core.WebFragment.Class
         };
 
         /// <summary>
+        /// Gets the input selection control for the object kind. The class is the
+        /// single source of the kind: every object of the class is presented in the
+        /// matching kind overview (documents, blogs, issues, …).
+        /// </summary>
+        public ControlFormItemInputSelection KindSelection { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Class.Kind),
+            Label = _ => "kleenestar.core:class.kind.label",
+            Help = _ => "kleenestar.core:class.kind.help"
+        };
+
+        /// <summary>
+        /// Gets the input selection control for the renderer - the surface the objects of
+        /// the class are read and written through. Left at <em>follow the object type</em>
+        /// the class follows the default of its type, which is what a class that was never
+        /// configured does; only the renderers the chosen type offers are accepted. It
+        /// projects the renderer catalog itself, so the three class dialogs offer one list
+        /// and a plugin's renderer reaches all of them - see
+        /// <see cref="ObjectRendererSelectionControl"/>.
+        /// </summary>
+        public ControlFormItemInputSelection RendererSelection { get; } = new ObjectRendererSelectionControl();
+
+        /// <summary>
         /// Gets the input selection control for the access modifier.
         /// </summary>
-        public ControlRestFormItemInputSelection AccessModifierSelection { get; } = new()
+        public ControlDataFormItemInputSelection AccessModifierSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.AccessModifier),
             Label = _ => "kleenestar.core:class.accessmodifier.label",
             Placeholder = _ => "kleenestar.core:class.accessmodifier.placeholder",
             Help = _ => "kleenestar.core:class.accessmodifier.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.AccessModifier>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.AccessModifier>().ToString())};
 
         /// <summary>
         /// Gets the checkbox control for the sealed flag.
@@ -116,15 +153,14 @@ namespace KleeneStar.Core.WebFragment.Class
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection ClassState { get; } = new()
+        public StateInputSelection ClassState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Class.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.ClassStateExtensions.Id(global::KleeneStar.Model.Entities.ClassState.Active).ToString(),
             Label = _ => "kleenestar.core:class.state.label",
             Placeholder = _ => "kleenestar.core:class.state.placeholder",
             Help = _ => "kleenestar.core:class.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -133,8 +169,11 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(WorkspaceId);
             Add(ClassName);
             Add(Description);
+            Add(KindSelection);
+            Add(RendererSelection);
             Add(InheritedSelection);
             Add(ClassIsAbstract);
             Add(ParentSelection);
@@ -143,7 +182,19 @@ namespace KleeneStar.Core.WebFragment.Class
             Add(ClassSealed);
             Add(ClassState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
+            // the kind options come from the extensible object-kind catalog, so add-on
+            // kinds automatically become selectable
+            KindSelection.Add(CoreHub.ObjectKindManager.Kinds
+                .Select(kind => new ControlFormItemInputSelectionItem(kind.Key)
+                {
+                    Text = _ => kind.Label
+                }));
+
+            // the renderer options are not filled in here: the catalog is open and a plugin
+            // registers into it after this fragment was built, so RendererSelection projects
+            // it per render instead of being handed a snapshot that predates every add-on
+
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
         }
 
         /// <summary>
@@ -160,7 +211,18 @@ namespace KleeneStar.Core.WebFragment.Class
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is workspace scoped, so the workspace it creates
+            // the class in is taken from the request and carried in the hidden input
+            var key = renderContext?.Request?.GetParameter<WorkspaceKeyParameter>()?.Value;
+            var workspace = CoreHub.WorkspaceManager?.GetWorkspaceByKey(key);
+
+            if (workspace is not null)
+            {
+                renderContext.SetValue(WorkspaceId, new ControlFormInputValueString(workspace.Id.ToString()));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }
 }
+

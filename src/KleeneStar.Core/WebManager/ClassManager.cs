@@ -72,12 +72,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The class.</returns>
         public Class GetClass(Guid classId)
         {
-            var query = new Query<Class>()
-                .Where(x => x.Id == classId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetClass), classId, () =>
+            {
+                var query = new Query<Class>()
+                    .Where(x => x.Id == classId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetClasses(query)
-                .FirstOrDefault();
+                return ModelHub.GetClasses(query)
+                    .FirstOrDefault();
+            }, typeof(Class), typeof(Workspace));
         }
 
         /// <summary>
@@ -135,12 +138,15 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(classEntity);
 
+            classEntity.Kind = Model.Entities.ObjectKind.Normalize(classEntity.Kind);
+            classEntity.Renderer = Model.Entities.ObjectRenderer.Normalize(classEntity.Renderer);
+
             ModelHub.Add(classEntity);
 
             ClassAdded?.Invoke(this, classEntity);
 
             // create notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.class.created", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.class.created", classEntity);
 
             return this;
         }
@@ -154,12 +160,23 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(classEntity);
 
+            classEntity.Kind = Model.Entities.ObjectKind.Normalize(classEntity.Kind);
+
+            // an empty renderer is the state 'follow the kind' rather than a key, so it is
+            // normalized to null instead of to a default - unlike the kind beside it
+            classEntity.Renderer = Model.Entities.ObjectRenderer.Normalize(classEntity.Renderer);
+
             ModelHub.Update(classEntity);
+
+            // the class is the single source of the object kind: stamp the (possibly
+            // changed) kind onto every object of the class so the kind overviews
+            // immediately reflect the change
+            ModelHub.AlignObjectKinds(classEntity.Id, classEntity.Kind);
 
             ClassUpdated?.Invoke(this, classEntity);
 
             // update notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.class.updated", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.class.updated", classEntity);
 
             return this;
         }

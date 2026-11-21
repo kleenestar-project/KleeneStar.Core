@@ -1,0 +1,277 @@
+using KleeneStar.Core.WebManager;
+using KleeneStar.Core.WebRestApi;
+using KleeneStar.Model;
+using KleeneStar.Model.Entities;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Net;
+using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
+using WebExpress.WebCore.WebAttribute;
+using WebExpress.WebCore.WebMessage;
+using WebExpress.WebCore.WebRestApi;
+using WebExpress.WebIndex.Queries;
+
+namespace KleeneStar.Core.WWW.Api._1_.Identities
+{
+    /// <summary>
+    /// Issues the one-time links that set the password of an internal account.
+    /// </summary>
+    /// <remarks>
+    /// The link is answered to the administrator who issued it - in the create response, the
+    /// only time its secret can be read - and handed over by them. Where the installation
+    /// delivers mail (<c>WebExpress:Email</c>) and the account has an address, it is mailed to
+    /// the account as well (<see cref="WebIdentity.PasswordResetMail"/>) and the answer says
+    /// whether that worked; it is still shown, because an accepted message may never arrive.
+    /// The endpoint only creates: a stored link is a hash, and there is nothing in it worth
+    /// listing. Issuing is for the account administrators alone (<see cref="AccountAuthorization"/>),
+    /// because a link for somebody's account <em>is</em> that account; an external account is
+    /// refused, its password is not this installation's to set.
+    /// </remarks>
+    [Cache]
+    public sealed class PasswordResets : RestApiCrud<PasswordReset>
+    {
+        /// <summary>
+        /// Initializes a new instance of the class.
+        /// </summary>
+        public PasswordResets()
+        {
+        }
+
+        /// <summary>
+        /// Issues a link, once the caller administers the accounts.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Answers the empty form of the dialog, and nothing else: the stored links are not read
+        /// back.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Retrieve(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Refuses every change: a link is issued, used or superseded, never edited.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Refuses every removal: issuing a new link spends the open one.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates a new instance of an object that implements the IQueryContext interface.
+        /// </summary>
+        /// <returns>An IQueryContext instance.</returns>
+        protected override IQueryContext CreateContext()
+        {
+            return ModelHub.CreateDbContext();
+        }
+
+        /// <summary>
+        /// Retrieves nothing: the stored links are hashes and are not read back.
+        /// </summary>
+        protected override IEnumerable<PasswordReset> Retrieve(IQuery<PasswordReset> query, IQueryContext context, IRequest request)
+        {
+            return [];
+        }
+
+        /// <summary>
+        /// Validates the account the link is to be issued for.
+        /// </summary>
+        protected override IRestApiValidationResult Validate(PasswordReset existingItem, RestApiCrudFormData payload, IRequest request)
+        {
+            var result = base.Validate(existingItem, payload, request);
+            var account = CoreHub.IdentityManager.GetIdentity(ReadIdentityId(payload));
+
+            if (account is null || account.State != IdentityState.Active)
+            {
+                result.Add(I18N.Translate(request, "kleenestar.core:setting.identity.password.validation.unknown"), nameof(PasswordReset.IdentityId));
+            }
+            else if (!global::KleeneStar.Core.CoreHub.AuthenticationSourceManager.ManagesPassword(account))
+            {
+                result.Add(I18N.Translate(request, "kleenestar.core:setting.identity.password.validation.external"), nameof(PasswordReset.IdentityId));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Issues the link and answers it - the one time its secret can be read.
+        /// </summary>
+        protected override IRestApiCrudResultCreate Create(RestApiCrudFormData fieldMap, IRequest request, out PasswordReset newItem)
+        {
+            newItem = null;
+
+            var issuer = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var result = CoreHub.CredentialManager.IssuePasswordReset(ReadIdentityId(fieldMap), issuer, out var secret);
+
+            if (!result.Succeeded)
+            {
+                return null;
+            }
+
+            newItem = result.Reset;
+
+            var link = BuildLink(request, secret);
+            var account = CoreHub.IdentityManager.GetIdentity(newItem.IdentityId);
+            var mailed = WebIdentity.PasswordResetMail.Send(account, newItem, link, request?.Culture);
+
+            return new RestApiCrudResultCreate
+            {
+                Message = Describe(request, link, newItem) + DescribeMail(request, mailed, account)
+            };
+        }
+
+        /// <summary>
+        /// Composes what the dialog shows: the link, ready to copy, and when it stops working.
+        /// </summary>
+        /// <remarks>
+        /// The form shows the message as markup, so everything in it is encoded - the link is
+        /// built from the request's own address, which a client can say anything about.
+        /// </remarks>
+        /// <param name="request">The request.</param>
+        /// <param name="link">The link carrying the secret.</param>
+        /// <param name="reset">The stored link.</param>
+        /// <returns>The markup.</returns>
+        private static string Describe(IRequest request, string link, PasswordReset reset)
+        {
+            var expires = reset.Expires.ToLocalTime().ToString("g", request?.Culture ?? CultureInfo.CurrentCulture);
+            var intro = I18N.Translate(request, "kleenestar.core:setting.identity.password.issued", expires);
+
+            return $"<p>{WebUtility.HtmlEncode(intro)}</p>"
+                + $"<input type=\"text\" class=\"form-control\" readonly=\"readonly\" onfocus=\"this.select()\" value=\"{WebUtility.HtmlEncode(link)}\"/>";
+        }
+
+        /// <summary>
+        /// Composes the sentence on the mailed copy of the link, or nothing where none was meant
+        /// to be sent.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <param name="outcome">What happened to the message.</param>
+        /// <param name="account">The account the link was issued for.</param>
+        /// <returns>The markup.</returns>
+        private static string DescribeMail(IRequest request, WebIdentity.PasswordResetMailOutcome outcome, Identity account)
+        {
+            var key = outcome switch
+            {
+                WebIdentity.PasswordResetMailOutcome.Sent => "kleenestar.core:setting.identity.password.mail.sent",
+                WebIdentity.PasswordResetMailOutcome.AlreadySent => "kleenestar.core:setting.identity.password.mail.already",
+                WebIdentity.PasswordResetMailOutcome.Failed => "kleenestar.core:setting.identity.password.mail.failed",
+                _ => null
+            };
+
+            return key is null
+                ? string.Empty
+                : $"<p class=\"mt-2\">{WebUtility.HtmlEncode(I18N.Translate(request, key, account?.Email?.Trim()))}</p>";
+        }
+
+        /// <summary>
+        /// Builds the absolute address of the reset page carrying the secret.
+        /// </summary>
+        /// <param name="request">The request whose origin the link points at.</param>
+        /// <param name="secret">The secret.</param>
+        /// <returns>The link.</returns>
+        private static string BuildLink(IRequest request, string secret)
+        {
+            var page = CoreHub.GetUri<global::KleeneStar.Core.WWW.SetPassword.Index>()?.ToString() ?? string.Empty;
+            var anchored = Anchor
+            (
+                page,
+                CoreHub.HttpServerContext?.ExternalUri,
+                request?.Uri?.ToString(),
+                request?.Header?.Host
+            );
+
+            return $"{anchored}?token={Uri.EscapeDataString(secret)}";
+        }
+
+        /// <summary>
+        /// Places the reset page at the address the link will be opened from.
+        /// </summary>
+        /// <remarks>
+        /// The sitemap builds page addresses on <c>WebExpress:ExternalUri</c> when one is
+        /// configured - the public address, which is what the link needs - and on the listener
+        /// binding otherwise, which is nobody's address from outside (<c>0.0.0.0</c> in the
+        /// container, <c>localhost</c> on a server). Without a public address the origin the
+        /// administrator's browser used is the better guess: the scheme of the request and its
+        /// <c>Host</c> header, which keeps a mapped port the request's own address has already
+        /// replaced by the listener's.
+        /// </remarks>
+        /// <param name="page">The page address the sitemap answered.</param>
+        /// <param name="externalUri">The configured public address, or null.</param>
+        /// <param name="requestUri">The address of the request that issues the link.</param>
+        /// <param name="requestHost">The <c>Host</c> header of that request.</param>
+        /// <returns>The absolute address of the page.</returns>
+        private static string Anchor(string page, string externalUri, string requestUri, string requestHost)
+        {
+            var absolute = Uri.TryCreate(page, UriKind.Absolute, out var pageUri);
+
+            if (absolute && !string.IsNullOrWhiteSpace(externalUri))
+            {
+                return page;
+            }
+
+            if (!Uri.TryCreate(requestUri, UriKind.Absolute, out var current))
+            {
+                return page;
+            }
+
+            // the header is the issuing administrator's own browser speaking - only an administrator
+            // issues a link, so even the mailed copy is built on an origin they used - but a value
+            // that is no bare authority is still not put in front of a secret
+            var origin = Uri.TryCreate($"{current.Scheme}://{requestHost?.Trim()}", UriKind.Absolute, out var host)
+                && host.PathAndQuery == "/" && string.IsNullOrEmpty(host.UserInfo)
+                    ? host.GetLeftPart(UriPartial.Authority)
+                    : current.GetLeftPart(UriPartial.Authority);
+            var path = absolute ? pageUri.PathAndQuery : page;
+
+            return origin + path;
+        }
+
+        /// <summary>
+        /// Reads the account the payload names.
+        /// </summary>
+        /// <param name="payload">The payload.</param>
+        /// <returns>The account id, or <see cref="Guid.Empty"/>.</returns>
+        private static Guid ReadIdentityId(RestApiCrudFormData payload)
+        {
+            var key = nameof(PasswordReset.IdentityId);
+            var raw = payload is null
+                ? null
+                : payload.TryGetValue(key.ToLowerInvariant(), out var lower) ? lower : payload.TryGetValue(key, out var exact) ? exact : null;
+
+            return Guid.TryParse(raw?.ToString(), out var id) ? id : Guid.Empty;
+        }
+    }
+}

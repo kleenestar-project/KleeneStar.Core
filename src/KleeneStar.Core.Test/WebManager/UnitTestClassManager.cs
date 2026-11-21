@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using WebExpress.WebIndex.Queries;
@@ -98,7 +97,7 @@ namespace KleeneStar.Core.Test.WebManager
             var classEntity = Sample("Delete");
             CoreHub.ClassManager.Add(classEntity);
 
-            Class? raised = null;
+            Class raised = null;
             CoreHub.ClassManager.ClassRemoved += (_, c) => raised = c;
 
             CoreHub.ClassManager.Remove(classEntity.Id);

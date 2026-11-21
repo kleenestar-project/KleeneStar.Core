@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using System;
 using System.Linq;
 using WebExpress.WebApp.WebSection;
@@ -6,6 +6,7 @@ using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebUri;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -19,16 +20,19 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.SecurityLevels._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Priorities._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Slas._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendars._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Relations._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendar._calendarid_.Index>]
+    [Condition<ClassServiceLevelCondition>]
     [Order(20)]
     [Cache]
     public sealed class ClassSidebarSlaLinkFragment : FragmentControlSidebarItemLink
@@ -42,12 +46,13 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassSidebarSlaLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconProcessTimer(/*TypeIconTheme.Light*/);
+            Icon = _ => new IconProcessTimer();
             Text = _ => "kleenestar.core:sla.link.label";
             Uri = renderContext => GetUri(renderContext);
             Active = renderContext => IsActive(renderContext)
                 ? TypeActive.Active
                 : TypeActive.None;
+            Badge = renderContext => GetBadge(renderContext);
         }
 
         /// <summary>
@@ -133,6 +138,32 @@ namespace KleeneStar.Core.WebFragment.Class
             var classId = ResolveClassId(renderContext);
 
             return _uri.BindParameters(new ClassIdParameter(classId));
+        }
+
+        /// <summary>
+        /// Computes the trailing sidebar badge for the 'SLA' link: the number of SLA policies
+        /// attached to the resolved class. Returns <c>null</c> when no class can be resolved or
+        /// the class has no SLA policies, so an empty collection leaves the link badge-free
+        /// rather than showing a noisy zero.
+        /// </summary>
+        /// <param name="renderContext">
+        /// The render context used to resolve the class identifier whose SLA policies are counted.
+        /// Cannot be null.
+        /// </param>
+        /// <returns>
+        /// The element count as a string, or <c>null</c> when there is nothing to display.
+        /// </returns>
+        private static string GetBadge(IRenderControlContext renderContext)
+        {
+            var classId = ResolveClassId(renderContext);
+            if (classId == Guid.Empty)
+            {
+                return null;
+            }
+
+            var count = CoreHub.SlaManager.GetSlas(new ClassIdParameter(classId)).Count();
+
+            return count > 0 ? count.ToString() : null;
         }
     }
 }

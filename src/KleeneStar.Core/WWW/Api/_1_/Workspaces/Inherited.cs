@@ -35,7 +35,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </summary>
         protected override IQueryable<RestApiSelectionItem> RetrieveItems(IQuery<Workspace> query, IQueryContext context, IRequest request)
         {
-            var workspaces = CoreHub.WorkspaceManager.GetWorkspaces(query, context);
+            var workspaces = CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context);
 
             var list = new List<RestApiSelectionItem>
             {

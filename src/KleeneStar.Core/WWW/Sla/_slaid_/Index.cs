@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebAttribute;
+﻿using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebUri;
 using System;
@@ -46,7 +46,7 @@ namespace KleeneStar.Core.WWW.Sla._slaid_
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                         .BindParameters(new WorkspaceKeyParameter(workspace?.Key))
                         .BindParameters(renderContext.Request)
                 })

@@ -1,5 +1,6 @@
 ﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebPolicies;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -14,10 +15,10 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// Represents a avatar form fragment for a workspace.
     /// </summary>
     [Section<SectionContentPreferences>]
-    [Policy<WorkspaceAdminPolicy>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Avatar>]
     [Cache]
-    public sealed class WorkspaceAvatarFormFragment : FragmentControlRestFormEdit
+    public sealed class WorkspaceAvatarFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
         /// Gets the input text control for specifying the name of the workspace.
@@ -36,7 +37,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
         {
             Add(Avatar);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Index>();
             ItemId = renderContext =>
             {
                 var key = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
@@ -63,3 +64,4 @@ namespace KleeneStar.Core.WebFragment.Workspace
         }
     }
 }
+

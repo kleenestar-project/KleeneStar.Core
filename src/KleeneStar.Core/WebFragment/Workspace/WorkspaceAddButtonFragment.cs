@@ -15,6 +15,8 @@ namespace KleeneStar.Core.WebFragment.Workspace
     /// </summary>
     [Section<SectionHeadlinePrimary>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces.Index>]
+    // creating a workspace needs a signed-in caller, so the button is not offered to anybody else
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogin>]
     [Cache]
     public sealed class WorkspaceAddButtonFragment : FragmentControlButtonLink
     {
@@ -29,7 +31,7 @@ namespace KleeneStar.Core.WebFragment.Workspace
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.core:workspace.add.label";
-            Icon = _ => new IconPlus(TypeIconTheme.Light);
+            Icon = _ => new IconPlus();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
             BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);
             PrimaryAction = _ => new ActionModal
@@ -41,11 +43,17 @@ namespace KleeneStar.Core.WebFragment.Workspace
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             if (!FragmentContext.Conditions.Check(renderContext?.Request))

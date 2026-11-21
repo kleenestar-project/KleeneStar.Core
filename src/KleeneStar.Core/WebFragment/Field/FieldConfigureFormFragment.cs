@@ -1,8 +1,10 @@
 ﻿using KleeneStar.Core.WebParameter;
 using System.Collections.Generic;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -19,7 +21,7 @@ namespace KleeneStar.Core.WebFragment.Field
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Field._fieldid_.Configure>]
     [Cache]
-    public sealed class FieldConfigureFormFragment : FragmentControlRestForm
+    public sealed class FieldConfigureFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
         /// Gets the numeric input control for the minimum number of values the field must contain.
@@ -98,40 +100,37 @@ namespace KleeneStar.Core.WebFragment.Field
         /// Only active workflows compatible with the field's class are available.
         /// Applies to fields of type Workflow.
         /// </summary>
-        public ControlRestFormItemInputSelection WorkflowSelection { get; } = new()
+        public ControlDataFormItemInputSelection WorkflowSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.WorkflowId),
             Label = _ => "kleenestar.core:field.configure.workflow.label",
             Placeholder = _ => "kleenestar.core:field.configure.workflow.placeholder",
             Help = _ => "kleenestar.core:field.configure.workflow.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.Index>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.Index>().ToString())};
 
         /// <summary>
         /// Gets the selection control for choosing the default priority for this field.
         /// Applies to fields of type Priority (Reference with priority semantics).
         /// </summary>
-        public ControlRestFormItemInputSelection DefaultPrioritySelection { get; } = new()
+        public ControlDataFormItemInputSelection DefaultPrioritySelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.DefaultPriorityId),
             Label = _ => "kleenestar.core:field.configure.priority.default.label",
             Placeholder = _ => "kleenestar.core:field.configure.priority.default.placeholder",
             Help = _ => "kleenestar.core:field.configure.priority.default.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.Index>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.Index>().ToString())};
 
         /// <summary>
         /// Gets the dual-list transfer control for selecting the priorities available for this field.
         /// </summary>
-        public ControlRestFormItemInputSelection SelectedPriorities { get; } = new()
+        public ControlDataFormItemInputSelection SelectedPriorities { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.SelectedPriorityIds),
             Label = _ => "kleenestar.core:field.configure.priority.selected.label",
             Placeholder = _ => "kleenestar.core:field.configure.priority.available.label",
             Help = _ => "kleenestar.core:field.configure.priority.selected.label",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.Index>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Priorities.Index>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -140,8 +139,7 @@ namespace KleeneStar.Core.WebFragment.Field
         public FieldConfigureFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Mode = _ => "configure";
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Fields.Index>();
             ItemId = renderContext =>
             {
                 var fieldId = renderContext.Request.GetParameter<FieldIdParameter>();
@@ -265,27 +263,53 @@ namespace KleeneStar.Core.WebFragment.Field
         /// <returns><c>true</c> when the category should be shown; otherwise <c>false</c>.</returns>
         private static bool AppliesToCardinality(Model.Entities.FieldType? type)
             => type is not (Model.Entities.FieldType.Text
+                or Model.Entities.FieldType.Multiline
+                or Model.Entities.FieldType.RichText
+                or Model.Entities.FieldType.Password
                 or Model.Entities.FieldType.Boolean
                 or Model.Entities.FieldType.Workflow
-                or Model.Entities.FieldType.Priority);
+                or Model.Entities.FieldType.Priority
+                or Model.Entities.FieldType.Color
+                or Model.Entities.FieldType.Rating
+                or Model.Entities.FieldType.Slider
+                or Model.Entities.FieldType.Range
+                or Model.Entities.FieldType.Estimate
+                or Model.Entities.FieldType.TrafficLight
+                or Model.Entities.FieldType.DateRange
+                or Model.Entities.FieldType.CalendarRange
+                or Model.Entities.FieldType.Avatar
+                or Model.Entities.FieldType.Choice
+                or Model.Entities.FieldType.Radio);
 
         /// <summary>
         /// Determines whether the Validation category applies to the given field type.
-        /// Regular-expression validation is only meaningful for text-based fields.
+        /// Regular-expression validation is only meaningful for fields whose value is typed
+        /// as free text.
         /// </summary>
         /// <param name="type">The resolved field type, or <c>null</c> when it cannot be determined.</param>
         /// <returns><c>true</c> when the category should be shown; otherwise <c>false</c>.</returns>
         private static bool AppliesToValidation(Model.Entities.FieldType? type)
-            => type is null or Model.Entities.FieldType.Text;
+            => type is null
+                or Model.Entities.FieldType.Text
+                or Model.Entities.FieldType.Multiline
+                or Model.Entities.FieldType.Password;
 
         /// <summary>
         /// Determines whether the Options category applies to the given field type.
-        /// Selectable option values are only meaningful for enumerable fields.
+        /// Selectable option values are meaningful for every field the user picks from a
+        /// list the field itself defines, whichever control that list is offered through.
         /// </summary>
         /// <param name="type">The resolved field type, or <c>null</c> when it cannot be determined.</param>
         /// <returns><c>true</c> when the category should be shown; otherwise <c>false</c>.</returns>
         private static bool AppliesToOptions(Model.Entities.FieldType? type)
-            => type is null or Model.Entities.FieldType.Selection;
+            => type is null
+                or Model.Entities.FieldType.Selection
+                or Model.Entities.FieldType.MultiSelection
+                or Model.Entities.FieldType.Choice
+                or Model.Entities.FieldType.Radio
+                or Model.Entities.FieldType.Tile
+                or Model.Entities.FieldType.Move
+                or Model.Entities.FieldType.Cascading;
 
         /// <summary>
         /// Determines whether the Filter objects category applies to the given field type.

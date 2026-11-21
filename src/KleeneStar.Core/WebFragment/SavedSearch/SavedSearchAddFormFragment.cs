@@ -1,4 +1,6 @@
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -15,7 +17,7 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.SavedSearches.Add>]
     [Cache]
-    public sealed class SavedSearchAddFormFragment : FragmentControlRestFormAdd
+    public sealed class SavedSearchAddFormFragment : FragmentControlDataFormAdd
     {
         /// <summary>
         /// Gets the input control for the saved-search name.
@@ -30,27 +32,15 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
         };
 
         /// <summary>
-        /// Gets the input control for the query expression.
+        /// Gets the editor for the query: the WQL prompt of the search page, with its
+        /// highlighting, completion and syntax check against the object model.
         /// </summary>
-        public ControlFormItemInputText Query { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.SavedSearch.Query),
-            Label = _ => "kleenestar.core:search.saved.query.label",
-            Placeholder = _ => "kleenestar.core:search.saved.query.placeholder",
-            Help = _ => "kleenestar.core:search.saved.query.help",
-            Required = _ => true
-        };
+        public ControlDataWqlPrompt Query { get; } = SavedSearchFormItems.BuildQuery("savedsearch-add-query");
 
         /// <summary>
-        /// Gets the input control for the optional description.
+        /// Gets the input control for the optional description, written in the prose editor.
         /// </summary>
-        public ControlFormItemInputText Description { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.SavedSearch.Description),
-            Label = _ => "kleenestar.core:search.saved.description.label",
-            Placeholder = _ => "kleenestar.core:search.saved.description.placeholder",
-            Required = _ => false
-        };
+        public ControlFormItemInputText Description { get; } = SavedSearchFormItems.BuildDescription();
 
         /// <summary>
         /// Gets the checkbox control for the starred flag.
@@ -71,11 +61,16 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
             : base(fragmentContext)
         {
             Add(SavedSearchName);
-            Add(Query);
+            Add(SavedSearchFormItems.BuildQueryPanel(Query));
             Add(Description);
             Add(Starred);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.SavedSearches.Index>();
+            // opened from the search page, the dialog names the expression on screen, which
+            // the endpoint answers as the query the new saved search starts with
+            ServiceFactory = renderContext => DataServiceDescriptor.FormData(SavedSearchFormItems.ResolveService(renderContext));
+
+            // the endpoint answers the address that runs the new saved search as uri
+            SuccessAction = _ => TypeRestFormSuccess.FollowUri;
         }
 
         /// <summary>
@@ -90,3 +85,4 @@ namespace KleeneStar.Core.WebFragment.SavedSearch
         }
     }
 }
+

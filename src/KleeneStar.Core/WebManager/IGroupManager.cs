@@ -48,6 +48,17 @@ namespace KleeneStar.Core.WebManager
         IEnumerable<Group> GetGroups(IQuery<Group> query, IQueryContext context);
 
         /// <summary>
+        /// Returns how many groups satisfy the supplied filter criteria without loading
+        /// them - the figure behind a headline such as the landing page's team count.
+        /// </summary>
+        /// <param name="query">
+        /// The query criteria used to filter the counted groups. Paging must be left off:
+        /// a query carrying it counts the page, not the whole result.
+        /// </param>
+        /// <returns>The number of matching groups.</returns>
+        int CountGroups(IQuery<Group> query);
+
+        /// <summary>
         /// Adds a group.
         /// </summary>
         IGroupManager Add(Group groupEntity);

@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 
@@ -112,7 +111,7 @@ namespace KleeneStar.Core.Test.WebManager
             var calendar = SampleCalendar();
             CoreHub.CalendarManager.Add(calendar);
 
-            Calendar? raised = null;
+            Calendar raised = null;
             CoreHub.CalendarManager.CalendarRemoved += (_, c) => raised = c;
 
             CoreHub.CalendarManager.Remove(calendar.Id);
@@ -143,13 +142,13 @@ namespace KleeneStar.Core.Test.WebManager
         [Fact]
         public void ReservedCalendarNames_BlocksRouterSegments()
         {
-            Assert.Contains("add",    KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
-            Assert.Contains("edit",   KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
+            Assert.Contains("add", KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
+            Assert.Contains("edit", KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
             Assert.Contains("delete", KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
-            Assert.Contains("api",    KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
+            Assert.Contains("api", KleeneStar.Core.WebManager.CalendarManager.ReservedCalendarNames);
         }
 
-        private static Calendar SampleCalendar(string? name = null) => new()
+        private static Calendar SampleCalendar(string name = null) => new()
         {
             Id = Guid.NewGuid(),
             Name = name ?? "Standard · Europe/Berlin",

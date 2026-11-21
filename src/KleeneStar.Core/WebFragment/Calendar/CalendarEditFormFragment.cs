@@ -1,7 +1,10 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +19,19 @@ namespace KleeneStar.Core.WebFragment.Calendar
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Calendar._calendarid_.Edit>]
     [Cache]
-    public sealed class CalendarEditFormFragment : FragmentControlRestFormEdit
+    public sealed class CalendarEditFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
         /// Gets the unique-name input control.
         /// </summary>
-        public ControlRestFormItemInputUnique CalendarName { get; } = new()
+        public ControlDataFormItemInputUnique CalendarName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Calendar.Name),
             Label = _ => "kleenestar.core:calendar.name.label",
             Placeholder = _ => "kleenestar.core:calendar.name.placeholder",
             Help = _ => "kleenestar.core:calendar.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the description input control.
@@ -40,21 +42,21 @@ namespace KleeneStar.Core.WebFragment.Calendar
             Label = _ => "kleenestar.core:calendar.description.label",
             Placeholder = _ => "kleenestar.core:calendar.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the timezone selection control.
         /// </summary>
-        public ControlRestFormItemInputSelection CalendarTimeZone { get; } = new()
+        public ControlDataFormItemInputSelection CalendarTimeZone { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Calendar.TimeZone),
             Label = _ => "kleenestar.core:calendar.timezone.label",
             Placeholder = _ => "kleenestar.core:calendar.timezone.placeholder",
             Help = _ => "kleenestar.core:calendar.timezone.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.TimeZone>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.TimeZone>().ToString())};
 
         /// <summary>
         /// Gets the region input control.
@@ -71,15 +73,14 @@ namespace KleeneStar.Core.WebFragment.Calendar
         /// <summary>
         /// Gets the state selection control.
         /// </summary>
-        public ControlRestFormItemInputSelection CalendarState { get; } = new()
+        public StateInputSelection CalendarState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Calendar.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.CalendarStateExtensions.Id(global::KleeneStar.Model.Entities.CalendarState.Active).ToString(),
             Label = _ => "kleenestar.core:calendar.state.label",
             Placeholder = _ => "kleenestar.core:calendar.state.placeholder",
             Help = _ => "kleenestar.core:calendar.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.State>().ToString())};
 
         /// <summary>
         /// Gets the "default" toggle.
@@ -105,8 +106,7 @@ namespace KleeneStar.Core.WebFragment.Calendar
             Add(CalendarRegion);
             Add(CalendarState);
             Add(IsDefault);
-
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Calendars.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Calendars.Index>();
             ItemId = renderContext =>
             {
                 var calendarId = renderContext.Request.GetParameter<CalendarIdParameter>();

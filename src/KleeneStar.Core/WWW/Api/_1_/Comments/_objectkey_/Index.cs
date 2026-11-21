@@ -1,5 +1,6 @@
 using KleeneStar.Core.WebAttribute;
 using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
@@ -15,8 +17,8 @@ using WebExpress.WebIndex.Queries;
 namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
 {
     /// <summary>
-    /// REST endpoint backing the <c>ControlRestComment</c> and
-    /// <c>ControlRestCommentComposer</c> controls on an object detail page. The URL is
+    /// REST endpoint backing the <c>ControlDataComment</c> and
+    /// <c>ControlDataCommentComposer</c> controls on an object detail page. The URL is
     /// <c>/api/1/comments/{objectkey}</c>; the <c>{objectkey}</c> URL segment is
     /// declared via <see cref="ObjectKeySegmentAttribute"/> so callers can bind the
     /// segment by passing the current request's <see cref="ObjectKeyParameter"/>
@@ -41,13 +43,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
     [Cache]
     public sealed class Index : RestApiComment<Comment>
     {
-        /// <summary>
-        /// Fallback identity used as the author when the request session does not
-        /// carry an authenticated user (e.g. during seeding or anonymous test traffic).
-        /// Matches the admin identity seeded by <see cref="KleeneStarDbSeeder"/>.
-        /// </summary>
-        private static readonly Guid FallbackAuthorId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
-
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -75,6 +70,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return [];
             }
 
+            // the service team's notes stay with the service team: a customer reading the same
+            // object is shown the public part of the conversation only
+            var seesInternal = CommentAudience.SeesInternal(CoreHub.ObjectManager.GetObject(objectId));
+
             using var db = ModelHub.CreateDbContext();
             var all = db.Comments
                 .Include(c => c.Author)
@@ -82,6 +81,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 .Include(c => c.Reactions).ThenInclude(r => r.Author)
                 .AsNoTracking()
                 .Where(c => c.ObjectId == objectId)
+                .ToList()
+                .Where(c => CommentAudience.Reaches(c, seesInternal))
                 .ToList();
 
             var byParent = all.Where(c => c.ParentCommentId.HasValue)
@@ -92,7 +93,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 .Where(c => !c.ParentCommentId.HasValue)
                 .OrderByDescending(c => c.IsPinned)
                 .ThenBy(c => c.Created)
-                .Select(c => ToItem(c, byParent))
+                .Select(c => ToItem(c, byParent, request))
                 .ToList();
         }
 
@@ -110,7 +111,19 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             ArgumentNullException.ThrowIfNull(payload);
 
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body))
+            var authorId = ResolveAuthorId(request);
+
+            // a comment is somebody's word, so it is not written when nobody can be named for
+            // it - the alternative is to sign it with an account that did not write it
+            if (objectId == Guid.Empty || authorId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Body)
+                || !MayCommentOn(objectId, request))
+            {
+                return null;
+            }
+
+            var visibility = ResolveVisibility(payload);
+
+            if (visibility == CommentVisibility.InternalTeam && !CommentAudience.MayWriteInternal(CoreHub.ObjectManager.GetObject(objectId)))
             {
                 return null;
             }
@@ -119,16 +132,17 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             {
                 Id = Guid.NewGuid(),
                 ObjectId = objectId,
-                AuthorId = ResolveAuthorId(request),
+                AuthorId = authorId,
                 Content = payload.Body.Trim(),
                 State = CommentState.Active,
+                Visibility = visibility,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
             };
 
             CoreHub.CommentManager.Add(comment);
 
-            return ToItem(LoadWithAuthor(comment.Id), parentReplies: null);
+            return ToItem(LoadWithAuthor(comment.Id), parentReplies: null, request);
         }
 
         /// <summary>
@@ -150,7 +164,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null)
+            if (existing is null || !CommentAudience.Reaches(existing) || !MayCommentOn(existing.ObjectId, request))
             {
                 return null;
             }
@@ -161,7 +175,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
 
             CoreHub.CommentManager.Update(existing);
 
-            return ToItem(LoadWithAuthor(id), parentReplies: null);
+            return ToItem(LoadWithAuthor(id), parentReplies: null, request);
         }
 
         /// <summary>
@@ -181,7 +195,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             var existing = CoreHub.CommentManager.GetComment(id);
-            if (existing is null)
+            if (existing is null || !CommentAudience.Reaches(existing) || !MayCommentOn(existing.ObjectId, request))
             {
                 return false;
             }
@@ -206,8 +220,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return null;
             }
 
+            var authorId = ResolveAuthorId(request);
             var parent = CoreHub.CommentManager.GetComment(parentId);
-            if (parent is null)
+
+            if (parent is null || authorId == Guid.Empty || !CommentAudience.Reaches(parent) || !MayCommentOn(parent.ObjectId, request))
             {
                 return null;
             }
@@ -216,9 +232,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             {
                 Id = Guid.NewGuid(),
                 ObjectId = parent.ObjectId,
-                AuthorId = ResolveAuthorId(request),
+                AuthorId = authorId,
                 Content = reply.Trim(),
                 State = CommentState.Active,
+
+                // a reply never widens the audience of the thread it hangs under, otherwise
+                // answering a service-team note would publish its subject to the requester
+                Visibility = parent.Visibility,
                 ParentCommentId = parentId,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
@@ -237,24 +257,28 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
-        /// Toggles a like on the comment for the identity resolved by name from the
-        /// supplied <paramref name="user"/> argument (the control sends back whatever
-        /// the host returned from <see cref="ResolveCurrentUser"/>). Returns the list
-        /// of identity names that currently like the comment.
+        /// Toggles a like on the comment for the signed-in user. Returns the list of identity
+        /// names that currently like the comment.
         /// </summary>
+        /// <remarks>
+        /// The <paramref name="user"/> the control sends along is ignored: it is a name that
+        /// travelled through the browser, and taking it would let a caller like as anybody
+        /// whose name they know. Whose like it is, is a question about the session.
+        /// </remarks>
         /// <param name="commentId">The id of the comment.</param>
-        /// <param name="user">The display name of the user toggling the like.</param>
+        /// <param name="user">The display name the control sends back; not trusted.</param>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The current likers.</returns>
         protected override IEnumerable<string> ToggleLike(string commentId, string user, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            var authorId = ResolveAuthorId(request);
+
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return [];
             }
 
-            var authorId = ResolveAuthorIdByName(user) ?? ResolveAuthorId(request);
             return CoreHub.CommentManager.ToggleLike(id, authorId);
         }
 
@@ -269,7 +293,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         /// <returns>The new pin state, or <c>null</c> when no comment matches.</returns>
         protected override bool? TogglePin(string commentId, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            // a pin carries no author of its own, but it is still somebody's act: the identity
+            // is resolved here so the notification and the audit event the manager raises are
+            // attributed to whoever pinned, and so an anonymous caller cannot pin at all
+            if (!Guid.TryParse(commentId, out var id) || ResolveAuthorId(request) == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return null;
             }
@@ -278,43 +305,71 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         }
 
         /// <summary>
-        /// Toggles an emoji reaction on the comment for the identity resolved by name
-        /// from the supplied <paramref name="user"/> argument.
+        /// Toggles an emoji reaction on the comment for the signed-in user.
         /// </summary>
+        /// <remarks>
+        /// As with the like, the <paramref name="user"/> the control sends along is ignored in
+        /// favour of the session - a reaction says who felt that way about the comment, and a
+        /// name from the browser cannot answer that.
+        /// </remarks>
         /// <param name="commentId">The id of the comment.</param>
-        /// <param name="user">The display name of the user toggling the reaction.</param>
+        /// <param name="user">The display name the control sends back; not trusted.</param>
         /// <param name="reaction">The emoji to toggle.</param>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The reaction map (emoji → identity names) after the toggle.</returns>
         protected override IDictionary<string, IEnumerable<string>> ToggleReaction(string commentId, string user, string reaction, IQueryContext context, IRequest request)
         {
-            if (!Guid.TryParse(commentId, out var id))
+            var authorId = ResolveAuthorId(request);
+
+            if (!Guid.TryParse(commentId, out var id) || authorId == Guid.Empty || !MayCommentOnComment(id, request))
             {
                 return new Dictionary<string, IEnumerable<string>>();
             }
 
-            var authorId = ResolveAuthorIdByName(user) ?? ResolveAuthorId(request);
             return CoreHub.CommentManager.ToggleReaction(id, authorId, reaction);
         }
 
         /// <summary>
-        /// Looks up an identity by its display name and returns the id, or <c>null</c>
-        /// when no matching identity exists. The control sends back the name string from
-        /// <see cref="ResolveCurrentUser"/>; we re-resolve it server-side rather than
-        /// trusting the client-supplied value verbatim.
+        /// Returns the audiences the composer offers as its categories: the public one to
+        /// everybody who may comment, the service team's to the service team alone.
         /// </summary>
-        /// <param name="name">The identity display name.</param>
-        /// <returns>The identity id or <c>null</c>.</returns>
-        private static Guid? ResolveAuthorIdByName(string name)
+        /// <remarks>
+        /// The composer posts the chosen category id as <see cref="RestApiCommentPayload.Category"/>,
+        /// which is where the endpoint reads the audience from, so the ids are the visibility
+        /// tokens. The framework's six topical categories are not offered: they were stored
+        /// nowhere and only hid the one choice the comment does carry.
+        /// </remarks>
+        /// <param name="context">The query context.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The audiences the caller may address.</returns>
+        protected override IEnumerable<RestApiCommentCategory> RetrieveCategories(IQueryContext context, IRequest request)
         {
-            if (string.IsNullOrEmpty(name))
+            var categories = new List<RestApiCommentCategory>
             {
-                return null;
+                new()
+                {
+                    Id = CommentVisibilityExtensions.PublicToken,
+                    I18n = CommentVisibility.Public.Text(),
+                    Color = "var(--wx-webapp-cat-general, #6b7280)",
+                    Background = "var(--wx-webapp-cat-general-bg, #f3f4f6)"
+                }
+            };
+
+            var @object = CoreHub.ObjectManager.GetObject(ResolveObjectId(request));
+
+            if (@object is not null && CommentAudience.MayWriteInternal(@object))
+            {
+                categories.Add(new()
+                {
+                    Id = CommentVisibilityExtensions.InternalTeamToken,
+                    I18n = CommentVisibility.InternalTeam.Text(),
+                    Color = "var(--wx-webapp-cat-question, #b45309)",
+                    Background = "var(--wx-webapp-cat-question-bg, #fef3c7)"
+                });
             }
 
-            using var db = ModelHub.CreateDbContext();
-            return db.Identities.AsNoTracking().FirstOrDefault(i => i.Name == name)?.Id;
+            return categories;
         }
 
         /// <summary>
@@ -332,54 +387,80 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 return Guid.Empty;
             }
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == keyParam.Value);
-            return obj?.Id ?? Guid.Empty;
+            // through the object manager, so an object the caller may not read - by its
+            // permissions or its security level - has no thread to show either
+            return CoreHub.ObjectManager.GetObjectByKey(keyParam.Value)?.Id ?? Guid.Empty;
         }
 
         /// <summary>
-        /// Resolves the author id for a new comment / reply. Looks up the identity by
-        /// the name returned from <see cref="ResolveCurrentUser"/>; falls back to the
-        /// seeded admin identity when no match exists.
+        /// Determines whether the caller may take part in the discussion of an object - write,
+        /// edit, delete, reply, pin, like and react.
         /// </summary>
+        /// <param name="objectId">The object the comment hangs on.</param>
         /// <param name="request">The HTTP request.</param>
-        /// <returns>The author identity id.</returns>
+        /// <returns><see langword="true"/> when the caller may comment on it.</returns>
+        private static bool MayCommentOn(Guid objectId, IRequest request)
+        {
+            var @object = CoreHub.ObjectManager.GetObject(objectId);
+
+            // the home page takes no comments
+            return @object is not null
+                && !CoreHub.WorkspaceManager.IsHome(@object)
+                && global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(@object, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectCommentPermission));
+        }
+
+        /// <summary>
+        /// Determines whether the caller may take part in the discussion a comment belongs to.
+        /// </summary>
+        /// <param name="commentId">The comment.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns><see langword="true"/> when the caller may comment on its object.</returns>
+        private static bool MayCommentOnComment(Guid commentId, IRequest request)
+        {
+            return CoreHub.CommentManager.GetComment(commentId) is { } comment
+                && CommentAudience.Reaches(comment)
+                && MayCommentOn(comment.ObjectId, request);
+        }
+
+        /// <summary>
+        /// Resolves the identity the request is served for - the author of whatever it
+        /// writes.
+        /// </summary>
+        /// <remarks>
+        /// It is the signed-in user of the request's session and nothing else. There is
+        /// deliberately no fallback: a comment nobody can be named for is refused rather than
+        /// signed with the seeded administrator, which is what this endpoint used to do and
+        /// what put that person's name under every anonymous word.
+        /// </remarks>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The author identity id, or <see cref="Guid.Empty"/> when the caller is not
+        /// signed in.</returns>
         private static Guid ResolveAuthorId(IRequest request)
         {
-            var name = ResolveCurrentUserName(request);
-            if (string.IsNullOrEmpty(name))
-            {
-                return FallbackAuthorId;
-            }
-
-            using var db = ModelHub.CreateDbContext();
-            var identity = db.Identities.AsNoTracking().FirstOrDefault(i => i.Name == name);
-            return identity?.Id ?? FallbackAuthorId;
+            return CoreHub.SessionManager?.GetCurrentIdentityId(request) ?? Guid.Empty;
         }
 
         /// <summary>
-        /// Returns the display name of the active user. The control passes this string
-        /// back through the like / pin / reaction endpoints; the endpoint then resolves
-        /// the identity by name. Falls back to the seeded admin identity name when the
-        /// request does not carry an authenticated session.
+        /// Returns the display name of the signed-in user, which the comment control marks
+        /// its own entries, likes and reactions by.
         /// </summary>
+        /// <remarks>
+        /// The control sends this string back through the like and reaction routes, and the
+        /// endpoint does <b>not</b> take it as the actor - it reads the session again. A name
+        /// travelling through the browser is a claim, and honouring it would let anybody like
+        /// as somebody else by returning a different one.
+        /// </remarks>
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request.</param>
-        /// <returns>The current user's display name.</returns>
+        /// <returns>The current user's display name, or an empty string when nobody is signed
+        /// in.</returns>
         protected override string ResolveCurrentUser(IQueryContext context, IRequest request)
         {
-            return ResolveCurrentUserName(request);
-        }
+            var identityId = ResolveAuthorId(request);
 
-        private static string ResolveCurrentUserName(IRequest request)
-        {
-            // TODO: read the authenticated identity from request.Session once the
-            // WebExpress identity flow exposes it on the request. Until then, every
-            // anonymous request is attributed to the seeded admin identity so the
-            // like / pin / reaction toggles still resolve to a valid author.
-            using var db = ModelHub.CreateDbContext();
-            var admin = db.Identities.AsNoTracking().FirstOrDefault(i => i.Id == FallbackAuthorId);
-            return admin?.Name ?? "admin";
+            return identityId == Guid.Empty
+                ? string.Empty
+                : CoreHub.IdentityManager?.GetIdentity(identityId)?.Name ?? string.Empty;
         }
 
         /// <summary>
@@ -407,8 +488,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
         /// <param name="parentReplies">A dictionary of parent-id → replies, used when
         /// rendering a top-level comment with its nested replies. Pass <c>null</c> when
         /// mapping a freshly created comment that has no replies yet.</param>
+        /// <param name="request">The HTTP request, used to localize the audience label.</param>
         /// <returns>The REST DTO.</returns>
-        private static RestApiCommentItem ToItem(Comment comment, IReadOnlyDictionary<Guid, List<Comment>> parentReplies)
+        private static RestApiCommentItem ToItem(Comment comment, IReadOnlyDictionary<Guid, List<Comment>> parentReplies, IRequest request)
         {
             if (comment is null)
             {
@@ -424,6 +506,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
                 Body = isDeleted ? "" : comment.Content,
                 When = FormatTimestamp(comment.Created),
                 Category = comment.State.ToString(),
+
+                // the operator thread shows every comment, so the narrowed audience has to
+                // be legible on the entry itself — otherwise a service-team note is
+                // indistinguishable from one the requester can read. Public is the norm and
+                // stays unlabelled.
+                Labels = comment.Visibility == CommentVisibility.InternalTeam
+                    ? [I18N.Translate(request, CommentVisibility.InternalTeam.Text())]
+                    : null,
                 Pinned = comment.IsPinned,
                 Likes = comment.Likes?
                     .OrderBy(l => l.Created)
@@ -461,6 +551,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Comments._objectkey_
             }
 
             return item;
+        }
+
+        /// <summary>
+        /// Resolves the audience of a newly composed comment from the payload. The
+        /// composer has no dedicated visibility field, so the audience travels in
+        /// <see cref="RestApiCommentPayload.Category"/> (the free-form slot the control
+        /// already round-trips); anything the model does not recognise reads as
+        /// <see cref="CommentVisibility.Public"/>, so an operator never narrows the
+        /// audience by typo.
+        /// </summary>
+        /// <param name="payload">The submitted payload.</param>
+        /// <returns>The resolved visibility.</returns>
+        private static CommentVisibility ResolveVisibility(RestApiCommentPayload payload)
+        {
+            return CommentVisibilityExtensions.Parse(payload?.Category);
         }
 
         /// <summary>

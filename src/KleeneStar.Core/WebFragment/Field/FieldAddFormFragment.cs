@@ -1,6 +1,10 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +20,32 @@ namespace KleeneStar.Core.WebFragment.Field
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Add>]
     [Cache]
-    public sealed class FieldAddFormFragment : FragmentControlRestFormAdd
+    public sealed class FieldAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the class the field is created in.
+        /// </summary>
+        /// <remarks>
+        /// The form posts to the field collection, whose route names no class, so the class
+        /// of the page the form was opened from has to travel in the payload — a field
+        /// cannot be inserted without it.
+        /// </remarks>
+        public ControlFormItemInputHidden ClassId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Field.ClassId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the field.
         /// </summary>
-        public ControlRestFormItemInputUnique FieldName { get; } = new()
+        public ControlDataFormItemInputUnique FieldName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.Name),
             Label = _ => "kleenestar.core:field.name.label",
             Placeholder = _ => "kleenestar.core:field.name.placeholder",
             Help = _ => "kleenestar.core:field.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the field.
@@ -40,6 +56,7 @@ namespace KleeneStar.Core.WebFragment.Field
             Label = _ => "kleenestar.core:field.description.label",
             Placeholder = _ => "kleenestar.core:field.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
@@ -68,28 +85,26 @@ namespace KleeneStar.Core.WebFragment.Field
         /// <summary>
         /// Gets the input selection control for the field type.
         /// </summary>
-        public ControlRestFormItemInputSelection FieldTypeSelection { get; } = new()
+        public ControlDataFormItemInputSelection FieldTypeSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.FieldType),
             Label = _ => "kleenestar.core:field.fieldtype.label",
             Placeholder = _ => "kleenestar.core:field.fieldtype.placeholder",
             Help = _ => "kleenestar.core:field.fieldtype.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.FieldType>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.FieldType>().ToString())};
 
         /// <summary>
         /// Gets the input selection control for the cardinality.
         /// </summary>
-        public ControlRestFormItemInputSelection CardinalitySelection { get; } = new()
+        public ControlDataFormItemInputSelection CardinalitySelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.Cardinality),
             Label = _ => "kleenestar.core:field.cardinality.label",
             Placeholder = _ => "kleenestar.core:field.cardinality.placeholder",
             Help = _ => "kleenestar.core:field.cardinality.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.Cardinality>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.Cardinality>().ToString())};
 
         /// <summary>
         /// Gets the checkbox control for the required flag.
@@ -127,15 +142,14 @@ namespace KleeneStar.Core.WebFragment.Field
         /// <summary>
         /// Gets the input selection control for the access modifier.
         /// </summary>
-        public ControlRestFormItemInputSelection AccessModifierSelection { get; } = new()
+        public ControlDataFormItemInputSelection AccessModifierSelection { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.AccessModifier),
             Label = _ => "kleenestar.core:field.accessmodifier.label",
             Placeholder = _ => "kleenestar.core:field.accessmodifier.placeholder",
             Help = _ => "kleenestar.core:field.accessmodifier.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.AccessModifier>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.AccessModifier>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the default specification.
@@ -152,15 +166,14 @@ namespace KleeneStar.Core.WebFragment.Field
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection FieldState { get; } = new()
+        public StateInputSelection FieldState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Field.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.FieldStateExtensions.Id(global::KleeneStar.Model.Entities.FieldState.Active).ToString(),
             Label = _ => "kleenestar.core:field.state.label",
             Placeholder = _ => "kleenestar.core:field.state.placeholder",
             Help = _ => "kleenestar.core:field.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -169,6 +182,7 @@ namespace KleeneStar.Core.WebFragment.Field
         public FieldAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(ClassId);
             Add(FieldName);
             Add(Description);
             Add(HelpText);
@@ -182,7 +196,7 @@ namespace KleeneStar.Core.WebFragment.Field
             Add(DefaultSpec);
             Add(FieldState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Fields.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Fields.Index>();
         }
 
         /// <summary>
@@ -199,6 +213,15 @@ namespace KleeneStar.Core.WebFragment.Field
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is class scoped, so the class it creates the
+            // field in is taken from the request and carried in the hidden input
+            var classId = renderContext?.Request?.GetParameter<ClassIdParameter>()?.Value;
+
+            if (!string.IsNullOrWhiteSpace(classId))
+            {
+                renderContext.SetValue(ClassId, new ControlFormInputValueString(classId));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

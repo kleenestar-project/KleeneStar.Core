@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -15,7 +16,7 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Avatar>]
     [Cache]
-    public sealed class ClassAvatarFormFragment : FragmentControlRestFormEdit
+    public sealed class ClassAvatarFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
         /// Gets the input text control for specifying the name of the workspace.
@@ -34,7 +35,7 @@ namespace KleeneStar.Core.WebFragment.Class
         {
             Add(Avatar);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
             ItemId = renderContext =>
             {
                 var classId = renderContext.Request.GetParameter<ClassIdParameter>();
@@ -60,3 +61,4 @@ namespace KleeneStar.Core.WebFragment.Class
         }
     }
 }
+

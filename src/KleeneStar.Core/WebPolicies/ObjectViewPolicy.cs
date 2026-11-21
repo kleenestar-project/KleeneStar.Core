@@ -9,6 +9,7 @@ namespace KleeneStar.Core.WebPolicies
     /// </summary>
     [Name("object_view_policy")]
     [Permission<ObjectReadPermission>()]
+    [Permission<ObjectReadHistoryPermission>()]
     public sealed class ObjectViewPolicy : IIdentityPolicy
     {
     }

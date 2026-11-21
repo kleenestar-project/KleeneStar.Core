@@ -153,7 +153,7 @@ namespace KleeneStar.Core.WebManager
 
             CalendarAdded?.Invoke(this, calendar);
 
-            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.calendar.created");
+            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.calendar.created", calendar);
 
             return this;
         }
@@ -173,7 +173,7 @@ namespace KleeneStar.Core.WebManager
 
             CalendarUpdated?.Invoke(this, calendar);
 
-            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.calendar.updated");
+            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.calendar.updated", calendar);
 
             return this;
         }
@@ -207,11 +207,11 @@ namespace KleeneStar.Core.WebManager
         }
 
         // Wraps CoreHub.AddNotification so unit tests with a partially wired host don't crash.
-        private static void TryAddNotification(string titleKey, string messageKey)
+        private static void TryAddNotification(string titleKey, string messageKey, object subject)
         {
             try
             {
-                CoreHub.AddNotification(titleKey, messageKey, 5000);
+                CoreHub.AddNotification(titleKey, messageKey, subject);
             }
             catch
             {

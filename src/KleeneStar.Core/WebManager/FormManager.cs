@@ -196,7 +196,7 @@ namespace KleeneStar.Core.WebManager
             FormAdded?.Invoke(this, formEntity);
 
             // create notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.form.created", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.form.created", formEntity);
 
             return this;
         }
@@ -215,7 +215,7 @@ namespace KleeneStar.Core.WebManager
             FormUpdated?.Invoke(this, formEntity);
 
             // update notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.form.updated", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.form.updated", formEntity);
 
             return this;
         }

@@ -1,4 +1,6 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebQuickfilter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -10,8 +12,10 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
 using WebExpress.WebUI.WebControl;
+using WebExpress.WebUI.WebIcon;
 
 namespace KleeneStar.Core.WWW.Api._1_.Tenants
 {
@@ -26,6 +30,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         private readonly IUri _editFormUri;
         private readonly IUri _cloneFormUri;
         private readonly IUri _deleteFormUri;
+        private readonly IUri _avatarFormUri;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -35,6 +40,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
             _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Tenant._tenantid_.Edit>();
             _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Tenant._tenantid_.Clone>();
             _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Tenant._tenantid_.Delete>();
+            _avatarFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Settings.Tenant._tenantid_.Avatar>();
         }
 
         /// <summary>
@@ -74,9 +80,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
                 Visible = true
             };
 
+            // its own id: a second "description" made every layout of the table fail
+            // (RestApiTableLayout keys the columns by id)
             yield return new RestApiTableColumn()
             {
-                Id = "description",
+                Id = "workspaces",
                 Label = I18N.Translate(request, "kleenestar.core:setting.tenant.column.assigned.workspace"),
                 Visible = true
             };
@@ -114,24 +122,27 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
         /// </returns>
         protected override IEnumerable<RestApiTableRow> RetrieveRows(IQuery<Model.Entities.Tenant> query, IQueryContext context, IEnumerable<RestApiTableColumn> columns, IRequest request)
         {
+            // the cells follow the columns in the order they are shown - a stored layout reorders
+            // them, and the client pairs cells with columns by position
+            var order = columns?.Select(c => c.Id).ToList() ?? [];
+
             return CoreHub.TenantManager.GetTenants(query, context)
                 .Select(x => new RestApiTableRow
                 {
                     Id = x.Id.ToString(),
                     Cells =
                     [
-                        new RestApiTableCell() {
-                             Content = x.Name
-                        },
-                        new() {
-                            Content = x.Description
-                        },
-                        new() {
-                            Content = string.Join(", ", x.Workspaces.Select(x => x.Name))
-                        },
-                        new() {
-                            Content = x.State.ToString()
-                        }
+                        .. order.Select(id => new RestApiTableCell
+                        {
+                            Content = id switch
+                            {
+                                "name" => x.Name,
+                                "description" => ProseText.ToPlainText(x.Description),
+                                "workspaces" => string.Join(", ", x.Workspaces.Select(w => w.Name)),
+                                "state" => x.State.ToString(),
+                                _ => null
+                            }
+                        })
                     ],
                     Options = GetOptions(x, request).Select(o => o.ToJson()),
                     Uri = GetUri(x, request)?.ToString()
@@ -202,7 +213,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
                 }
             }
 
-            return query;
+            // the filters the user defined are resolved from storage rather than from a case above,
+            // and compose onto the query so they combine with the chips handled here
+            return CustomQuickfilterSupport.Apply(filters, query, Quickfilter.ViewKey);
         }
 
         /// <summary>
@@ -225,6 +238,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
             var deleteUri = _deleteFormUri?
                 .BindParameters(request)
                 .BindParameters(new TenantIdParameter(row.Id));
+            var avatarUri = _avatarFormUri?
+                .BindParameters(request)
+                .BindParameters(new TenantIdParameter(row.Id));
 
             yield return new RestApiOptionHeader(request)
             {
@@ -239,6 +255,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Tenants
             yield return new RestApiOptionClone(request)
             {
                 PrimaryAction = new ActionModal("modal-form", cloneUri, TypeModalSize.ExtraLarge)
+            };
+
+            yield return new RestApiOptionCustom(request)
+            {
+                Text = I18N.Translate(request, "kleenestar.core:setting.tenant.avatar.label"),
+                Icon = new IconImage(),
+                PrimaryAction = new ActionModal("modal-form", avatarUri, TypeModalSize.ExtraLarge)
             };
 
             yield return new RestApiOptionSeparator(request);

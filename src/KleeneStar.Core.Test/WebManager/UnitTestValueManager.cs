@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 
 namespace KleeneStar.Core.Test.WebManager
@@ -120,7 +119,7 @@ namespace KleeneStar.Core.Test.WebManager
             var value = SampleValue("delete me");
             CoreHub.ValueManager.Add(value);
 
-            Value? raised = null;
+            Value raised = null;
             CoreHub.ValueManager.ValueRemoved += (_, v) => raised = v;
 
             CoreHub.ValueManager.Remove(value.Id);

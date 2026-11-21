@@ -20,11 +20,18 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
     public sealed partial class UniqueKey : RestApiUnique
     {
         /// <summary>
-        /// Provides a compiled regular expression that matches strings containing only alphanumeric 
+        /// Provides a compiled regular expression that matches strings containing only alphanumeric
         /// characters (letters
         /// and digits).
         /// </summary>
-        [GeneratedRegex(@"^[a-z0-9-]{1,10}$")]
+        /// <remarks>
+        /// Upper case is matched as well, because the keys the product proposes are upper case -
+        /// the seeded workspaces and every workspace template's <c>SuggestedKey</c>. While this
+        /// expression was lower case only, the wizard reported its own suggestion as unavailable.
+        /// It is the same shape <see cref="Index"/> enforces on create, so the advice given while
+        /// the form is filled in and the gate the create passes through cannot disagree.
+        /// </remarks>
+        [GeneratedRegex(@"^[a-zA-Z0-9-]{1,10}$")]
         private static partial Regex KeyRegex();
 
         /// <summary>

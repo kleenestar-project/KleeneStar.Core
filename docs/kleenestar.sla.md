@@ -44,7 +44,7 @@ SLA management follows a default lifecycle with the states draft, active, inacti
 
 ## Data Model and Relationships
 
-A policy is uniquely bound to a class. It aggregates a list of targets (`SlaTarget`), a list of scope rules (`SlaScopeRule` — combined with logical AND), and a list of escalation levels (`SlaEscalationLevel`). It references one optional working-hours `Calendar` from the same class (foreign key, set to `null` if the calendar is deleted) and one optional owner identity.
+A policy is uniquely bound to a class. It aggregates a list of targets (`SlaTarget`), a list of scope rules (`SlaScopeRule` — AND across rule types, OR within one type; see *Which Agreements Apply*), and a list of escalation levels (`SlaEscalationLevel`). It references one optional working-hours `Calendar` from the same class (foreign key, set to `null` if the calendar is deleted) and one optional owner identity.
 
 - Key attributes: id (stable Guid), name (unique per class), description, state, priority bucket, calendar reference, notification channels (flags enum), pause-on statuses (comma-separated), icon.
 - Targets: list of `SlaTarget` entries describing one measurable milestone each (response, resolution, update, approval, implementation, fulfillment, or custom).
@@ -146,7 +146,7 @@ A single measurable target on a policy, e.g. "first response within 30 minutes" 
 
 ### SlaScopeRule
 
-A single filter rule that contributes to the scope of a policy. Multiple rules on the same policy are combined with logical AND when matching a ticket.
+A single filter rule that contributes to the scope of a policy. Rules of **different** types are combined with logical AND, rules of the **same** type with OR - a ticket has one priority, so "priority P4 AND priority P5" could never hold, while "P4 or P5" is what such a policy means. See *Which Agreements Apply* for how and which rule types are evaluated.
 
 |Attribute   |Type                |Notes
 |------------|--------------------|-----
@@ -176,8 +176,6 @@ Flags enum that combines the dispatch channels for SLA breach notifications.
 |--------|----------------------------------
 |`None`  |No channels enabled
 |`Email` |Send notifications by e-mail
-|`Slack` |Send notifications to Slack
-|`Sms`   |Send notifications by SMS
 |`InApp` |Show in-app notifications
 
 ## UI Concepts and Pages
@@ -188,6 +186,8 @@ The SLA management UI integrates into the class detail pages. From the class sid
 
 Entry into SLA management occurs directly from the class detail page via the "SLA" item in the class sidebar. The sidebar item is `ClassSidebarSlaLinkFragment` and is registered with every class-bound page.
 
+The item - and the calendar item beside it, whose business hours only an SLA counts in - is offered only where the class's kind is measured against service levels at all. That is a statement of the kind, `IObjectKind.ServiceLevels`, read by `ClassServiceLevelCondition`: the document, blog and asset kinds answer `false` (a page, a post or an inventory item is never overdue), the issue kind and every add-on kind keep the default `true`. The routes themselves stay reachable; only the sidebar stops offering them.
+
 ### SLA Management (Page)
 
 This page is the central administrative view for all SLA policies of a selected class. The main area is rendered by the `SlaViewFragment` (toggle group), which hosts the `SlaViewTableFragment`. Quick-filter chips ("Active", "Draft", "Inactive", "Critical") sit in the header along with an advanced-search input backed by the SLA WQL endpoint. New policies are created via the "New policy" button.
@@ -195,7 +195,7 @@ This page is the central administrative view for all SLA policies of a selected 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / SLA                                                    │║
@@ -210,7 +210,7 @@ This page is the central administrative view for all SLA policies of a selected 
 ║│                      │░│ Incident · P1 ·…  |Critical| 24 / 7        |Active |  3   │║
 ║│                      │░│ Incident · P2 ·…  |High    | Standard ·…   |Active |  3   │║
 ║│                      │░│ Incident · P3 ·…  |Low     | Standard ·…   |Active |  2   │║
-║│                      │░│ Incident · VIP ·…|Critical| 24 / 7        |Active |  3   │║
+║│                      │░│ Incident · VIP·…  |Critical| 24 / 7        |Active |  3   │║
 ║│                      │░│ Batch job · …     |Medium  | Night shift   |Draft  |  2   │║
 ║│                      │░│ Legacy · …        |Low     | Standard ·…   |Inact. |  2   │║
 ║│                      │░│                                                           │║
@@ -231,7 +231,7 @@ The "Add SLA policy" and "Edit SLA policy" modals share a form layout. The basic
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔SlaAddEditModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add SLA policy / Edit SLA policy                                     │║     │║
@@ -272,6 +272,38 @@ Cloning a policy reuses targets, scope rules, and escalations of an existing ent
 
 Deleting a policy is irreversible. The modal warns that the policy and all its children (`SlaTarget`, `SlaScopeRule`, `SlaEscalationLevel`) will be removed in a single cascade.
 
+### Which Agreements Apply
+
+A ticket is held to the active policies of its class **whose scope covers it** (`WebManager/SlaScope`, 2026-09-23). Before that every active policy ran on every ticket of the class, so an incident showed the clocks of all four priority agreements instead of the one its priority selects. The decision is KleeneStar's, not the framework's: WebExpress times one agreement (`SlaDefinition`, `SlaEvaluator`), and `SlaScope.Select` is called by both surfaces that show or serve a clock - the card and `/api/1/slaclocks/{objectKey}`, which answers `404` for a target of a policy whose scope leaves the ticket out.
+
+|Rule type   |Evaluated against
+|------------|-----------------------------------------------------------------------------
+|`Priority`  |The value of the class's priority fields - the priority's **name**, which is what the field stores (an id is resolved too). Compared ignoring case. A rule naming no priority of the class can never be satisfied and is **skipped** rather than switching its policy off.
+|`Tag`       |The ticket's tags (`ObjectTag.Name`), ignoring case.
+|all others  |Not evaluated - `Contract`, `Customer`, `Catalog`, `System`, `Site`, `Category`, `Source` and `Type` name attributes no ticket carries, so they do not restrict. Treating them as "never" would silently retire every policy that states one; the seeded catalogue does.
+
+A policy without rules covers every ticket of its class, and a ticket without a priority is held to no priority-scoped policy.
+
+### SLA Display on the Ticket (Card)
+
+The ticket detail page (`/issue/{objectKey}`) carries an "Service Level Agreement" card rendered by the `IssueSlaCardFragment`. Every active policy of the ticket's class whose scope covers the ticket becomes one agreement group carrying its name, its severity bucket and the summary of how its targets are doing; every `SlaTarget` inside it becomes one `ControlDataSla` tile — a coloured status, a meter of the consumed budget and the time left until the deadline.
+
+The tiles are rendered complete: the clock is derived and evaluated server-side and seeded into the markup, so the card is correct in the first paint and stays readable without JavaScript. The client then counts on its own and re-reads the state from `/api/1/slaclocks/{objectKey}` once a minute, which keeps a tile in step with a colleague who moved the ticket in another tab.
+
+**The clock is derived, not stored.** KleeneStar persists policies, not per-object timers, so `SlaClock` reads the state off the ticket itself:
+
+|Aspect      |Derivation
+|------------|-----------------------------------------------------------------------------
+|Start       |`Object.Created`.
+|Budget      |`SlaTarget.TargetValue` in its `Unit`, as wall-clock time. A `BusinessDays` target counts as 8 hours per day.
+|Paused      |The ticket's current workflow status is named in the policy's `PauseOn` list. The stop is dated at `Object.Updated`, because the transition into that status is what stamped the ticket.
+|Settled     |The ticket's current workflow status belongs to the `Done` category. The settlement is dated at `Object.Updated`.
+|Pause total |Always zero — there is no status history to reconstruct earlier pauses from.
+
+Two consequences follow and are deliberate: pause time accrued *before* the current status is not credited, and an unrelated edit while the ticket is paused moves the stop forward. The working-hours `Calendar` referenced by the policy is not evaluated either, so a policy bound to a business calendar counts nights and holidays against its target. All three resolve themselves the moment a real per-object clock is persisted — `SlaClock` is then the only place that has to change.
+
+For the same reason the tiles carry no pause / resume / settle actions: a manual transition would have to be written somewhere. The way to stop an agreement is to move the ticket into one of the policy's pause statuses.
+
 ## Sitemap SLA Management
 
 |Path                                                                       |Page              |Description
@@ -301,6 +333,7 @@ For programmatic interaction, automation, and form rendering, SLA policies are e
 |`/api/1/slas/{classKey}/calendar`                     |GET         |Class-scoped REST selection of the active `Calendar` entries belonging to the class. Used by the SLA Add/Edit/Clone calendar dropdown.
 |`/api/1/slas/{classKey}/table`                        |GET         |Table-row backing for the SLA view (class-scoped).
 |`/api/1/slas/{classKey}/quickfilter`                  |GET         |Quick-filter chips ("Active", "Draft", "Inactive", "Critical").
+|`/api/1/slaclocks/{objectKey}?slatargetid={targetId}` |GET         |Returns the running clock of one target on one ticket — `status`, `target`, `elapsed`, `remaining`, `period`, `cycle`, `cycles`, `paused`, `settled` — in the shape the `ControlDataSla` tile adopts. The target must belong to an active policy of the ticket's class.
 
 Standard HTTP status codes apply: `200`/`201`/`204` for success, `400` for validation errors (e.g. duplicate name), `401` for unauthenticated, `403` for forbidden, `404` for unknown policy/class.
 

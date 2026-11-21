@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
 
@@ -100,7 +99,7 @@ namespace KleeneStar.Core.Test.WebManager
             var obj = Sample("INC-99", "DeleteMe");
             CoreHub.ObjectManager.Add(obj);
 
-            ObjectEntity? raised = null;
+            ObjectEntity raised = null;
             CoreHub.ObjectManager.ObjectRemoved += (_, o) => raised = o;
 
             CoreHub.ObjectManager.Remove(obj.Id);
@@ -223,6 +222,139 @@ namespace KleeneStar.Core.Test.WebManager
 
             var capped = CoreHub.ObjectManager.GetRecentObjects(ownerId, 2);
             Assert.Equal([newest.Id, middle.Id], capped.Select(o => o.Id).ToList());
+        }
+
+        /// <summary>
+        /// Verifies that <c>Add</c> derives the kind from the object's class — the
+        /// class is the single source of the kind, so a caller-supplied kind is
+        /// overruled by the class kind.
+        /// </summary>
+        [Fact]
+        public void Add_DerivesKindFromClass()
+        {
+            Seed(nameof(Add_DerivesKindFromClass));
+            var documentClassId = SeedClass(nameof(Add_DerivesKindFromClass), "Handbook", ObjectKind.Document);
+
+            var document = Sample("DOC-1", "Belongs to a document class");
+            document.ClassId = documentClassId;
+            document.Kind = null;
+            CoreHub.ObjectManager.Add(document);
+
+            var overruled = Sample("INC-300", "Caller-supplied kind is overruled");
+            overruled.Kind = "  Document ";
+            CoreHub.ObjectManager.Add(overruled);
+
+            Assert.Equal(ObjectKind.Document, CoreHub.ObjectManager.GetObject(document.Id)?.Kind);
+            Assert.Equal(ObjectKind.Issue, CoreHub.ObjectManager.GetObject(overruled.Id)?.Kind);
+        }
+
+        /// <summary>
+        /// Verifies that changing the kind of a class re-stamps the kind onto the
+        /// existing objects of the class, so the kind overviews immediately reflect
+        /// the change.
+        /// </summary>
+        [Fact]
+        public void ClassKindChange_RestampsObjects()
+        {
+            Seed(nameof(ClassKindChange_RestampsObjects));
+
+            var obj = Sample("INC-400", "Re-stamped on class change");
+            CoreHub.ObjectManager.Add(obj);
+            Assert.Equal(ObjectKind.Issue, CoreHub.ObjectManager.GetObject(obj.Id)?.Kind);
+
+            var classEntity = CoreHub.ClassManager.GetClass(ClassId);
+            Assert.NotNull(classEntity);
+            classEntity.Kind = ObjectKind.Blog;
+            CoreHub.ClassManager.Update(classEntity);
+
+            Assert.Equal(ObjectKind.Blog, CoreHub.ObjectManager.GetObject(obj.Id)?.Kind);
+        }
+
+        /// <summary>
+        /// Verifies the star round trip: <c>SetFavorite</c> flips the flag,
+        /// <c>IsFavorite</c> reflects it, and <c>GetFavoriteObjects</c> surfaces only
+        /// starred objects.
+        /// </summary>
+        [Fact]
+        public void SetFavorite_Toggle_SurfacesInFavorites()
+        {
+            Seed(nameof(SetFavorite_Toggle_SurfacesInFavorites));
+            var ownerId = SeedOwner(nameof(SetFavorite_Toggle_SurfacesInFavorites));
+
+            var obj = Sample("INC-200", "Starrable");
+            CoreHub.ObjectManager.Add(obj);
+
+            Assert.False(CoreHub.ObjectManager.IsFavorite(ownerId, obj.Id));
+
+            var visit = CoreHub.ObjectManager.SetFavorite(ownerId, obj.Id, true);
+            Assert.NotNull(visit);
+            Assert.True(CoreHub.ObjectManager.IsFavorite(ownerId, obj.Id));
+
+            var favorites = CoreHub.ObjectManager.GetFavoriteObjects(ownerId);
+            Assert.Single(favorites);
+            Assert.Equal(obj.Id, favorites[0].Id);
+
+            CoreHub.ObjectManager.SetFavorite(ownerId, obj.Id, false);
+            Assert.False(CoreHub.ObjectManager.IsFavorite(ownerId, obj.Id));
+            Assert.Empty(CoreHub.ObjectManager.GetFavoriteObjects(ownerId));
+        }
+
+        /// <summary>
+        /// Verifies that starring alone does not surface the object in the recents (the
+        /// star leaves the last-visited timestamp untouched) and that a subsequent visit
+        /// keeps the star.
+        /// </summary>
+        [Fact]
+        public void SetFavorite_DoesNotAffectRecents()
+        {
+            Seed(nameof(SetFavorite_DoesNotAffectRecents));
+            var ownerId = SeedOwner(nameof(SetFavorite_DoesNotAffectRecents));
+
+            var obj = Sample("INC-201", "Starred, never visited");
+            CoreHub.ObjectManager.Add(obj);
+
+            CoreHub.ObjectManager.SetFavorite(ownerId, obj.Id, true);
+            Assert.Empty(CoreHub.ObjectManager.GetRecentObjects(ownerId, 10));
+
+            CoreHub.ObjectManager.RecordVisit(ownerId, obj.Id);
+            Assert.Single(CoreHub.ObjectManager.GetRecentObjects(ownerId, 10));
+            Assert.True(CoreHub.ObjectManager.IsFavorite(ownerId, obj.Id));
+        }
+
+        /// <summary>
+        /// Verifies that <c>SetFavorite</c> with an unknown owner or object persists
+        /// nothing and returns <c>null</c>.
+        /// </summary>
+        [Fact]
+        public void SetFavorite_UnknownOwnerOrObject_ReturnsNull()
+        {
+            Seed(nameof(SetFavorite_UnknownOwnerOrObject_ReturnsNull));
+            var ownerId = SeedOwner(nameof(SetFavorite_UnknownOwnerOrObject_ReturnsNull));
+
+            var obj = Sample("INC-202", "Thing");
+            CoreHub.ObjectManager.Add(obj);
+
+            Assert.Null(CoreHub.ObjectManager.SetFavorite(Guid.NewGuid(), obj.Id, true));
+            Assert.Null(CoreHub.ObjectManager.SetFavorite(ownerId, Guid.NewGuid(), true));
+        }
+
+        /// <summary>
+        /// Seeds an additional class with the supplied kind into the in-memory database
+        /// and returns its id, so kind-derivation tests can attach objects to it.
+        /// </summary>
+        /// <param name="connectionString">The per-test in-memory database name.</param>
+        /// <param name="name">The name of the class.</param>
+        /// <param name="kind">The object-kind key of the class.</param>
+        /// <returns>The id of the seeded class.</returns>
+        private static Guid SeedClass(string connectionString, string name, string kind)
+        {
+            var classId = Guid.NewGuid();
+
+            using var db = CoreHubFixture.CreateDbContext(connectionString);
+            db.Classes.Add(new Class { Id = classId, Name = name, Kind = kind, WorkspaceId = WorkspaceId });
+            db.SaveChanges();
+
+            return classId;
         }
 
         /// <summary>

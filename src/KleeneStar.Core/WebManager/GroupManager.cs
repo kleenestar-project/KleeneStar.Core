@@ -85,6 +85,20 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns how many groups satisfy the specified filter criteria without loading
+        /// them.
+        /// </summary>
+        /// <param name="query">
+        /// The query criteria used to filter the counted groups. Paging must be left off:
+        /// a query carrying it counts the page, not the whole result.
+        /// </param>
+        /// <returns>The number of matching groups.</returns>
+        public int CountGroups(IQuery<Group> query)
+        {
+            return ModelHub.CountGroups(query);
+        }
+
+        /// <summary>
         /// Retrieves groups matching the query with context.
         /// </summary>
         public IEnumerable<Group> GetGroups(IQuery<Group> query, IQueryContext context)
@@ -103,7 +117,7 @@ namespace KleeneStar.Core.WebManager
 
             GroupAdded?.Invoke(this, groupEntity);
 
-            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.group.created", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.group.created", groupEntity);
 
             return this;
         }
@@ -119,7 +133,7 @@ namespace KleeneStar.Core.WebManager
 
             GroupUpdated?.Invoke(this, groupEntity);
 
-            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.group.updated", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.group.updated", groupEntity);
 
             return this;
         }
@@ -127,9 +141,14 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Removes a group.
         /// </summary>
+        /// <remarks>
+        /// The built-in groups whose membership is implicit (<see cref="Group.IsImplicit"/>) are
+        /// not removed: every workspace a template set up grants its everyday access to one of
+        /// them, and the store re-creates them on the next start anyway.
+        /// </remarks>
         public IGroupManager Remove(Guid groupId)
         {
-            var groupEntry = GetGroup(groupId);
+            var groupEntry = Group.IsImplicit(groupId) ? null : GetGroup(groupId);
 
             if (groupEntry is not null)
             {

@@ -104,6 +104,27 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns the active object views attached to the workspace identified by
+        /// <paramref name="workspaceId"/> that belong to the supplied object
+        /// <paramref name="kind"/> (each kind keeps its own tab set), ordered by
+        /// <see cref="ObjectView.Order"/>.
+        /// </summary>
+        /// <param name="workspaceId">The owning workspace id.</param>
+        /// <param name="kind">The object kind key whose tab set is requested.</param>
+        /// <returns>An enumerable collection of the kind's views, ordered by display position.</returns>
+        public IEnumerable<ObjectView> GetViewsForWorkspace(Guid workspaceId, string kind)
+        {
+            var normalized = Model.Entities.ObjectKind.Normalize(kind);
+
+            var query = new Query<ObjectView>()
+                .WhereEquals(x => x.WorkspaceId, workspaceId)
+                .WhereEquals(x => x.Kind, normalized)
+                .OrderByAsc(x => x.Order);
+
+            return ModelHub.GetObjectViews(query);
+        }
+
+        /// <summary>
         /// Persists a new object view.
         /// </summary>
         /// <param name="viewEntry">The view to add. Cannot be null.</param>
@@ -137,6 +158,20 @@ namespace KleeneStar.Core.WebManager
             ModelHub.Remove(viewEntry);
             ObjectViewRemoved?.Invoke(this, viewEntry);
             return this;
+        }
+
+        /// <summary>
+        /// Puts the tabs of one overview of a workspace into the given order.
+        /// </summary>
+        /// <param name="workspaceId">The owning workspace id.</param>
+        /// <param name="kind">The object kind of the overview.</param>
+        /// <param name="order">The tab ids in their new order. Cannot be null.</param>
+        /// <returns><see langword="true"/> when the order was applied.</returns>
+        public bool ReorderViews(Guid workspaceId, string kind, IReadOnlyList<Guid> order)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+
+            return ModelHub.SetObjectViewOrder(workspaceId, kind, order);
         }
 
         /// <summary>

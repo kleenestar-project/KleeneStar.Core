@@ -1,6 +1,10 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,20 +20,32 @@ namespace KleeneStar.Core.WebFragment.Form
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Add>]
     [Cache]
-    public sealed class FormAddFormFragment : FragmentControlRestFormAdd
+    public sealed class FormAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the class the form is created in.
+        /// </summary>
+        /// <remarks>
+        /// The form posts to the collection endpoint, whose route names no class, so the
+        /// class of the page the form was opened from has to travel in the payload — a
+        /// form cannot be inserted without it.
+        /// </remarks>
+        public ControlFormItemInputHidden ClassId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Form.ClassId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the form.
         /// </summary>
-        public ControlRestFormItemInputUnique FormName { get; } = new()
+        public ControlDataFormItemInputUnique FormName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Form.Name),
             Label = _ => "kleenestar.core:form.name.label",
             Placeholder = _ => "kleenestar.core:form.name.placeholder",
             Help = _ => "kleenestar.core:form.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Forms.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Forms.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the form.
@@ -40,21 +56,21 @@ namespace KleeneStar.Core.WebFragment.Form
             Label = _ => "kleenestar.core:form.description.label",
             Placeholder = _ => "kleenestar.core:form.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection FormState { get; } = new()
+        public StateInputSelection FormState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Form.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.FormStateExtensions.Id(global::KleeneStar.Model.Entities.FormState.Active).ToString(),
             Label = _ => "kleenestar.core:form.state.label",
             Placeholder = _ => "kleenestar.core:form.state.placeholder",
             Help = _ => "kleenestar.core:form.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Forms.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Forms.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -63,11 +79,12 @@ namespace KleeneStar.Core.WebFragment.Form
         public FormAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(ClassId);
             Add(FormName);
             Add(Description);
             Add(FormState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Forms.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Forms.Index>();
         }
 
         /// <summary>
@@ -84,6 +101,15 @@ namespace KleeneStar.Core.WebFragment.Form
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is class scoped, so the class it creates the
+            // item in is taken from the request and carried in the hidden input
+            var classId = renderContext?.Request?.GetParameter<ClassIdParameter>()?.Value;
+
+            if (!string.IsNullOrWhiteSpace(classId))
+            {
+                renderContext.SetValue(ClassId, new ControlFormInputValueString(classId));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

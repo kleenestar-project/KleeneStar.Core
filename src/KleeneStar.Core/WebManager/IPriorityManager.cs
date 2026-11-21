@@ -108,6 +108,17 @@ namespace KleeneStar.Core.WebManager
         IPriorityManager Reorder(IReadOnlyList<Guid> orderedIds);
 
         /// <summary>
+        /// Moves the specified priority one position towards the start or the end of the order of
+        /// its class.
+        /// </summary>
+        /// <param name="priorityId">The id of the priority to move.</param>
+        /// <param name="up">
+        /// <c>true</c> to move the priority towards the start; otherwise towards the end.
+        /// </param>
+        /// <returns>The current instance to allow for method chaining.</returns>
+        IPriorityManager Move(Guid priorityId, bool up);
+
+        /// <summary>
         /// Removes the specified priority from the manager.
         /// </summary>
         /// <remarks>This method removes the specified priority from the manager. If the field does

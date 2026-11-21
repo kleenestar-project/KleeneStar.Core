@@ -159,7 +159,7 @@ The `ObjectCommentFragment` and `ObjectCommentComposerFragment` are registered f
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incidents / INC-1042 — VPN drop                                   │║
@@ -207,7 +207,9 @@ The `ObjectCommentFragment` and `ObjectCommentComposerFragment` are registered f
 
 ### Reaction / pin / like
 
-Reactions, pins, and likes are not modelled on the `Comment` entity today. The REST endpoint implements the abstract `ToggleLike`, `TogglePin`, and `ToggleReaction` overrides as empty / null returns so the control degrades gracefully — the buttons are absent and no traffic is generated when the user clicks them.
+*Resolved* — the three were once left out of the model, and are now part of it. A comment carries `IsPinned` (a pinned comment sorts before everything else in the thread and survives the ordering by date), a `Likes` collection (`CommentLike`, one row per identity) and a `Reactions` collection (`CommentReaction`, one row per identity and emoji). `ICommentManager.TogglePin`, `ToggleLike` and `ToggleReaction` flip them and answer the new state — the pin flag, the names of everybody who likes the comment, the full emoji → names map — which is what the control redraws from. The REST endpoint implements the framework's three toggle overrides on top of them. Who liked or reacted is read off the session, never off the name the browser sends along; an anonymous caller can do neither, nor pin.
+
+A comment also carries a `Visibility` (`Public` or `InternalTeam`), sent as the composer's category and shown as a label on the entry; a reply inherits the visibility of its parent. And every add, edit, delete and pin raises a notification through `CoreHub.AddNotification`, so the change reaches the notification center and the toast the way every other change does.
 
 ## Sitemap Comment Management
 
@@ -229,6 +231,9 @@ For programmatic interaction, the comment thread of a single object is exposed v
 |`/api/1/comments/{objectKey}/{commentId}`         |PUT         |Updates the body of an existing comment. The server automatically sets `State = Edited` and refreshes `Updated`.
 |`/api/1/comments/{objectKey}/{commentId}`         |DELETE      |Soft-deletes a comment via `CommentManager.SoftDelete` — sets `State = Deleted`, populates `DeletedAt`, clears `Content`. The row is kept so replies still resolve.
 |`/api/1/comments/{objectKey}/{commentId}/reply`   |POST        |Appends a reply to the parent comment identified by `commentId`. Returns the created reply mapped to the REST DTO.
+|`/api/1/comments/{objectKey}/{commentId}/likes`   |POST        |Toggles the like of the signed-in identity on the comment. Returns the names of everybody who currently likes it.
+|`/api/1/comments/{objectKey}/{commentId}/pin`     |POST        |Toggles the pin of the comment. Returns the new pin state; an anonymous caller is refused.
+|`/api/1/comments/{objectKey}/{commentId}/reactions`|POST        |Toggles an emoji reaction of the signed-in identity on the comment. Returns the full reaction map (emoji → names).
 
 The endpoint maps the persisted `Comment` entity to the `RestApiCommentItem` / `RestApiCommentReply` DTOs from `WebExpress.WebApp`:
 
@@ -271,6 +276,17 @@ Comments inherit the access rules of the object they are attached to. A user who
 
 Assignment is performed via the standard group-policy mechanism. Most deployments only need to grant `comment_moderate` to a dedicated moderator group and rely on the implied per-object grants for everyone else.
 
+### Audience: public comments and internal notes
+
+A comment carries its audience (`Comment.Visibility`): **public** - the default - reaches everyone who may read the object; **internal-team** is the service team's working note. `WebPermission/CommentAudience` is the one rule, asked by every surface that shows, counts or changes comments - the thread endpoint, the dock's badge, the document home and blog teasers, the key-based `CommentManager.GetComments` and the customer portal:
+
+- An internal note reaches the **service team** alone: an *internal* account (one that belongs to no tenant), active, holding `object_read` on the object's chain. An account with a tenant is a customer's - the requester, a colleague the issue was shared with, the client of an order - and **never** reads an internal note, whatever its groups are granted. Granting a customer group read access to a workspace must not hand them the team's notes about their own request. (The requester used to be part of the internal audience; a note the customer can read is a public comment.)
+- Only the service team **writes** one (`object_comment` on the chain, internal account). The composer offers the audiences as its categories (`RetrieveCategories`: *Public* to everybody, *Service team only* to the team), and the endpoint refuses an internal note from anybody else - also on the portal (`403`).
+- The paths that address a comment by id - edit, delete, reply, like, pin, react - refuse a note the caller was never shown. A reply inherits the audience of the comment it answers.
+- With nobody acting (start-up, background work) the system reads every comment, the way `ContentVisibility` narrows nothing then.
+
+The composer's and thread's own user marker is the signed-in reader's name (it was a fixed "Admin User").
+
 ## Conclusion
 
-This document describes the comment concept in **KleeneStar** as a thin, reusable conversation layer that lives directly on the object detail page. The reference implementation comprises the `Comment` entity, the `CommentManager` component, a single REST endpoint at `/api/1/comments/{objectkey}`, two object-scoped WebFragments hosting the existing `ControlRestComment` / `ControlRestCommentComposer` controls, and a seeded set of per-object class-flavoured threads that exercise both the top-level and the reply rendering paths. The model is intentionally narrow — no reactions, no pins, no per-comment permissions — so future additions (notifications, attachments, @-mentions) can be layered on top without revisiting the storage schema.
+This document describes the comment concept in **KleeneStar** as a thin, reusable conversation layer that lives directly on the object detail page. The reference implementation comprises the `Comment` entity, the `CommentManager` component, a single REST endpoint at `/api/1/comments/{objectkey}`, two object-scoped WebFragments hosting the existing `ControlRestComment` / `ControlRestCommentComposer` controls, and a seeded set of per-object class-flavoured threads that exercise both the top-level and the reply rendering paths. The model started deliberately narrow, and the additions it was left open for have since landed without revisiting the storage schema: pins, likes and emoji reactions (`IsPinned`, `CommentLike`, `CommentReaction`), a public / internal-team visibility per comment, and notifications on every change. Per-comment permissions beyond that visibility, attachments on a comment and @-mentions remain open.

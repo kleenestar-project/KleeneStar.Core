@@ -1,4 +1,5 @@
 ﻿using KleeneStar.Core.WebParameter;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
@@ -15,7 +16,7 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Delete>]
     [Cache]
-    public sealed class ClassDeleteFormFragment : FragmentControlRestFormDelete
+    public sealed class ClassDeleteFormFragment : FragmentControlDataFormDelete
     {
         /// <summary>
         /// Initializes a new instance of the class.
@@ -24,7 +25,7 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassDeleteFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Classes.Index>();
             ItemId = renderContext =>
             {
                 var classId = renderContext.Request.GetParameter<ClassIdParameter>();
@@ -52,3 +53,4 @@ namespace KleeneStar.Core.WebFragment.Class
         }
     }
 }
+

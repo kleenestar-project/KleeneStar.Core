@@ -1,33 +1,37 @@
+﻿using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
+using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
-    /// Object-scoped content card that renders the
+    /// The narrative section of the object view: the
     /// <see cref="Model.Entities.Object.Description"/> of the current object as an
-    /// inline-editable rich-text block on <see cref="WWW.Object._objectkey_.Index"/>.
+    /// inline-editable rich-text block on <see cref="WWW.Issue._objectkey_.Index"/>.
     /// </summary>
     /// <remarks>
-    /// The card wraps a <see cref="ControlSmartEdit"/> that persists changes through
+    /// The section wraps a <see cref="ControlSmartEdit"/> that persists changes through
     /// the object REST API as soon as the user finishes editing. The smart-edit hosts
     /// a multiline <see cref="ControlFormItemInputText"/> in Wysiwyg format so the
     /// description supports the same formatting affordances as the add/edit form
-    /// variants used elsewhere. The card lives in <see cref="SectionContentPrimary"/>
-    /// with an explicit <see cref="OrderAttribute"/> of <c>0</c> so it always renders
-    /// above the form-driven <see cref="ObjectItemDetailFragment"/>.
+    /// variants used elsewhere. It lives in <see cref="SectionContentPrimary"/> with an
+    /// explicit <see cref="OrderAttribute"/> of <c>0</c> so the narrative always opens the
+    /// work zone, above the field structure of <see cref="ObjectItemDetailFragment"/>.
     /// </remarks>
     [Section<SectionContentPrimary>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Order(0)]
     [Cache]
     public sealed class ObjectDescriptionCardFragment : FragmentControlPanel
@@ -69,15 +73,16 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            var card = new ControlPanelCard("object-description-card")
+            var section = new ControlSection("object-description-section")
             {
                 Header = _ => "kleenestar.core:object.description.card.header",
-                Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Two)
+                HeaderIcon = _ => new IconAlignLeft(),
+                Layout = _ => TypeLayoutSection.Rule
             };
 
-            card.Add(BuildDescriptionSmartEdit(@object, ResolveObjectRestUri(@object, renderContext)));
+            section.Add(BuildDescriptionSmartEdit(@object, ResolveObjectRestUri(@object, renderContext)));
 
-            return card.Render(renderContext, visualTree);
+            return section.Render(renderContext, visualTree);
         }
 
         /// <summary>
@@ -101,7 +106,8 @@ namespace KleeneStar.Core.WebFragment.Object
                 Label = _ => "kleenestar.core:object.description.label",
                 Placeholder = _ => "kleenestar.core:object.description.placeholder",
                 Required = _ => false,
-                Format = _ => TypeEditTextFormat.Wysiwyg
+                Format = _ => TypeEditTextFormat.Wysiwyg,
+                LinkLibraryUri = CoreHub.EditorLinkLibrary
             };
 
             var smartEdit = new ControlSmartEdit("attr-description")

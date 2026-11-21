@@ -68,22 +68,51 @@ To improve traceability and documentation, objects can be enriched with addition
 ║                                          │ 1                    │ *       │          ║
 ║          ┌───────────┐ *           * ┌───▼───┐ 1          * ┌───▼───┐ 0,1 │          ║
 ║          │ Workspace ├───────────────► Class ◄──────────────┤ Field ├─────┘          ║
-║          └─────┬─────┘               └───▲───┘              └───▲───┘                ║
-║                │ 1                       │ 1                    │ 1                  ║
-║                └────────────────────┐    │                      │                    ║
-║                                     │ *  │ *                    │ *                  ║
-║    ┌───────────┐  ┌──────┐ *    2 ┌─▼────┴─┐ 1            * ┌───┴───┐                ║
-║    │ Dashboard │  │ Link ├────────► Object ├────────────────► Value │                ║
-║    └─────┬─────┘  └──────┘        └─▲────▲─┘                └───▲───┘                ║
-║          │ 1                        │ 1  │ 1                    │ 1                  ║
-║          │              ┌───────────┘    │                      │                    ║
-║          │ *            │ *              │ *                    │ *                  ║
-║     ┌────▼───┐     ┌────┴────┐      ┌────┴────┐         ┌───────┴───────┐            ║
-║     │ Widget │     │ Comment │      │ Version │         │ FileReference │            ║
-║     └────────┘     └─────────┘      └─────────┘         └───────────────┘            ║
+║          └─────┬─────┘               └───▲───┘              └─▲───▲─┘                ║
+║                │ 1                       │ 1                  │ 1 │ 1                ║
+║                └────────────────────┐    │              ┌─────┘   └──────┐           ║
+║                                     │ *  │ *            │ *              │ *         ║
+║    ┌─────────┐    ┌──────┐ *    2 ┌─▼────┴─┐ 1    * ┌───┴───┐        ┌───┴────┐      ║
+║    │ Insight │    │ Link ├────────► Object ◄────────┤ Value │        │ Change │      ║
+║    └────┬────┘    └──────┘        └─▲──▲──▲┘        └───────┘        └───┬────┘      ║
+║         │ 1                       1 │  │ 1│ 1                            │ *         ║
+║         │              ┌────────────┘  │  └──────────────┐    ┌──────────┘           ║
+║         │ *            │ *             │ *               │ *  │ 1                    ║
+║  ┌──────▼──────┐  ┌────┴────┐    ┌─────┴─────────┐     ┌─┴────▼─┐                    ║
+║  │ InsightView │  │ Comment │    │ FileReference │     │ Commit │                    ║
+║  └─────────────┘  └─────────┘    └───────────────┘     └────────┘                    ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
+
+### Persistence
+
+The **class is the single source of the kind**: `Class.Kind` is chosen in the class add/edit/clone forms ("Object type"), and every object of the class carries that kind. The `ObjectManager` stamps the class kind onto `Object.Kind` on every add and update, and changing a class's kind re-stamps the existing objects of the class, so the kind overviews immediately reflect the change. The object-side copy exists purely for efficient querying (the kind overviews filter on the indexed `Object.Kind` column).
+
+Both kinds are persisted as plain, lower-case string keys (defaulting to `issue`) rather than enums. This keeps the set of kinds **open**: add-ons may introduce further keys without touching the data layer, without a schema change, and without the ordinal-shift hazards of persisted enums. Unknown keys survive in the database, so content of an add-on kind outlives the add-on itself. The `ObjectKind` class in the model defines the well-known keys and the normalization rule (trim, lower-case, empty → `issue`).
+
+### Extensibility (add-ons)
+
+The UI-side counterpart of the persisted key is the `IObjectKind` descriptor (key, i18n label, icon, order, overview route, and the per-kind **detail route** `DetailUri(objectKey)` plus an optional **edit route** `EditUri(objectKey)`) registered in the `ObjectKindManager`. Because each kind now owns its own detail view (see *Object Detail View* below), `CoreHub.ObjectKindManager.ResolveDetailUri(object)` and `ResolveEditUri(object)` are the **single dispatch points** every object link uses to reach the view matching an object's kind; an unknown key (e.g. of an uninstalled add-on) falls back to the issue route. The core registers its three built-in kinds; an add-on introduces a new kind by:
+
+1. implementing `IObjectKind` — including `DetailUri`/`EditUri` — as a **public sealed** class with a public parameterless constructor, which the `ObjectKindManager` finds in the plugin's assembly (no registration; `Register` stays for a kind that is no type),
+2. contributing an overview page for the kind (a workspace-scoped page like `WWW/Documents/{workspacekey}`) and a detail page (an object-scoped page like `WWW/Document/{objectkey}`) that `DetailUri` returns,
+3. deriving a sidebar link from `ObjectKindSidebarLinkFragment` and scoping it to the kind overviews and the per-kind detail pages, and
+4. contributing the kind's view fragments scoped to its overview and detail pages.
+
+Because the sidebar links and views compose declaratively via Section/Scope attributes, no core code changes are needed. The catalog does not gate persistence — it is the lookup UI components use to resolve a key to its presentation. Registered kinds automatically appear as options in the "Object type" selection of the class forms.
+
+### Navigation and starring
+
+Every per-kind detail page carries the **same sidebar as its kind overview** — the workspace header and icon, the kind links (Documents, Blogs, Issues), the workspace settings toolbar, and, for documents and blogs, the document tree resp. blog timeline — so navigation stays continuous when moving from the overview into an object. In that tree/timeline the entry of the currently displayed document (or post) is highlighted as **active** and the path down to it is expanded so it is on screen. The kinds thus stay switchable from everywhere. The issue overview is the workspace's content landing page; the former objects overview has been removed entirely (its `/objects/{workspacekey}` route no longer exists), and the organize dialog now lives under `/issues/{workspacekey}/organize`. Only the add-object wizard keeps its `/objects/add` route. Every identity can additionally **star** objects: the star toggle lives in the object headline's more menu and in the issue overview's row menu, and starred issues surface under the issue overview's "Starred" quickfilter. The star is stored per identity on the object visit row (`ObjectVisit.Favorite`), mirroring the combined favorite/recency design of the workspace bookmark.
+
+### Known limitations
+
+- The kind is class-wide by design: an object cannot override the kind of its class. To move a single object into another kind overview, move it to a class of that kind.
+- The document and blog detail views show the title and the body of the record (plus a date/author line for posts), without the comment thread or the attachment area of the issue view. To capture a discussion on such an object, model it with a class of the issue kind. *Resolved since:* which surface the body is read and written through is no longer fixed per kind — the class's [renderer](kleenestar.renderer.md) decides between the prose editor and the structured mask of the class's forms, so a document with structured fields is a document class rendered as a form. *Resolved since:* the reading view behind an editing dialog is brought up to date — every object detail page reloads after a dialog has changed the record it shows (the structured edit mask, the prose editor's publish, the security-level and organize dialogs), the same way a workflow transition on the page already ends in a reload; `IncludeObjectRefreshScript` and `ObjectRefreshFragment` are the two halves, and a dialog that writes something else on the page is left alone.
+- The document tree and blog timeline in the sidebars render the first 200 objects of their kind ("top 200") to keep the pages responsive; there is no paging within the trees yet.
+- The document overview of a workspace shows its **home page**, a dedicated document referenced by `Workspace.HomeId` (`IWorkspaceManager.GetHome`, `EnsureHome`). It is the same for every reader. It is not part of the page tree, has no detail page (`/document/{key}` redirects to the overview) and takes no comments; the overview renders it with the like count. A caller with write permission on it edits it on the overview (*Edit home page*, prose editor with drafts and publishing). Its initial content is declared by the workspace template (see [workspace templates](kleenestar.workspacetemplate.md)).
+- The issue overview filters and pages in memory (the starred scope is a per-identity projection a WebIndex query cannot express); the advanced-search box only feeds the plain-text `q` filter — full WQL is not wired to this projection.
 
 ## Software Architecture
 
@@ -185,6 +214,14 @@ Objects themselves are described by the `IObject` interface. In addition to a un
 
 The architecture also foresees a clear separation between interfaces and implementations. `IObject` is implemented by the concrete object class, which provides all defined properties and methods. This separation enables high flexibility and extensibility of the system.
 
+Beyond its class, every object carries a kind, a coarse subtype that decides how the object is presented and navigated. The kind partitions the objects of a workspace into content families with distinct overview experiences:
+
+- **Document:** This kind is designed for structured knowledge organization and permanent documentation. Content is arranged in a hierarchical parent-child page tree, which is mirrored in the sidebar navigation, while the main panel opens with the designated home document. Typical use cases include internal wikis, standard operating procedures, manuals, and meeting notes.
+- **Blog:** This kind handles time-sensitive updates, corporate communication, and chronological announcements. The sidebar displays a timeline sorted by year and month with the newest entries listed first, while the main panel serves a stream of the latest articles. Common examples are company news, product launch logs, and team updates.
+- **Issue:** This kind manages active work items, task lifecycles, and operational workflows. It serves as the default behavior for unclassified objects and features dynamic, tabbed views including Kanban boards, Scrum backlogs, and lists that users can customize via templates. It is heavily used for tracking software bugs, customer incidents, and project tasks.
+- **Asset:** This category represents digital files and binary resources uploaded from external sources, strictly distinguishing them from physical capital assets or financial asset management. Digital assets do not possess their own navigation structure but are instead attached to or embedded within documents, blogs, or issues to support them as reference materials. Examples include images, PDF documents, spreadsheets, and video clips.
+
+
 ## UI Concepts and Pages
 
 The **KleeneStar** WebApp user interface translates the abstract data models and lifecycle rules of object management into a concrete and user-friendly application. The goal is to enable intuitive, efficient, and secure interaction with structured objects and their metadata.
@@ -208,7 +245,7 @@ The search supports both temporary filters (e.g., "Recently updated") and user-d
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Search                                                                           │║
@@ -249,7 +286,7 @@ The object overview page is the central view for displaying objects of a specifi
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk                                                                     │║
@@ -285,7 +322,15 @@ The object overview page is the central view for displaying objects of a specifi
 
 ### Object Management - Object Detail View (Page)
 
-The detail view of an object is presented via a form defined in the form management for the respective object class. This view displays all fields and metadata of the object in a structured form and provides a comprehensive overview of the current state and context. The page is typically divided into sections to present different information areas such as attributes, linked objects, comments, attachments, and version history clearly.
+Each **kind** owns its own detail view, reached at a kind-specific route resolved through `CoreHub.ObjectKindManager.ResolveDetailUri` (see *Object Kinds*):
+
+- **Issue** — `/issue/{objectKey}`: the full, form-driven work-item view described in the rest of this section and shown below.
+- **Document** — `/document/{objectKey}` (reading) and `/document/{objectKey}/edit` (editing).
+- **Blog** — `/blog/{objectKey}` (reading) and `/blog/{objectKey}/edit` (editing).
+
+Opening any object link routes to the view matching that object's kind; requesting the wrong route for an object (e.g. a document under `/issue/…`) transparently redirects to the correct one.
+
+The **issue** detail view is presented via a form defined in the form management for the respective object class. This view displays all fields and metadata of the object in a structured form and provides a comprehensive overview of the current state and context. The page is typically divided into sections to present different information areas such as attributes, linked objects, comments, attachments, and version history clearly.
 
 Workflow transitions are prominently offered as actions, enabling the user to advance the process directly from the detail view. These actions are context-sensitive and may offer different options depending on the status and role.
 
@@ -293,10 +338,12 @@ A central component of the detail view is the comment area. Users can add new co
 
 Handling attachments is also user-friendly: files can be dragged and dropped directly into the window, where they are automatically associated with the object and displayed in the "Attachments" section. This makes it easy to quickly add screenshots, documents, or other relevant files without needing separate upload steps.
 
+For the **document** and **blog** kinds the detail view is deliberately reduced to prose. The **reading view** presents the object's title (in the headline) and its rich-text body — a blog post additionally shows a date/author line — without the form-driven field structure, comment thread, or attachment area of the issue view. An **Edit** button in the headline opens the **editing view as a fullscreen modal** (hosted by the object's `/…/edit` route): a focused form for just the title and body that persists through the same object REST endpoint and, like the issue edit modal, closes automatically on a successful save, returning to the reading view. The document reading page keeps the workspace's document tree in the sidebar (blogs keep their timeline), so navigation within the kind is preserved while reading.
+
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / INC-00123                                                         │║
@@ -343,7 +390,7 @@ Clicking the "+ Add Object" button opens a central modal that allows the user to
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectBlueprintModal════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Create new object                                                    │║     │║
@@ -382,10 +429,12 @@ Clicking the "+ Add Object" button opens a central modal that allows the user to
 
 After selecting a workspace, the user is presented with a modal displaying all available object templates. Each template is shown as a card that includes the class name, a short description, and an icon to improve recognizability. Choosing a template initializes a new object with predefined fields, default values, and configuration settings defined in the class blueprint.
 
+The step always offers a way on: beside the templates of the chosen class stands a *no template* card, which is what a class nobody has written a template for is left with. When it is the only card left — the class has no templates — the step **answers itself**: the picker selects the sole remaining choice, so the user is not made to click the one card that can be clicked. The choice is taken back the moment a class with templates is picked instead, and a card the user chose is never overridden. This is the tile picker's general rule for a required single choice with one answer (`InputTileCtrl`, WebExpress.WebUI), not something the wizard does on its own.
+
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectBlueprintModal════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Create new object                                                    │║     │║
@@ -428,7 +477,7 @@ The form layout is dynamically loaded from the form manager, based on the select
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectAddEditModal══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Incident / Edit Incident                                         │║     │║
@@ -477,7 +526,7 @@ The search function also enables targeted finding of a specific entry within the
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectLinkModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add link                                                             │║     │║
@@ -518,7 +567,7 @@ Titles and status are provided for quick orientation. The integrated search func
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectLinkModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add link                                                             │║     │║
@@ -560,7 +609,7 @@ The displayed list is based on the defined search query (WQL) and shows relevant
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectLinkModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add link                                                             │║     │║
@@ -602,7 +651,7 @@ This function is particularly suitable for integrating knowledge articles, suppo
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectLinkModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add link                                                             │║     │║
@@ -645,7 +694,7 @@ The form displayed within the modal is based on the transition form assigned to 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectTransitionModal═══════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Execute Transition: Resolve                                          │║     │║
@@ -700,7 +749,7 @@ When "Show as…" is activated, the view is adjusted as if logged in with the se
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectShowAsModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Show as...                                                           │║     │║
@@ -740,7 +789,7 @@ When viewing as another person is active, this is clearly indicated at the top e
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║ Viewing as: Max Mustermann [Return to own view]                                    x ║
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ```
 
 ### Object Management - Move Function (Modal)
@@ -754,7 +803,7 @@ After the move, the object is displayed in the new class and/or workspace. Only 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectMoveModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Move Object                                                          │║     │║
@@ -788,45 +837,82 @@ After the move, the object is displayed in the new class and/or workspace. Only 
 
 ### Object Management - Export (Modal)
 
-The "Export" function enables exporting objects from the system to an external format, for example for further processing, documentation, or sharing with third parties. The function is available in the object overview and may support different formats such as CSV, Excel, or PDF, depending on context.
+The entry *Export* of the overflow menu (`ObjectItemExportMoreFragment`) on the issue, asset,
+document and blog pages and in the preview pane opens `WWW/Issue/{objectkey}/Export`. The dialog
+(`ObjectExportFormFragment`, a REST add form) offers the formats as a tile selection
+(`ControlFormItemInputTile` named `Format`, two columns, search field, empty text) of the formats
+of `CoreHub.ObjectExportManager`, in their order; the first is preselected
+(`WebControl/PresetInputTile`). *Export* posts `Format` to `/api/1/exports/{objectkey}`, which
+answers `{ uri }`; the form follows it (`TypeRestFormSuccess.FollowUri`), the browser downloads the
+attachment, the dialog closes and the page stays.
 
-The export includes all fields and content that are visible to the user according to their permissions. The structure of the export follows the current view. That is, filters, column selection, and sorting directly affect the exported data. Linked objects such as subobjects or parent references can optionally be included, if configured.
+**Content.** `ObjectExport.Collect` reads the object through `IObjectManager.GetObjectByKey`, so
+content visibility and security levels apply. It exports the system attributes (key, summary,
+object type, workspace, class, record state, security level, creator, assignee, created, updated),
+the description and the values of the active fields of the class (`ClassFields.Active`). Fields
+named `Summary` or `Description` alias system attributes and are not exported as fields. Display
+texts follow `ObjectValueFormat` in the request culture; a password field exports no value, only
+the mask. Attributes carry a machine value (dates in ISO 8601 UTC) and a display text (dates in the
+request culture). The description text of a workbook is `SpreadsheetWorkbook.ToPlainText()`, every
+cell without the preview limit of `WorkbookText.ToPlainText` (`ObjectExport.DescriptionText`).
 
-The export function is read-only and does not alter any data in the system. It is especially suitable for handing off information to external parties, for archiving completed processes, or for analyzing object data outside the application. For complex objects with nested relationships, the export can be rendered as a structured report, for example with section logic or a hierarchy tree in PDF format.
+**Formats are registrable classes.** `IObjectExportFormat` (`WebReport/IObjectExportFormat.cs`)
+declares key, extension, tile texts (i18n keys), badge, colour, icon, order, the download
+parameters (`Parameters`, default none) and `Write(record, request)`, which answers the attachment
+(`ObjectExport.Attachment`, `ObjectExport.FileName`). `WebManager/ObjectExportManager` collects
+every `public sealed` implementation with a public parameterless constructor from the core and the
+plugins through WebExpress's `PluginTypeCatalog`; a plugin adds a format by declaring such a class.
+`Register`/`Unregister` take a format that is no plugin type. Without a host `CoreHub` answers from
+a detached manager that knows the core's formats. The core ships `WebReport/Formats`:
+
+| Key | Class | Order |
+|-----|-------|-------|
+| `pdf` | `PdfObjectExportFormat` | 10 |
+| `json` | `JsonObjectExportFormat` | 20 |
+| `csv` | `CsvObjectExportFormat` (`Parameters`: `delimiter=semicolon` for a culture with a decimal comma) | 30 |
+
+**Relations and comments** (`WebReport/ObjectExport.Activity.cs`); revisions are not exported:
+
+- Relations: `IObjectRelationManager.GetRelations`; the other end is read again through
+  `IObjectManager.GetObject`, so a relation to an object the caller may not read is not exported.
+  The label is the inverse label when the object is the target of an asymmetric type; an external
+  address exports caption and address.
+- Comments: `ICommentManager.GetComments` narrowed by `CommentAudience.Filter` (internal notes only
+  for the service team), deleted comments omitted, in thread order (a reply follows the comment it
+  answers).
+
+| Format | Content |
+|--------|---------|
+| PDF | `PdfDocument` (WebExpress `WebPdf`): heading `{key} {summary}`, attribute table, description (`EditorContent.ConvertToPdf`; a workbook as one table per visible sheet, at most `PdfObjectExportFormat.MaxSheetRows` 500 rows and `MaxSheetColumns` 26 columns, a formula without stored result as the formula), field table, a section each for relations (table) and comments (author, date, internal note and reply markers, content through `EditorContent.ConvertToPdf`), footer `object.export.pdf.footer` |
+| JSON | UTF-8, indented, camel case: the attributes as machine values, `description` as plain text, `fields` with `name`, `type`, `value` (stored value) and `text` (display text), `relations`, `comments`, `exported` |
+| CSV | `CsvDocument`: one header row (attribute labels, description, field names) and one value row, then a table block each for relations and comments (empty row, title row, header row, entries); the dialog address carries `delimiter=semicolon` when the request culture uses a comma as decimal separator |
+
+The file is named `{key}.{extension}`.
 
 ```
-╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
-║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
-║└─────╔ObjectExportModal═══════════════════════════════════════════════════════╗─────┘║
-║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
-║│ / Se║│ Export Object                                                        │║     │║
-║└─────║├──────────────────────────────────────────────────────────────────────┤║─────┘║
-║┌Works║│ Select the desired export format and the content to be exported.     │║─────┐║
-║│[Name║│                                                                      │║     │║
-║│     ║│ Export format:                                                       │║rch] │║
-║│     ║│   ● Excel (.xlsx)                                                    │║     │║
-║│     ║│   ○ CSV (.csv)                                                       │║-----│║
-║│ Issu║│   ○ PDF report                                                       │║ […] │║
-║│ ├─ I║│                                                                      │║ […] │║
-║│ ├─ P║│                                                                      │║ […] │║
-║│ └─ S║│ Content:                                                             │║ […] │║
-║│     ║│   [ ] Linked subobjects                                              │║ […] │║
-║│     ║│   [ ] Comments                                                       │║ […] │║
-║│     ║│   [ ] History / change log                                           │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│                                                                      │║ […] │║
-║│     ║│    Note: Exported data only includes fields you are allowed to see.  │║ […] │║
-║│     ║│                                                                      │║     │║
-║│     ║└──────────────────────────────────────────────────────────────────────┘║xt › │║
-║├─────║                                                                        ║     │║
-║│ [+] ║                                                     [Export] [Cancel]  ║     │║
-║└─────║                                                                        ║─────┘║
-║┌Foote╚════════════════════════════════════════════════════════════════════════╝─────┐║
-║│ [Documentation]        |        KleeneStar v1.2.3        |      [Report a problem] │║
-║└────────────────────────────────────────────────────────────────────────────────────┘║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
+╔ObjectExportModal═══════════════════════════════════════════════════════╗
+║ Export object                                                          ║
+╟────────────────────────────────────────────────────────────────────────╢
+║ Format*:                                                               ║
+║ ┌Search────────────────────────────────────────────────────────────┐   ║
+║ │ Search format...                                                 │   ║
+║ └──────────────────────────────────────────────────────────────────┘   ║
+║ ┌Tile (selected)───────────────┐ ┌Tile─────────────────────────────┐   ║
+║ │ ● PDF                        │ │ ● JSON                          │   ║
+║ │ PDF document                 │ │ JSON file                       │   ║
+║ │ A print ready document ...   │ │ Structured data for ...         │   ║
+║ │ Attributes, description, ... │ │ Attributes, description, ...    │   ║
+║ └──────────────────────────────┘ └─────────────────────────────────┘   ║
+║ ┌Tile──────────────────────────┐                                       ║
+║ │ ● CSV                        │                                       ║
+║ │ CSV file                     │                                       ║
+║ │ One table row with all ...   │                                       ║
+║ │ Header row and one data row  │                                       ║
+║ └──────────────────────────────┘                                       ║
+║ The export contains the attributes, the description and the values ... ║
+╟────────────────────────────────────────────────────────────────────────╢
+║                                                    [Export] [Close]    ║
+╚════════════════════════════════════════════════════════════════════════╝
 ```
 
 ### Object Management - Delete Object (Modal)
@@ -838,7 +924,7 @@ As a rule, deleting objects is only recommended in exceptional cases. A better a
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔ObjectDeleteModal═══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Delete object                                                        │║     │║
@@ -887,7 +973,7 @@ All existing assignments are displayed in a table. They can be adjusted or exten
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspacePermissionsModal═══════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│  Manage Permissions for 'INC-00123'                                  │║     │║
@@ -934,15 +1020,17 @@ The sitemap supports both technical integration and conceptual design of the use
 |`/objects`                        |Object overview         |Global, workspace-wide search for objects.
 |`/objects/{workspaceKey}`         |Object overview         |Workspace‑specific search for objects.
 |`/objects/{workspaceKey}/add`     |Object creation         |Opens the modal for selecting an object template to create a new object.
-|`/object/{objectKey}`             |Object detail view      |Detailed view of a single object.
-|`/object/{objectKey}/edit`        |Object editing          |Form for editing the metadata of an existing object.
-|`/object/{objectKey}/delete`      |Object deletion         |Confirmation and execution of the deletion process.
-|`/object/{objectKey}/move`        |Object move             |Move an object to another workspace or class.
-|`/object/{objectKey}/export`      |Object export           |Export an object in different formats.
-|`/object/{objectKey}/permissions` |Permissions management  |Manage access rights for an object.
-|`/object/{objectKey}/link`        |Linking                 |Add links to an object.
-|`/object/{objectKey}/subobject`   |Subobject creation      |Start the process to create a subobject.
-|`/object/{objectKey}/show-as`     |View-as                 |View the object from another user’s perspective.
+|`/issue/{objectKey}`              |Issue detail view       |Full, form-driven detail view of an issue (fields, workflow, comments, attachments).
+|`/issue/{objectKey}/edit`         |Issue editing           |Modal form for editing an issue's metadata.
+|`/issue/{objectKey}/clone`        |Issue clone             |Clone an issue.
+|`/issue/{objectKey}/delete`       |Issue deletion          |Confirmation and execution of the deletion process.
+|`/issue/{objectKey}/export`       |Issue export            |Export an issue in different formats.
+|`/issue/{objectKey}/permission`   |Permissions management  |Manage access rights for an issue.
+|`/issue/{objectKey}/print`        |Issue print             |Printable rendering of an issue.
+|`/document/{objectKey}`           |Document reading view   |Prose reading view of a document (title + rich-text body).
+|`/document/{objectKey}/edit`      |Document editing view   |Fullscreen modal form (opened from the reading view) for a document's title and body.
+|`/blog/{objectKey}`               |Blog reading view       |Prose reading view of a blog post (date/author + body).
+|`/blog/{objectKey}/edit`          |Blog editing view       |Fullscreen modal form (opened from the reading view) for a blog post's title and body.
 
 ## API Interfaces (REST Endpoints)
 
@@ -961,6 +1049,8 @@ For programmatic interaction with object management, **KleeneStar** provides a R
 |`/api/1/objects/{workspaceKey}/{objectKey}/restore`                     |POST        |Restores a previously archived object.
 |`/api/1/objects/{workspaceKey}/{objectKey}/transitions`                 |GET         |Lists all available workflow transitions for the object.
 |`/api/1/objects/{workspaceKey}/{objectKey}/transitions/{transitionKey}` |POST        |Executes a workflow transition for the object. May include field values in the body.
+|`/api/1/exports/{objectKey}?format={key}`                               |GET         |Exports the object in a format of `IObjectExportManager` (core: `pdf`, `json`, `csv`) as an attachment `{objectKey}.{extension}`; CSV takes `delimiter=semicolon`. Without `format`: `{ "format": "<first key>" }`, the starting values of the export dialog. Unknown format `400`, unreadable object `404`.
+|`/api/1/exports/{objectKey}`                                            |POST        |Body `Format` (form data or JSON). Answers `{ "uri": … }`, the address of the matching `GET` with the parameters of the format.
 |`/api/1/hierarchy/{objectKey}`                                          |GET         |Returns the hierarchy of the object: the ancestor chain (nearest first), the parent, the object itself, the immediate children (with their resolved workflow status), and the siblings.
 |`/api/1/hierarchy/{objectKey}`                                          |PUT         |Sets or clears the parent. Body: `{ "parent": "KEY" }` (object key or id) or `{ "parent": null }`. Validates against self-parenting, cycles, cross-workspace links, and the allowed-children declaration of the parent's class.
 

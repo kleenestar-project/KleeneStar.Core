@@ -13,7 +13,9 @@ namespace KleeneStar.Core.WWW.Workspaces
     [WebIcon<WorkspaceIcon>]
     [Title("kleenestar.core:workspace.manage.title")]
     [Scope<IScopeGeneral>]
-    //[Policy<WorkspaceViewPolicy>]
+    // the overview lists every workspace and is administered on none of them; the rows a caller
+    // may not read are the concern of the list it embeds. A page-level policy attribute would ask
+    // the framework's global group question instead (see WebPermission.PageAuthorization)
     [Domain<Workspace>]
     [Cache]
     public sealed class Index : IPage<VisualTreeWebApp>, IScopeGeneral

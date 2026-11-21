@@ -1,8 +1,11 @@
+using KleeneStar.Core.WebControl;
 using KleeneStar.Core.WebParameter;
 using System;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -18,19 +21,19 @@ namespace KleeneStar.Core.WebFragment.Sla
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Edit>]
     [Cache]
-    public sealed class SlaEditFormFragment : FragmentControlRestFormEdit
+    public sealed class SlaEditFormFragment : FragmentControlDataFormEdit
     {
         /// <summary>
         /// Gets the input control for the policy name.
         /// </summary>
-        public ControlRestFormItemInputUnique SlaName { get; } = new()
+        public ControlDataFormItemInputUnique SlaName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.SlaPolicy.Name),
             Label = _ => "kleenestar.core:sla.name.label",
             Placeholder = _ => "kleenestar.core:sla.name.placeholder",
             Help = _ => "kleenestar.core:sla.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.UniqueName>()
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.UniqueName>().ToString())
         };
 
         /// <summary>
@@ -42,33 +45,34 @@ namespace KleeneStar.Core.WebFragment.Sla
             Label = _ => "kleenestar.core:sla.description.label",
             Placeholder = _ => "kleenestar.core:sla.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the selection control for the lifecycle state.
         /// </summary>
-        public ControlRestFormItemInputSelection SlaState { get; } = new()
+        public StateInputSelection SlaState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.SlaPolicy.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.SlaPolicyStateExtensions.Id(global::KleeneStar.Model.Entities.SlaPolicyState.Active).ToString(),
             Label = _ => "kleenestar.core:sla.state.label",
             Placeholder = _ => "kleenestar.core:sla.state.placeholder",
             Help = _ => "kleenestar.core:sla.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.State>()
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.State>().ToString())
         };
 
         /// <summary>
         /// Gets the selection control for the severity priority.
         /// </summary>
-        public ControlRestFormItemInputSelection SlaPriority { get; } = new()
+        public ControlDataFormItemInputSelection SlaPriority { get; } = new()
         {
             Name = _ => nameof(Model.Entities.SlaPolicy.Priority),
             Label = _ => "kleenestar.core:sla.priority.label",
             Placeholder = _ => "kleenestar.core:sla.priority.placeholder",
             Help = _ => "kleenestar.core:sla.priority.help",
             StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.Priority>()
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.Priority>().ToString())
         };
 
         /// <summary>
@@ -76,14 +80,14 @@ namespace KleeneStar.Core.WebFragment.Sla
         /// class-scoped — the class id is resolved from the SLA id parameter carried by the
         /// edit page URL.
         /// </summary>
-        public ControlRestFormItemInputSelection SlaCalendar { get; } = new()
+        public ControlDataFormItemInputSelection SlaCalendar { get; } = new()
         {
             Name = _ => nameof(Model.Entities.SlaPolicy.CalendarId),
             Label = _ => "kleenestar.core:sla.calendar.label",
             Placeholder = _ => "kleenestar.core:sla.calendar.placeholder",
             Help = _ => "kleenestar.core:sla.calendar.help",
             StickySelection = _ => true,
-            RestUri = renderContext =>
+            ServiceFactory = renderContext =>
             {
                 var slaParam = renderContext.Request.GetParameter<SlaIdParameter>();
                 var slaId = Guid.TryParse(slaParam?.Value, out var id) ? id : Guid.Empty;
@@ -91,9 +95,13 @@ namespace KleeneStar.Core.WebFragment.Sla
 
                 // bind the request FIRST, then bind the resolved class id LAST so that
                 // the explicit class id always wins over an empty/missing one from the request.
-                return CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas._classid_.Calendar>()
-                    .BindParameters(renderContext.Request)
-                    .BindParameters(new ClassIdParameter(policy?.ClassId ?? Guid.Empty));
+                return DataServiceDescriptor.QueryData
+                (
+                    CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas._classid_.Calendar>()
+                        .BindParameters(renderContext.Request)
+                        .BindParameters(new ClassIdParameter(policy?.ClassId ?? Guid.Empty))
+                        .ToString()
+                );
             }
         };
 
@@ -122,8 +130,7 @@ namespace KleeneStar.Core.WebFragment.Sla
             Add(SlaPriority);
             Add(SlaCalendar);
             Add(PauseOn);
-
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Slas.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Slas.Index>();
             ItemId = renderContext =>
             {
                 var slaId = renderContext.Request.GetParameter<SlaIdParameter>();

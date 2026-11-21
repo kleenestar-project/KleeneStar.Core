@@ -1,27 +1,35 @@
-﻿using WebExpress.WebApp.WebCondition;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebScope;
-using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment
 {
     /// <summary>
-    /// Represents a control panel fragment that provides a login form for user authentication via 
-    /// REST API endpoints.
+    /// The login dialog that <see cref="LoginLinkFragment"/> (the Login entry of the avatar
+    /// menu) opens, so signing in happens on top of the page the user is on.
     /// </summary>
+    /// <remarks>
+    /// The dialog is the framework's <see cref="ControlDataModalLogin"/>: the login dialog of
+    /// WebUI framing the REST login, which submits the credentials to the
+    /// <see cref="WWW.Api._1_.Session"/> endpoint - the one the full-page login at
+    /// <see cref="WWW.Session.Index"/> uses as well - and reloads the page once the session
+    /// cookie is set. It used to be a remote-page modal that fetched that login page on every
+    /// click and lifted its form out; the dialog is now rendered with the page, so it opens
+    /// without a round trip and the link names only its id.
+    /// </remarks>
     [Section<SectionBodySecondary>]
     [Scope<IScopeGeneral>]
     [Scope<IScopeAdmin>]
     [Scope<IScopeStatusPage>]
-    [Condition<ConditionLogout>]
+    [Condition<global::WebExpress.WebApp.WebCondition.ConditionLogout>]
     [Cache]
-    public sealed class LoginModalFragment : ControlModalRemotePage, IFragmentControl<ControlModalRemotePage>
+    public sealed class LoginModalFragment : ControlDataModalLogin, IFragmentControl<ControlDataModalLogin>
     {
         /// <summary>
         /// Gets the context of the fragment.
@@ -41,15 +49,22 @@ namespace KleeneStar.Core.WebFragment
         {
             FragmentContext = fragmentContext;
             Header = _ => "webexpress.webapp:login.label";
-            Selector = _ => "#login";
+
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Session>();
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragment, or null when conditions are not met.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control, or null when the user is signed in.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             if (!FragmentContext.Conditions.Check(renderContext?.Request))

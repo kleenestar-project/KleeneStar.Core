@@ -20,12 +20,14 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionSidebarPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.SecurityLevels._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Priorities._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Slas._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendars._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Relations._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
@@ -45,7 +47,7 @@ namespace KleeneStar.Core.WebFragment.Class
         public ClassSidebarClassLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconClass(TypeIconTheme.Light);
+            Icon = _ => new IconClass();
             Text = _ => "kleenestar.core:class.link.label";
             Uri = _ => _uri;
             Active = renderContext => IsActive(renderContext)
@@ -54,11 +56,17 @@ namespace KleeneStar.Core.WebFragment.Class
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);
@@ -100,10 +108,9 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? parsedForm
                     : Guid.Empty;
 
-                var form = CoreHub.FormManager.GetForm(formId)
-                    ?? throw new InvalidOperationException($"Form with ID '{formId}' not found.");
-
-                return form.ClassId;
+                // an id from the url may address a form that no longer exists; the class
+                // is then simply unresolved rather than the render being aborted
+                return CoreHub.FormManager.GetForm(formId)?.ClassId ?? Guid.Empty;
             }
             else if (workflowParameter != null)
             {
@@ -111,10 +118,7 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var workflow = CoreHub.WorkflowManager.GetWorkflow(workflowId)
-                    ?? throw new InvalidOperationException($"Workflow with ID '{workflowId}' not found.");
-
-                return workflow.ClassId;
+                return CoreHub.WorkflowManager.GetWorkflow(workflowId)?.ClassId ?? Guid.Empty;
             }
 
             throw new InvalidOperationException("One of the parameters 'class','form' or 'workflow' must be set.");

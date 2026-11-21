@@ -14,7 +14,7 @@ namespace KleeneStar.Core.WWW.Api._1_.WatcherUsers._objectkey_
 {
     /// <summary>
     /// REST endpoint that supplies the candidate user directory consumed by the
-    /// <c>ControlRestObserver</c> "+" dropdown on the watcher card. The URL is
+    /// <c>ControlDataWatcher</c> "+" dropdown on the watcher card. The URL is
     /// <c>/api/1/watcher-users/{objectkey}</c>; the <c>{objectkey}</c> URL segment
     /// is declared via <see cref="ObjectKeySegmentAttribute"/> but is intentionally
     /// ignored by this endpoint — every object currently exposes the same global
@@ -26,7 +26,7 @@ namespace KleeneStar.Core.WWW.Api._1_.WatcherUsers._objectkey_
     /// The client-side controller issues <c>GET {uri}?q=…</c> as the user types into
     /// the dropdown; this implementation returns the identities whose name or e-mail
     /// contains the substring (case-insensitive). The result shape matches
-    /// <see cref="WebExpress.WebApp.WebRestApi.RestApiObserverItem"/> so the client can
+    /// <see cref="WebExpress.WebApp.WebRestApi.RestApiWatcherItem"/> so the client can
     /// drop the chosen entry straight into the avatar row after a successful POST.
     /// </remarks>
     [Title("kleenestar.core:object.watcher.users.api.title")]
@@ -37,7 +37,7 @@ namespace KleeneStar.Core.WWW.Api._1_.WatcherUsers._objectkey_
         /// <summary>
         /// Serialisation options used when emitting the candidate list. The camelCase
         /// policy mirrors the contract declared by
-        /// <see cref="WebExpress.WebApp.WebRestApi.RestApiObserverItem"/>'s
+        /// <see cref="WebExpress.WebApp.WebRestApi.RestApiWatcherItem"/>'s
         /// <c>JsonPropertyName</c> attributes.
         /// </summary>
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -80,7 +80,7 @@ namespace KleeneStar.Core.WWW.Api._1_.WatcherUsers._objectkey_
             }
 
             var payload = identities
-                .Select(Watchers._objectkey_.Index.ToObserverItem)
+                .Select(Watchers._objectkey_.Index.ToWatcherItem)
                 .ToList();
 
             var json = JsonSerializer.Serialize(payload, _jsonOptions);

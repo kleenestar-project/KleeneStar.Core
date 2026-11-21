@@ -1,0 +1,2211 @@
+#wx-content-property {
+    font-size: 0.875rem;
+
+    /* no scrolling of its own: the side pane it stands in (#wx-splitter-content-p1, the
+       framework's .wx-side-pane) has a definite height and scrolls itself. the column used to be
+       capped at 100vh with a scrollbar of its own, from when the shell established no height -
+       inside the bounded pane that cap was taller than the pane, so the pane scrolled the
+       overhang and the page showed two scrollbars side by side */
+}
+
+/* the reference zone is a column of short sections, so it breathes in smaller steps than the
+   work zone - the same gap that reads as calm over a paragraph reads as disconnected over a
+   three-line property list */
+#wx-content-property .wx-section {
+    --wx-section-gap: 1.25rem;
+}
+
+/* ================================================================ headline */
+
+#wx-content-main-headline h2 {
+    font-size: clamp(1.35rem, 1.1rem + 0.8vw, 1.75rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+}
+
+/* the metadata line under the summary is the object's vital signs, read at a glance and never
+   read twice - it stays quiet and sits close to the title it belongs to */
+#wx-content-main-headline #object-metadata-audit {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1rem;
+    row-gap: 0.1rem;
+    margin-top: 0.25rem;
+}
+
+#wx-content-main-headline #object-metadata-status {
+    margin-top: 0.35rem;
+}
+
+/* ================================================================== prose */
+
+/* prose takes the width of the view it is read in; only the line height is set, because a
+   long line is easier to follow when the next one is not crowded against it */
+.wx-kleenestar-prose,
+.wx-kleenestar-object-prose {
+    line-height: 1.65;
+}
+
+.wx-kleenestar-prose > :first-child,
+.wx-kleenestar-object-prose > :first-child {
+    margin-top: 0;
+}
+
+.wx-kleenestar-prose > :last-child,
+.wx-kleenestar-object-prose > :last-child {
+    margin-bottom: 0;
+}
+
+.wx-kleenestar-prose h1,
+.wx-kleenestar-prose h2,
+.wx-kleenestar-prose h3,
+.wx-kleenestar-object-prose h1,
+.wx-kleenestar-object-prose h2,
+.wx-kleenestar-object-prose h3 {
+    margin: 1.5em 0 0.5em 0;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.wx-kleenestar-prose h1,
+.wx-kleenestar-object-prose h1 {
+    font-size: 1.4rem;
+}
+
+.wx-kleenestar-prose h2,
+.wx-kleenestar-object-prose h2 {
+    font-size: 1.2rem;
+}
+
+.wx-kleenestar-prose h3,
+.wx-kleenestar-object-prose h3 {
+    font-size: 1.05rem;
+}
+
+/* a quotation is the one place in the object view where a second vertical line is worth its
+   weight - it marks text that is not the author's */
+.wx-kleenestar-prose blockquote,
+.wx-kleenestar-object-prose blockquote {
+    margin: 1em 0;
+    padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 2px solid var(--wx-border-color);
+    color: var(--wx-secondary-color);
+}
+
+.wx-kleenestar-prose pre,
+.wx-kleenestar-object-prose pre {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    background: var(--wx-tertiary-bg);
+    overflow-x: auto;
+}
+
+/* ================================================================= fields */
+
+/* the field list is a two-column reading grid: the labels align down one edge so the eye runs
+   along the values, and a label that runs long wraps inside its own column instead of pushing
+   the value out of line */
+.wx-kleenestar-field-list {
+    display: grid;
+    grid-template-columns: minmax(6rem, 14rem) minmax(0, 1fr);
+    column-gap: 1.25rem;
+    row-gap: 0.15rem;
+    align-items: baseline;
+}
+
+.wx-kleenestar-field-list > .wx-kleenestar-field {
+    display: contents;
+}
+
+.wx-kleenestar-field-label {
+    color: var(--wx-secondary-color);
+    font-weight: 500;
+    hyphens: auto;
+}
+
+/* the inline editors sit on the value column and only show their frame once they are aimed at,
+   so a page of fields reads as text rather than as a form waiting to be filled in */
+.wx-kleenestar-field-list .wx-webui-smartedit,
+.wx-kleenestar-field-list .wx-smartedit {
+    min-width: 0;
+}
+
+/* a narrow work zone cannot hold two columns - the labels move above their values */
+@media (max-width: 60rem) {
+    .wx-kleenestar-field-list {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.75rem;
+    }
+
+    .wx-kleenestar-field-label {
+        display: block;
+    }
+}
+
+/* ============================================================ field sheet */
+
+/* the details of an object (ObjectFieldSheet): one row per field, the label the quiet half with
+   a glyph for the field type, the value in the shape its type reads. The label column is as wide as the longest name (capped),
+   not a share of the pane - a wide pane would otherwise open a gulf between name and value - and
+   every row takes it over as a subgrid, so the values line up on one edge. The sheet is a size
+   container, so a narrow preview pane stacks the name above its value instead of squeezing both */
+.ks-field-sheet {
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: fit-content(16rem) minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+}
+
+.ks-field-row,
+.ks-field-sheet-more {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+}
+
+.ks-field-sheet-more-summary {
+    grid-column: 1 / -1;
+}
+
+.ks-field-row {
+    box-sizing: border-box;
+    column-gap: 1.5rem;
+    align-items: start;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--wx-border-color-translucent, var(--wx-border-color));
+    border-radius: var(--wx-border-radius-sm, 4px);
+}
+
+.ks-field-row:last-child,
+.ks-field-sheet-more > .ks-field-row:last-child {
+    border-bottom: none;
+}
+
+.ks-field-row:hover {
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding-top: 0.35rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.875em;
+    font-weight: 500;
+}
+
+.ks-field-label[title] {
+    cursor: help;
+}
+
+.ks-field-icon {
+    flex: none;
+    width: 1em;
+    opacity: 0.7;
+}
+
+.ks-field-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-field-required {
+    color: var(--wx-danger);
+}
+
+.ks-field-value {
+    min-width: 0;
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    overflow-wrap: anywhere;
+}
+
+/* the inline editor spans the value column, so the pen sits at the row's end and the whole
+   value is something to aim at */
+.ks-field-value > .wx-smart-edit {
+    width: 100%;
+    margin: 0;
+    align-items: center;
+}
+
+.ks-field-value > .wx-smart-edit .pencil {
+    right: 0;
+    background: transparent;
+    color: var(--wx-secondary-color);
+}
+
+.ks-field-value > .wx-smart-edit:hover .pencil {
+    color: var(--wx-primary);
+}
+
+.ks-field-value > .wx-smart-edit > form {
+    width: 100%;
+}
+
+/* unset values say so quietly */
+.ks-field-none,
+.ks-field-value .wx-smart-edit-placeholder {
+    color: var(--wx-tertiary-color, var(--wx-secondary-color));
+    font-style: italic;
+    font-size: 0.875em;
+}
+
+/* choices, priorities, yes/no and tags read as chips */
+.ks-field-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.ks-field-chip {
+    --ks-chip-color: var(--wx-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--ks-chip-color);
+    background: color-mix(in srgb, var(--ks-chip-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ks-chip-color) 30%, transparent);
+}
+
+.ks-field-chip::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--ks-chip-color);
+}
+
+.ks-field-chip-primary { --ks-chip-color: var(--wx-primary); }
+.ks-field-chip-success { --ks-chip-color: var(--wx-success); }
+.ks-field-chip-secondary { --ks-chip-color: var(--wx-secondary-color); }
+
+.ks-field-chip-tag {
+    --ks-chip-color: var(--wx-secondary-color);
+    border-radius: var(--wx-border-radius-sm, 4px);
+}
+
+.ks-field-chip-tag::before {
+    content: none;
+}
+
+.ks-field-color {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--wx-font-monospace);
+    font-size: 0.875em;
+}
+
+.ks-field-swatch {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: var(--wx-border-radius-sm, 4px);
+    border: 1px solid var(--wx-border-color);
+}
+
+.ks-field-rating {
+    color: var(--wx-warning);
+    letter-spacing: 0.1em;
+}
+
+.ks-field-multiline {
+    white-space: pre-wrap;
+}
+
+.ks-field-prose > :first-child { margin-top: 0; }
+.ks-field-prose > :last-child { margin-bottom: 0; }
+
+/* the fields the object has not filled, folded after the filled ones (preview pane) */
+.ks-field-sheet-more {
+    margin-top: 0.35rem;
+}
+
+.ks-field-sheet-more-summary {
+    padding: 0.35rem 0.5rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.875em;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ks-field-sheet-more-summary:hover {
+    color: var(--wx-primary);
+}
+
+@container (max-width: 28rem) {
+    .ks-field-row,
+    .ks-field-sheet-more {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.1rem;
+    }
+
+    .ks-field-label {
+        padding-top: 0.15rem;
+    }
+
+    .ks-field-value {
+        min-height: 1.75rem;
+    }
+}
+
+/* ============================================================= attributes */
+
+/* The key/value rows of the reference zone: the key is the quiet half, and the pair sits on
+   one line until it cannot.
+
+   Matched by the name span a key/value row carries rather than by position, because the zone
+   holds more than attributes - the sla, the workflow, the dates each render their own
+   structure into the same section body, and turning those into a baseline flex row collapses
+   them to the width of their narrowest child. */
+#wx-content-property .wx-section-body > div:has(> span[id$="_name"]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.15rem 0;
+}
+
+#wx-content-property .wx-section-body > div > span[id$="_name"] {
+    color: var(--wx-secondary-color);
+}
+
+#wx-content-property .wx-section-body > div:has(> span[id$="_name"]) > i {
+    color: var(--wx-secondary-color);
+    width: 1em;
+    text-align: center;
+    flex: none;
+}
+
+/* ========================================================== communication */
+
+/* the conversation is the one part of the view that is a stream rather than a statement, and
+   the comment control frames every entry as its own box. inside the object view the frames
+   come off: a single tint a step away from the work zone marks the entries as a different
+   medium, and the entries are told apart by that tint and the gap between them.
+
+   the rule stays inside the object view - the control keeps its framed look everywhere else it
+   is used, where it does not sit in a stack of flat sections. */
+#object-comments-section .wx-comment,
+#object-comments-section .wx-comment-item {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+#object-comments-section .wx-comment-item {
+    padding: 0.35rem 0;
+    background: color-mix(in srgb, var(--wx-tertiary-bg) 55%, transparent);
+    border-radius: 4px;
+}
+
+#object-comments-section .wx-comment-item + .wx-comment-item {
+    margin-top: 0.6rem;
+}
+
+/* a reply belongs to the comment above it, so it hangs off a guide line of its own rather than
+   off a second background */
+#object-comments-section .wx-comment-replies {
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+    border-top: 0;
+    border-left: 1px solid var(--wx-border-color);
+    background: transparent;
+}
+
+/* The conversation - the thread and the composer - is docked at the foot of the view rather
+   than following the text. A conversation grows downwards, so on a long object the one thing a
+   reader came to do - read the replies or reply - would sit below everything they have to
+   scroll past first; and a thread in the flow of the page pushed a short document long.
+
+   The dock is pinned to the bottom of the scrolling work zone and given the zone's own
+   background, so the page passes behind it instead of showing through. Its top rule is what
+   tells the reader that the strip is the end of the page rather than a floating panel. Both
+   sections start folded (ObjectCommentDockFragment), so the dock is two header lines until one
+   is opened; an opened thread scrolls inside the dock instead of taking the page with it. */
+.ks-comment-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--wx-body-bg);
+    border-top: 1px solid var(--wx-border-color);
+    padding-top: 0.25rem;
+}
+
+/* a sticky element cannot leave the box of its parent, and on a document the dock is the only
+   child of the secondary section's host - pinned inside a box exactly its own size, an opened
+   thread grew below the fold instead of upwards. dissolving the host makes the whole content
+   column the box the dock is pinned within */
+:has(> .ks-comment-dock) {
+    display: contents;
+}
+
+.ks-comment-dock #object-comments-section > .wx-section-wrapper > .wx-section-body {
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* ================================================================ preview */
+
+/* the reduced view is read inside a detail pane, which is narrower than the work zone and
+   already framed by the list beside it - its key/value rows take the same layout as the ones
+   in the reference zone rather than inventing a third. The field values are no such rows any
+   more: they are the field sheet (ObjectFieldSheet), which lays itself out */
+#object-preview-property-section .wx-section-body > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.1rem 0;
+}
+
+#object-preview-property-section .wx-section-body > div > span[id$="_name"],
+#object-preview-property-section .wx-section-body > div > i {
+    color: var(--wx-secondary-color);
+}
+
+/* ================================================================ landing page */
+
+/* The landing page is the one view of the installation that is read rather than worked in, so
+   it is laid out as a page: a full-width head, then a wide reading column beside a narrow
+   column of things that keep arriving.
+
+   Everything inside the columns is a WebExpress control - sections, tiles, a stat group, a
+   timeline, an accordion, a callout - so what is left here is the page grid and the few
+   places where a control has to be told how much room it has. The section container the
+   fragment manager emits is anonymous, so the grid is attached through the one child that is
+   always present. */
+#wx-content-main div:has(> .ks-landing-head) {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem 1.75rem;
+}
+
+/* the head and the figures speak for the whole page, so they span both columns */
+.ks-landing-head,
+.ks-landing-stats {
+    grid-column: 1 / -1;
+}
+
+.ks-landing-col-main {
+    grid-column: 1;
+}
+
+.ks-landing-col-side {
+    grid-column: 2;
+}
+
+/* below the two-column breakpoint the side column is not a margin any more but a continuation,
+   so the grid collapses into one column and the sections simply follow each other */
+@media (max-width: 1200px) {
+    #wx-content-main div:has(> .ks-landing-head) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ks-landing-col-main,
+    .ks-landing-col-side {
+        grid-column: 1;
+    }
+}
+
+.ks-landing-col-main,
+.ks-landing-col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+}
+
+/* the page carries its own head, so the frame's headline would repeat the application name
+   above it. the headline is emitted by the frame rather than by the page, so it is hidden
+   from here, on this page only */
+#wx-content-main:has(.ks-landing-head) #wx-content-main-headline {
+    display: none !important;
+}
+
+/* -------------------------------------------------------------- head */
+
+.ks-landing-kicker {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--wx-secondary-color);
+}
+
+.ks-landing-head-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.ks-landing-greeting {
+    margin: 0.15rem 0 0.25rem 0;
+    font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+    font-weight: 600;
+    line-height: 1.15;
+}
+
+.ks-landing-lede {
+    margin: 0;
+    color: var(--wx-secondary-color);
+}
+
+.ks-landing-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------------- rows */
+
+/* Every list of the page is made of one row shape (LandingRow): a small icon, the title, an
+   optional one-line teaser, a quiet meta line and an optional state chip at the end. The page
+   used to give each kind of content a shape of its own - big news tiles carrying the class
+   picture, pinned pages as columns of full descriptions, help in three narrow columns - and
+   read as a collage. The rows are divided by a hairline, not framed: a list is one thing. */
+.ks-landing-rows {
+    display: flex;
+    flex-direction: column;
+}
+
+/* the section lays its body out as a cell of a grid, and a grid cell grows to its widest line
+   unless told otherwise - so a teaser clipped with an ellipsis pushed the whole column past
+   the page instead of being clipped */
+:is(.ks-landing-col-main, .ks-landing-col-side) .wx-section-body {
+    min-width: 0;
+}
+
+.ks-landing-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--wx-border-color, rgba(0, 0, 0, 0.08));
+    min-width: 0;
+}
+
+.ks-landing-row:last-child {
+    border-bottom: 0;
+}
+
+/* the icon is the class picture of the object, an image as often as a glyph, so it is given
+   a fixed box of at most 21px rather than a font size. the row is named in the selector
+   because the framework's img.wx-icon (height 1.2em, min-width 1em) outranks a single class */
+.ks-landing-row > .ks-landing-row-icon,
+.ks-landing-row > img.wx-icon.ks-landing-row-icon {
+    flex: 0 0 21px;
+    width: 21px;
+    height: 21px;
+    min-width: 0;
+    max-width: 21px;
+    max-height: 21px;
+    margin-top: 0.1rem;
+    object-fit: contain;
+    border-radius: 0.2rem;
+    font-size: 1rem;
+    line-height: 21px;
+    text-align: center;
+    color: var(--wx-secondary-color);
+}
+
+.ks-landing-row-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ks-landing-row-title {
+    display: block;
+    max-width: 100%;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-landing-row-teaser {
+    display: block;
+    max-width: 100%;
+    color: var(--wx-secondary-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-landing-row-meta {
+    display: block;
+    max-width: 100%;
+    color: var(--wx-secondary-color);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* the state chip sits at the end of the row, level with the title */
+.ks-landing-row > .ks-co-chip {
+    flex: 0 0 auto;
+    margin-top: 0.15rem;
+}
+
+.ks-landing-caption {
+    display: block;
+    margin: 0.75rem 0 0.1rem 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--wx-secondary-color);
+}
+
+.ks-landing-caption:first-child {
+    margin-top: 0;
+}
+
+.ks-landing-empty {
+    margin: 0.25rem 0;
+    color: var(--wx-secondary-color);
+}
+
+.ks-landing-more {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* -------------------------------------------------- comment composer frame */
+
+/* The comment dock's composer (ObjectCommentDockFragment) starts expanded and stands inside a
+   section that frames it. It is drawn without the framework's card border and without the primary
+   ring of .wx-comment-composer-expanded; its head and foot bars separate it from the page. Scoped
+   to .ks-comment-composer-open, so other composers keep the framework look. */
+.ks-comment-composer-open,
+.ks-comment-composer-open.wx-comment-composer-expanded {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* ------------------------------------------------------ draft comparison */
+
+/* The two states of a changed attribute are told apart by a coloured edge rather than by a
+   caption alone: the eye finds the pair before it reads the labels. Removed on the left,
+   arriving on the right - the same reading the history detail uses. */
+.ks-draft-changes-before,
+.ks-draft-changes-after {
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--wx-border-color);
+    border-radius: 0 4px 4px 0;
+}
+
+.ks-draft-changes-before {
+    border-left-color: var(--wx-danger);
+    background: var(--wx-tertiary-bg);
+    color: var(--wx-secondary-color);
+}
+
+.ks-draft-changes-after {
+    border-left-color: var(--wx-success);
+    background: var(--wx-tertiary-bg);
+}
+
+/* -------------------------------------------------------- prose reading view */
+
+/* The reading view of a document is the document. The content control lays the stored value
+   out; what is set here is the measure it is read at. The room a short text leaves is not
+   claimed by the text any more - a guessed min-height (100vh minus the chrome) never matched the
+   chrome exactly and left a strip under the comment dock; the page fills instead (below). */
+.wx-kleenestar-object-prose .ks-prose-content {
+    line-height: 1.65;
+}
+
+/* An object page fills its work zone exactly: every box between the scrolling region and the
+   comment dock or the closing line of labels and likes becomes a growing column, and those two
+   take the free space above them (margin-top: auto). A short text therefore ends with its labels
+   and the dock flush against the bottom edge, a long one scrolls with the dock pinned there. The
+   dock's own host is left out - it is dissolved (display: contents) so the dock can stick.
+   The chain stops at a detail pane: an overview's master-detail loads the object page into
+   its pane, and without the stop every box above that pane - the tab pane of the list
+   included - became a growing flex column. That also beat `.tab-pane:not(.active)` by the
+   id's weight, so a list tab stayed laid out invisibly after switching away from it and
+   pushed the next tab (dashboard, kanban, scrum) a whole screen down. A hidden tab pane is
+   therefore never touched either. Nor is the pane's own body: it is the framework's scroll
+   container (overflow auto, shrinking to the pane), and `flex: 1 0 auto` stopped it shrinking -
+   it grew to its content and the pane, which clips, could no longer be scrolled. The boxes
+   inside it still grow, so a short object keeps its dock at the foot of the pane. */
+#wx-content-main div:is(:has(.ks-comment-dock), :has(.ks-object-engagement)):not(:has(> .ks-comment-dock)):not(:has(.wx-detail :is(.ks-comment-dock, .ks-object-engagement))):not(.tab-pane:not(.active)):not(.wx-detail-body) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+}
+
+.ks-object-engagement,
+.ks-comment-dock {
+    margin-top: auto;
+}
+
+/* the tags end the piece rather than annotate it, so they sit under the text behind a rule,
+   the way a byline or a set of labels closes an article */
+.ks-prose-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--wx-border-color);
+}
+
+/* The figures that close a prose page off: how many liked it, how many commented. They sit on
+   the same rule the tags do, because they end the piece the same way - the last line of the
+   article rather than one more property of a record. The like is a framework control
+   (ControlLike) and brings its own look; the comment count is a readout beside it and is given
+   the same colour and size so the two read as one row. */
+.ks-object-metrics {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--wx-border-color);
+}
+
+.ks-object-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.8125rem;
+}
+
+/* ------------------------------------------------------------ collaboration */
+
+/* On the object detail the presence chips are drawn into the top right corner of the shared
+   area, which is where its first field is. The padding is what keeps the two apart. The prose
+   editor needs none of this: its dialog docks the chips on the footer bar. */
+.wx-kleenestar-collaborative {
+    padding-top: 1.75rem;
+}
+
+
+/* ----------------------------------------------------- form reading view */
+
+/* The unchangeable view of a form-rendered object is a filled-in form, not a list of
+   properties: the same sheet the mask writes, with the answers printed into it. What makes it
+   read as a sheet is below - numbered lines and a ruled box per answer that is there whether
+   or not somebody filled it in. An empty box is information: it is the question nobody
+   answered, and a view that dropped it would quietly shorten the record.
+
+   The parts of the sheet are not styled here at all: they are ControlSections, so their
+   caption, rule and folding are the framework's and match every other captioned block on an
+   object page. The sheet itself carries no frame for the same reason the prose renderer beside
+   it carries none - the record is the page, not a card on it. */
+.ks-form-sheet {
+    margin: 0 0 1.5rem;
+}
+
+/* the lines themselves. Two columns where the answers are short, one where they are not: a
+   rich-text answer is a paragraph and reads badly in half a page. The section around it
+   supplies the indent and the spacing, so the grid adds none of its own */
+.ks-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 0.85rem 1.1rem;
+}
+
+.ks-form-field--wide {
+    grid-column: 1 / -1;
+}
+
+/* a group inside a tab is a sub-caption spanning the grid, so the lines under it stay in the
+   same columns as the ones above rather than starting a second, narrower layout */
+.ks-form-group-label {
+    grid-column: 1 / -1;
+    margin: 0.4rem 0 -0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--wx-secondary-color);
+}
+
+/* the caption of one line: the number first, the way a form refers to its own lines when it
+   explains them elsewhere, then what is being asked */
+.ks-form-field-cap {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-form-field-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 3px;
+    background: var(--wx-tertiary-bg);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-form-field-name {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* the mark beside a line that has to be filled in. It is its own node rather than part of the
+   caption, because the caption is translated and a key stops resolving once anything is
+   concatenated onto it */
+.ks-form-field-required {
+    margin-left: -0.2rem;
+    color: var(--wx-danger, #dc3545);
+    font-weight: 700;
+}
+
+/* the box the answer is written in. It keeps its height when it is empty, which is what makes
+   an unanswered line visible as one */
+.ks-form-field-box {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 4px;
+    background: var(--wx-tertiary-bg);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.ks-form-field-box--empty {
+    background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 6px,
+        var(--wx-border-color) 6px,
+        var(--wx-border-color) 7px
+    );
+    opacity: 0.35;
+}
+
+/* a rich-text answer is laid out by the content control; the box only holds it, and gives it
+   the room a paragraph needs instead of the height of one line */
+.ks-form-field-box--prose {
+    min-height: 6rem;
+    background: var(--wx-body-bg);
+}
+
+
+/* ------------------------------------------------- form edit mask, on a page */
+
+/* The mask titles itself with the record's summary, which it renders onto the form's header
+   (ObjectStructuredEditFormFragmentBase). Opened as a dialog - the issue and asset edit
+   dialogs - the framework lifts that header onto the title bar and styles the input as the
+   title; served as a page, the header stays where it is and there is no title bar to inherit
+   from. The field would then be an unlabelled box repeating the headline above it, so it is
+   drawn as the heading line it stands for: the name of the record, editable in place.
+
+   The selector matches the header only while it is still a child of the form, so it stops
+   applying by itself once a dialog has lifted it into its title bar. It says form rather than
+   .wx-webapp-restform on purpose: that class is the one the client controller is registered
+   for, and the registry strips it from the element at mount - nothing can be styled through
+   it. */
+form > header:has(> .wx-modal-title-input) {
+    margin-bottom: 0.75rem;
+}
+
+form > header > .wx-modal-title-input.form-control {
+    padding: 0.15rem 0.5rem;
+    margin-left: -0.5rem;
+    width: calc(100% + 0.5rem);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: inherit;
+    text-overflow: ellipsis;
+}
+
+/* offered by the pointer, taken by the caret - a field that looks like a heading has to say
+   that it is one when it is reached, by mouse or by keyboard */
+form > header > .wx-modal-title-input.form-control:hover {
+    border-color: var(--wx-border-color);
+    background: var(--wx-body-bg);
+    cursor: text;
+}
+
+form > header > .wx-modal-title-input.form-control:focus {
+    border-color: var(--wx-primary);
+    background: var(--wx-body-bg);
+    box-shadow: 0 0 0 0.2rem rgba(var(--wx-primary-rgb, 13, 110, 253), 0.25);
+}
+
+form > header > .wx-modal-title-input.form-control::placeholder {
+    color: inherit;
+    opacity: 0.5;
+}
+
+/* ================================================================ start page, signed out */
+
+/* A visitor who is not signed in reads the installation's greeting beside the sign-in and
+   nothing else (LandingWelcomeFragment). The two sit side by side on a wide screen, the greeting
+   first, and follow each other below 900px.
+
+   "Nothing else" includes the frame: the sidebar, the headline, the breadcrumb and the header's
+   navigation, search and notifications are the frame's, not fragments a
+   condition could withhold, so they are hidden from here - on this page only, identified by the
+   greeting it carries, the way the signed-in start page hides its headline. The application
+   title, the help and the avatar (with its sign-in) stay. */
+body:has(.ks-welcome) #wx-sidebar,
+body:has(.ks-welcome) #wx-content-main-headline,
+body:has(.ks-welcome) #wx-breadcrumb,
+body:has(.ks-welcome) #wx-header-appnavigation,
+body:has(.ks-welcome) #wx-header-search,
+body:has(.ks-welcome) #wx-header-notifications {
+    display: none !important;
+}
+
+/* a dialog page that serves no form (the permission dialogs) is shown by the modal as a clone of
+   its whole #wx-content-main - headline included, while the modal's title bar already carries the
+   page title. The clone keeps the headline's inline display, hence the !important */
+.modal-body #wx-content-main-headline {
+    display: none !important;
+}
+
+.ks-welcome {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+    gap: 2.5rem;
+    align-items: start;
+    max-width: 68rem;
+    margin: 3rem auto;
+    padding: 0 1rem;
+}
+
+.ks-welcome-text {
+    line-height: 1.6;
+}
+
+.ks-welcome-text img {
+    max-width: 100%;
+    height: auto;
+}
+
+.ks-welcome-login {
+    border: 1px solid var(--wx-border-color);
+    border-radius: 0.5rem;
+    background: var(--wx-body-bg);
+}
+
+@media (max-width: 900px) {
+    .ks-welcome {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+}
+
+/* ============================================================== engagement */
+
+/* the labels and the likes close a document or a post off: one line under the text, the labels
+   taking what the like leaves (ObjectEngagementFragment) */
+.ks-object-engagement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 1.5rem;
+}
+
+.ks-object-engagement .ks-object-tags-icon {
+    flex: none;
+    color: var(--wx-secondary-color);
+    margin-right: -0.4rem;
+}
+
+.ks-object-engagement .ks-object-tags {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* the dock is two folded header lines; the sections' own spacing would stack into a strip twice
+   that height */
+.ks-comment-dock > .wx-section,
+.ks-comment-dock > .wx-webui-section {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ================================================================ reading */
+
+/* a record is read like a page, so in the light theme the work zone is paper-white instead of
+   the application's tinted gradient (webexpress.webapp.theme.css, #wx-split-p2): the detail
+   pages of all four kinds - issue, asset, document, blog entry - which are the pages carrying
+   <meta name="kleenestar.object"> (ObjectRefreshFragment), plus the pages told by what they
+   contain - the document overview's home page (the prose reading view) and the blog stream. The
+   dark theme keeps its gradient; white there would be a lamp. */
+html:not([data-wx-theme="dark"]):has(meta[name="kleenestar.object"]) #wx-split-p2,
+html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-object-prose, #blog-stream) #wx-split-p2 {
+    background: var(--wx-body-bg);
+}
+
+/* ========================================================= class overview */
+
+/* the start page of a class (ClassOverviewFragment): usage and the recently changed objects on the
+   left, the setup check list on the right; one column on a narrow screen */
+.ks-class-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(16rem, 2fr);
+    grid-template-areas: "usage setup" "recent setup";
+    gap: 0.5rem 2rem;
+    align-items: start;
+}
+
+.ks-class-overview .ks-co-usage { grid-area: usage; }
+.ks-class-overview .ks-co-setup { grid-area: setup; }
+.ks-class-overview .ks-co-recent { grid-area: recent; }
+
+@media (max-width: 60rem) {
+    .ks-class-overview {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "usage" "setup" "recent";
+    }
+}
+
+.ks-co-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.ks-co-figure {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: 6px;
+    background: var(--wx-body-bg);
+}
+
+.ks-co-figure-value {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.ks-co-figure-label,
+.ks-co-caption {
+    display: block;
+    color: var(--wx-secondary-color);
+}
+
+.ks-co-caption {
+    margin: 0.75rem 0 0.35rem 0;
+}
+
+/* the status categories as one stacked bar, the legend under it */
+.ks-co-bar {
+    display: flex;
+    height: 0.75rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-co-seg {
+    display: block;
+    height: 100%;
+}
+
+.ks-co-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.ks-co-legend-item::before {
+    content: "";
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.35rem;
+    border-radius: 2px;
+    background: currentColor;
+    vertical-align: baseline;
+}
+
+.ks-co-tone-secondary { --ks-co-tone: var(--wx-secondary-color); }
+.ks-co-tone-primary { --ks-co-tone: var(--wx-primary); }
+.ks-co-tone-warning { --ks-co-tone: var(--wx-warning); }
+.ks-co-tone-success { --ks-co-tone: var(--wx-success); }
+.ks-co-tone-danger { --ks-co-tone: var(--wx-danger); }
+.ks-co-tone-info { --ks-co-tone: var(--wx-info); }
+
+.ks-co-seg { background: var(--ks-co-tone); }
+.ks-co-legend-item::before { background: var(--ks-co-tone); }
+
+/* twelve weeks of new objects as columns; the column is the hover target, the bar its fill */
+.ks-co-weeks {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.3rem;
+    height: 5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--wx-border-color);
+}
+
+.ks-co-week {
+    flex: 1 1 0;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.ks-co-week-bar {
+    display: block;
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    background: color-mix(in srgb, var(--wx-primary) 70%, transparent);
+}
+
+/* the setup check list: one line per check, its state in the icon */
+.ks-co-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.ks-co-check {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    line-height: 1.4;
+}
+
+.ks-co-check-icon { flex: none; }
+.ks-co-check-ok .ks-co-check-icon { color: var(--wx-success); }
+.ks-co-check-warning .ks-co-check-icon { color: var(--wx-warning); }
+.ks-co-check-info .ks-co-check-icon { color: var(--wx-secondary-color); }
+
+/* the objects changed last: key, summary, state, time */
+.ks-co-recent-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.ks-co-recent-row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--wx-border-color-translucent, var(--wx-border-color));
+}
+
+.ks-co-recent-key,
+.ks-co-recent-when {
+    color: var(--wx-secondary-color);
+    white-space: nowrap;
+}
+
+.ks-co-recent-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-co-chip {
+    font-size: 0.75rem;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    color: var(--ks-co-tone);
+    background: color-mix(in srgb, var(--ks-co-tone) 14%, transparent);
+    white-space: nowrap;
+}
+
+.ks-co-empty {
+    color: var(--wx-secondary-color);
+}
+
+/* ================================================================ editor add-ons */
+
+/* The KleeneStar add-ons of the WYSIWYG editor (Assets/js/editoraddons.js). Each rule has to
+   hold twice: in the editor, where an add-on sits in the framework's frame
+   (.wx-addon-frame[data-addon-id] > .wx-addon-body-widget|container), and in the reading view,
+   where the frame is replaced by .wx-content-addon carrying the same data attributes. The
+   widget's own markup is the same in both, so most rules key on it; the notice, whose body is
+   the author's text, keys on the frame and the reading block separately. */
+
+/* the reading view keeps the author's spaces (white-space: pre-wrap); what a widget draws is
+   no typed text and must not inherit that */
+.ks-addon-object,
+.ks-addon-list,
+.ks-addon-count,
+.ks-addon-children,
+.ks-addon-related,
+.ks-addon-toc,
+.ks-addon-news {
+    white-space: normal;
+}
+
+.ks-addon-quiet {
+    color: var(--wx-secondary-color);
+    font-size: 0.875rem;
+}
+
+.ks-addon-icon {
+    flex: 0 0 auto;
+    width: 1.1em;
+    height: 1.1em;
+    object-fit: contain;
+    vertical-align: -0.2em;
+    border-radius: 0.15rem;
+}
+
+.ks-addon-key {
+    font-family: var(--wx-font-monospace, ui-monospace, monospace);
+    font-size: 0.85em;
+    color: var(--wx-secondary-color);
+}
+
+/* -------------------------------------------------------------- object reference (inline) */
+
+.ks-addon-object {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3em;
+    max-width: 100%;
+    padding: 0 0.3em;
+    border-radius: 0.3rem;
+    background: color-mix(in srgb, var(--wx-primary) 7%, transparent);
+    white-space: nowrap;
+}
+
+.ks-addon-object-link {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: none;
+}
+
+.ks-addon-object .ks-co-chip {
+    font-size: 0.7em;
+}
+
+.ks-addon-object.ks-addon-missing {
+    color: var(--wx-secondary-color);
+    text-decoration: line-through;
+    background: transparent;
+}
+
+/* -------------------------------------------------------------- related pages */
+
+/* the closing box of a page: a title above the rows, on the subtle surface of the table of
+   contents, so the two frame the text alike */
+.ks-addon-related {
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: var(--wx-tertiary-bg);
+    color: var(--wx-body-color);
+    padding: 0.75rem 1rem;
+}
+
+.ks-addon-related-title {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.ks-addon-related .ks-addon-row {
+    border-bottom-color: color-mix(in srgb, var(--wx-border-color) 60%, transparent);
+}
+
+/* -------------------------------------------------------------- lists (objects, child pages) */
+
+/* named with its host, because the reading view indents every list of the prose */
+:is(.ks-addon-list, .ks-addon-children, .ks-addon-related) > ul.ks-addon-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.ks-addon-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.25rem;
+    border-bottom: 1px solid var(--wx-border-color);
+    min-width: 0;
+}
+
+.ks-addon-row:last-child {
+    border-bottom: 0;
+}
+
+.ks-addon-row-title {
+    text-decoration: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-addon-row-meta {
+    flex: 0 1 auto;
+    color: var(--wx-secondary-color);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ks-addon-row > .ks-co-chip {
+    flex: 0 0 auto;
+}
+
+/* -------------------------------------------------------------- key figure */
+
+.ks-addon-count {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.5rem 0.25rem;
+}
+
+.ks-addon-count-value {
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-addon-count-caption {
+    color: var(--wx-secondary-color);
+    font-size: 0.875rem;
+}
+
+/* ---------------------------------------- framework add-ons: table of contents and callout */
+
+/* the editor sheet of WebExpress draws both add-ons with Bootstrap tokens (--bs-border-color,
+   --bs-tertiary-bg, --bs-info), which no longer exist, so their light fallbacks applied in the
+   dark scheme too: light text on a light box. Here they take the tokens of the theme; the class
+   is doubled to outrank the framework rule regardless of the order of the sheets */
+
+/* the table of contents: no frame, a subtle surface */
+.wx-document-toc.wx-document-toc {
+    border: 0;
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: var(--wx-tertiary-bg);
+    color: var(--wx-body-color);
+    padding: 0.75rem 1rem;
+}
+
+.wx-document-toc.wx-document-toc ol {
+    margin-bottom: 0;
+}
+
+/* the callout: tinted by its tone like the notice of KleeneStar, readable in both schemes */
+.wx-editor-callout.wx-editor-callout {
+    --ks-callout: var(--wx-info);
+    border-left: 4px solid var(--ks-callout);
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: color-mix(in srgb, var(--ks-callout) 12%, var(--wx-body-bg));
+    color: var(--wx-body-color);
+    padding: 0.75rem 1rem;
+}
+
+[data-tone="success"] > .wx-editor-callout.wx-editor-callout,
+.wx-editor-callout.wx-editor-callout[data-tone="success"] {
+    --ks-callout: var(--wx-success);
+}
+
+[data-tone="warning"] > .wx-editor-callout.wx-editor-callout,
+.wx-editor-callout.wx-editor-callout[data-tone="warning"] {
+    --ks-callout: var(--wx-warning);
+}
+
+[data-tone="danger"] > .wx-editor-callout.wx-editor-callout,
+.wx-editor-callout.wx-editor-callout[data-tone="danger"] {
+    --ks-callout: var(--wx-danger);
+}
+
+[data-tone="secondary"] > .wx-editor-callout.wx-editor-callout,
+.wx-editor-callout.wx-editor-callout[data-tone="secondary"] {
+    --ks-callout: var(--wx-secondary);
+}
+
+[data-tone="primary"] > .wx-editor-callout.wx-editor-callout,
+.wx-editor-callout.wx-editor-callout[data-tone="primary"] {
+    --ks-callout: var(--wx-primary);
+}
+
+.wx-editor-callout.wx-editor-callout > :last-child {
+    margin-bottom: 0;
+}
+
+/* -------------------------------------------------------------- notice (container) */
+
+/* the notice's class (bodyClass) sits on the editable body in the editor and on the reading
+   block in the reading view; its variant sits on the frame in the editor and on the block in
+   the reading view, so only the variants need both forms */
+.ks-addon-callout {
+    --ks-callout: var(--wx-info);
+    border-left: 4px solid var(--ks-callout);
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: color-mix(in srgb, var(--ks-callout) 9%, transparent);
+    padding: 0.75rem 1rem;
+}
+
+[data-variant="tip"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="tip"] {
+    --ks-callout: var(--wx-success);
+}
+
+[data-variant="warning"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="warning"] {
+    --ks-callout: var(--wx-warning);
+}
+
+[data-variant="danger"] > .ks-addon-callout,
+.ks-addon-callout[data-variant="danger"] {
+    --ks-callout: var(--wx-danger);
+}
+
+/* the title is a property, not text of the body, so it is drawn from the attribute the
+   reading block carries; in the editor the frame's header already names the add-on */
+.wx-content-addon.ks-addon-callout[data-title]:not([data-title=""])::before {
+    content: attr(data-title);
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.wx-content-addon.ks-addon-callout > :last-child {
+    margin-bottom: 0;
+}
+
+/* -------------------------------------------------------------- organize tree */
+
+/* The node icons of the framework's data tree (WorkspaceObjectsOrganizeFragment) keep the size of
+   img.wx-icon inside #wx-content, where .wx-content img { height: auto } of the content stylesheet
+   has the same specificity, comes later and draws a picture at its natural size. */
+.wx-tree-label-container > img.wx-icon {
+    height: 1.2em;
+}
+
+/* -------------------------------------------------------------- saved searches */
+
+/* the save and share buttons of the search page (SavedSearchAdvancedSearch), placed by the
+   framework's search control in its extended content beside the input */
+.ks-savedsearch-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: .25rem;
+}
+
+.ks-savedsearch-actions .btn {
+    white-space: nowrap;
+}
+
+/* the "..." menu stands beside the save button at the same height */
+.ks-savedsearch-actions {
+    align-items: stretch;
+}
+
+.ks-savedsearch-actions > .wx-dropdown > .btn {
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   insight reports tab (InsightReportControl, insightreports.js): a toolbar, the chart on a stage
+   of a fixed height, the description above and the key figures beneath it
+   --------------------------------------------------------------------------------------------- */
+
+.ks-insight-reports {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    min-width: 0;
+}
+
+.ks-insight-reports-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-end;
+}
+
+.ks-insight-reports-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+/* the downloads sit at the end of the toolbar, aligned with the selects */
+.ks-insight-reports-downloads {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    padding-bottom: 0.375rem;
+    font-size: 0.8125rem;
+}
+
+.ks-insight-reports-field[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-field select {
+    min-width: 11rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.875rem;
+    color: inherit;
+    background: var(--wx-body-bg);
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius, 0.375rem);
+}
+
+.ks-insight-reports-report {
+    min-width: 16rem;
+}
+
+.ks-insight-reports-description {
+    margin: 0;
+    max-width: 60rem;
+    color: var(--wx-secondary-color);
+}
+
+/* the chart control sizes its own plot (300px) and puts the legend beneath it, so the stage
+   grows with the chart; the minimum keeps the empty and error notices from collapsing it */
+.ks-insight-reports-stage {
+    position: relative;
+    min-height: 22rem;
+    padding: 0.75rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius, 0.375rem);
+    background: var(--wx-body-bg);
+}
+
+.ks-insight-reports-chart[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-empty,
+.ks-insight-reports-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    text-align: center;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-empty[hidden],
+.ks-insight-reports-error[hidden],
+.ks-insight-reports-notice[hidden] {
+    display: none;
+}
+
+.ks-insight-reports-error {
+    color: var(--wx-danger);
+}
+
+.ks-insight-reports-loading .ks-insight-reports-stage {
+    opacity: 0.6;
+}
+
+.ks-insight-reports-notice {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2.5rem;
+    margin: 0;
+}
+
+.ks-insight-reports-summary dt {
+    font-size: 0.75rem;
+    font-weight: normal;
+    color: var(--wx-secondary-color);
+}
+
+.ks-insight-reports-summary dd {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+    .ks-insight-reports-field,
+    .ks-insight-reports-field select,
+    .ks-insight-reports-report {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .ks-insight-reports-stage {
+        min-height: 16rem;
+    }
+}
+
+/* ============================================================ people card */
+/* the people of an object (ObjectPropertyPeopleCardFragment, ObjectPersonRow): a round picture,
+   the role in small letters above the name, an optional status chip and an action at the end */
+.ks-people {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ks-person {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.35rem 0.4rem;
+    border-radius: var(--wx-border-radius, 6px);
+}
+
+.ks-person:hover {
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-person-avatar {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    overflow: hidden;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--wx-primary) 18%, transparent);
+    color: var(--wx-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.ks-person-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ks-person-avatar-group {
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--wx-secondary-color) 18%, transparent);
+    color: var(--wx-secondary-color);
+}
+
+.ks-person-muted .ks-person-avatar {
+    background: transparent;
+    border: 1.5px dashed var(--wx-border-color);
+}
+
+.ks-person-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.ks-person-role {
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-person-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-person-muted .ks-person-name {
+    color: var(--wx-secondary-color);
+    font-weight: 400;
+    font-style: italic;
+}
+
+.ks-person-status {
+    flex: 0 0 auto;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    --ks-status-color: var(--wx-secondary-color);
+    color: var(--ks-status-color);
+    background: color-mix(in srgb, var(--ks-status-color) 15%, transparent);
+}
+
+.ks-person-status-success { --ks-status-color: var(--wx-success); }
+.ks-person-status-danger { --ks-status-color: var(--wx-danger); }
+.ks-person-status-pending { --ks-status-color: var(--wx-warning); }
+
+/* yellow text on a yellow wash falls far short of 4.5:1; the pending chip darkens its text
+   towards the body colour and keeps the yellow wash */
+.ks-person-status-pending {
+    color: color-mix(in srgb, var(--wx-warning) 45%, var(--wx-body-color));
+}
+
+.ks-person-action {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.ks-people-heading {
+    display: block;
+    margin: 0.6rem 0.4rem 0.15rem;
+    color: var(--wx-secondary-color);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ks-people > .wx-watcher,
+.ks-people > [id="object-property-watcher"] {
+    padding: 0 0.4rem;
+}
+
+/* the dates card uses the field sheet; in the narrow property column its rows are tighter */
+.ks-field-sheet-compact .ks-field-row {
+    padding: 0.2rem 0.4rem;
+}
+
+/* ====================================================== page-wide file drop */
+/* an upload that takes files dropped anywhere on the page (ControlUpload.FullScreenDropzone)
+   shows its zone over the whole viewport while a drag is over the page */
+.wx-upload[data-fullscreen-dropzone="true"].wx-drag-over .wx-upload-dropzone {
+    position: fixed;
+    inset: 1rem;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--wx-primary);
+    border-radius: var(--wx-border-radius-lg, 12px);
+    background: color-mix(in srgb, var(--wx-body-bg) 82%, transparent);
+    backdrop-filter: blur(2px);
+    font-size: 1.15rem;
+    pointer-events: none;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Node tree of the hierarchy wizard (Assets/js/templatehierarchy.js): the root template on top,
+ * one card per node indented by its depth, with its class, its connection (sub-object and/or
+ * link), its assignee and the sibling it waits for, and a picker below that adds a template.
+ * ---------------------------------------------------------------------------------------- */
+.ks-template-children {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ks-template-children-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ks-template-children-list[hidden],
+.ks-template-children-empty[hidden] {
+    display: none;
+}
+
+.ks-template-children-empty {
+    padding: 1.25rem 1rem;
+    border: 1px dashed var(--wx-border-color);
+    border-radius: var(--wx-border-radius);
+}
+
+.ks-template-child {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem 0.75rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius);
+    background: var(--wx-body-bg);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ks-template-child:hover,
+.ks-template-child:focus-within {
+    border-color: var(--wx-primary-border-subtle, var(--wx-border-color));
+}
+
+.ks-template-child.ks-template-child-invalid {
+    border-color: var(--wx-form-invalid-border-color, var(--wx-danger));
+    box-shadow: 0 0 0 1px var(--wx-form-invalid-border-color, var(--wx-danger));
+}
+
+.ks-template-child-dragging {
+    opacity: 0.5;
+}
+
+.ks-template-child-drop-before::before,
+.ks-template-child-drop-after::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: var(--wx-drop-line-width, 2px);
+    background: var(--wx-drop-line-color, var(--wx-primary));
+    border-radius: 1px;
+}
+
+.ks-template-child-drop-before::before {
+    top: calc(-0.25rem - 1px);
+}
+
+.ks-template-child-drop-after::after {
+    bottom: calc(-0.25rem - 1px);
+}
+
+.ks-template-child-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.ks-template-child-handle {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--wx-border-radius-sm);
+    background: transparent;
+    color: var(--wx-secondary-color);
+    cursor: grab;
+}
+
+.ks-template-child-handle:hover,
+.ks-template-child-handle:focus-visible {
+    background: var(--wx-tertiary-bg);
+    color: var(--wx-body-color);
+}
+
+.ks-template-child-handle:active {
+    cursor: grabbing;
+}
+
+.ks-template-child-position {
+    flex: none;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--wx-secondary-bg);
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.5rem;
+    text-align: center;
+}
+
+.ks-template-child-icon {
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--wx-border-radius-sm);
+    object-fit: cover;
+}
+
+.ks-template-child-title {
+    flex: 1 1 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.5rem;
+    min-width: 0;
+}
+
+.ks-template-child-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.ks-template-child-meta {
+    flex-basis: 100%;
+    overflow: hidden;
+    color: var(--wx-secondary-color);
+    font-size: 0.8125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-template-child-badge {
+    padding: 0 0.4rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius-sm);
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.ks-template-child-workspace {
+    border-color: var(--wx-info-border-subtle, var(--wx-border-color));
+    background: var(--wx-info-bg-subtle, transparent);
+    color: var(--wx-info-text-emphasis, var(--wx-secondary-color));
+}
+
+.ks-template-child-connection {
+    padding: 0 0.4rem;
+    border: 1px solid var(--wx-primary-border-subtle, var(--wx-border-color));
+    border-radius: 999px;
+    background: var(--wx-primary-bg-subtle, transparent);
+    color: var(--wx-primary-text-emphasis, var(--wx-primary));
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.ks-template-child-connection-none {
+    border-color: var(--wx-danger-border-subtle, var(--wx-border-color));
+    background: var(--wx-danger-bg-subtle, transparent);
+    color: var(--wx-danger-text-emphasis, var(--wx-danger));
+}
+
+.ks-template-child-connect {
+    grid-column: span 2;
+}
+
+.ks-template-child-connect-body {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.ks-template-child-sub {
+    flex: none;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.ks-template-child-link {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ks-template-child-archived {
+    border-color: var(--wx-warning-border-subtle, var(--wx-border-color));
+    background: var(--wx-warning-bg-subtle, transparent);
+    color: var(--wx-warning-text-emphasis, var(--wx-secondary-color));
+}
+
+.ks-template-child-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.ks-template-child-actions .btn {
+    color: var(--wx-secondary-color);
+}
+
+.ks-template-child-actions .btn:hover:not(:disabled) {
+    color: var(--wx-body-color);
+}
+
+.ks-template-child-actions .ks-template-child-remove:hover {
+    color: var(--wx-danger);
+}
+
+.ks-template-child-actions .btn:disabled {
+    visibility: hidden;
+}
+
+.ks-template-child-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.5rem 0.75rem;
+    padding-left: 2rem;
+}
+
+.ks-template-child-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.ks-template-child-label {
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.ks-template-child-static {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-template-child-static .wx-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.ks-template-child-invalid .ks-template-child-choice .form-control {
+    border-color: var(--wx-form-invalid-border-color, var(--wx-danger));
+}
+
+.ks-template-children-add .form-control {
+    border-style: dashed;
+}
+
+.ks-template-children-add .form-control > .ks-template-children-add-icon {
+    flex: none;
+    align-self: center;
+    margin-right: 0.375rem;
+    color: var(--wx-primary);
+}
+
+.ks-template-child-option {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.ks-template-child-option-meta {
+    color: var(--wx-secondary-color);
+    font-size: 0.75rem;
+}
+
+.ks-template-child-option-position {
+    color: var(--wx-secondary-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-template-hierarchy .ks-template-child {
+    margin-left: calc(var(--ks-depth, 0) * 1.75rem);
+}
+
+.ks-template-hierarchy .ks-template-child[data-depth]:not([data-depth="0"])::after {
+    content: "";
+    position: absolute;
+    top: 1.25rem;
+    left: -1rem;
+    width: 0.75rem;
+    border-top: 1px solid var(--wx-border-color);
+}
+
+.ks-template-hierarchy .ks-template-child[data-depth]:not([data-depth="0"])::before {
+    content: "";
+    position: absolute;
+    top: -0.5rem;
+    bottom: calc(100% - 1.25rem);
+    left: -1rem;
+    border-left: 1px solid var(--wx-border-color);
+}
+
+/* the drop marker of a nested row takes the place of its tree line while a row is dragged */
+.ks-template-hierarchy .ks-template-child.ks-template-child-drop-before::before,
+.ks-template-hierarchy .ks-template-child.ks-template-child-drop-after::after {
+    left: 0;
+    right: 0;
+    width: auto;
+    height: var(--wx-drop-line-width, 2px);
+    border: 0;
+    background: var(--wx-drop-line-color, var(--wx-primary));
+}
+
+.ks-template-hierarchy .ks-template-child.ks-template-child-drop-before::before {
+    top: calc(-0.25rem - 1px);
+    bottom: auto;
+}
+
+.ks-template-hierarchy .ks-template-child.ks-template-child-drop-after::after {
+    top: auto;
+    bottom: calc(-0.25rem - 1px);
+}
+
+.ks-template-hierarchy-root {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--wx-primary-border-subtle, var(--wx-border-color));
+    border-radius: var(--wx-border-radius);
+    background: var(--wx-primary-bg-subtle, var(--wx-tertiary-bg));
+}
+
+.ks-template-hierarchy-root-none {
+    border-style: dashed;
+    background: transparent;
+    color: var(--wx-secondary-color);
+}
+
+@media (max-width: 576px) {
+    .ks-template-hierarchy .ks-template-child {
+        margin-left: calc(var(--ks-depth, 0) * 0.75rem);
+    }
+
+    .ks-template-child-fields {
+        grid-template-columns: 1fr;
+        padding-left: 0;
+    }
+
+    .ks-template-child-connect {
+        grid-column: auto;
+    }
+
+    .ks-template-child-connect-body {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

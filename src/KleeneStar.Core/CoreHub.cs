@@ -1,8 +1,10 @@
-﻿using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
 using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using WebExpress.WebCore;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebApplication;
@@ -12,6 +14,7 @@ using WebExpress.WebCore.WebParameter;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebIcon;
 using WebExpress.WebUI.WebNotification;
+using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core
 {
@@ -21,18 +24,39 @@ namespace KleeneStar.Core
     public static class CoreHub
     {
         private static WorkspaceManager _workspaceManager;
+        private static WorkspaceTemplateManager _workspaceTemplateManager;
         private static ClassManager _classManager;
         private static FieldManager _fieldManager;
+        private static SecurityLevelManager _securityLevelManager;
+        private static ObjectKindManager _objectKindManager;
+        private static ObjectKindManager _objectKindManagerDetached;
+        private static ObjectRendererManager _objectRendererManager;
+        private static ObjectRendererManager _objectRendererManagerDetached;
+        private static AuthenticationSourceManager _authenticationSourceManager;
+        private static AuthenticationSourceManager _authenticationSourceManagerDetached;
+        private static InsightViewTypeManager _insightViewTypeManager;
+        private static InsightViewTypeManager _insightViewTypeManagerDetached;
+        private static ObjectExportManager _objectExportManager;
+        private static ObjectExportManager _objectExportManagerDetached;
+        private static DatabaseSeedManager _databaseSeedManager;
         private static FormManager _formManager;
         private static PriorityManager _priorityManager;
         private static WorkflowManager _workflowManager;
         private static StatusManager _statusManager;
         private static ObjectManager _objectManager;
-        private static DashboardManager _dashboardManager;
+        private static InsightManager _insightManager;
+        private static KanbanBoardManager _kanbanBoardManager;
+        private static KindDashboardManager _kindDashboardManager;
         private static TenantManager _tenantManager;
+        private static NavigatorLinkManager _navigatorLinkManager;
+        private static MaintenanceManager _maintenanceManager;
+        private static BrandingManager _brandingManager;
+        private static CustomQuickfilterManager _customQuickfilterManager;
+        private static PermissionManager _permissionManager;
         private static IdentityManager _identityManager;
         private static GroupManager _groupManager;
         private static TemplateManager _templateManager;
+        private static TemplateHierarchyManager _templateHierarchyManager;
         private static ObjectViewManager _objectViewManager;
         private static SlaManager _slaManager;
         private static CalendarManager _calendarManager;
@@ -41,10 +65,32 @@ namespace KleeneStar.Core
         private static WatcherManager _watcherManager;
         private static ShareManager _shareManager;
         private static ObjectTagManager _objectTagManager;
+        private static ObjectDraftManager _objectDraftManager;
+        private static AppearanceManager _appearanceManager;
         private static ValueManager _valueManager;
-        private static ObjectLinkManager _objectLinkManager;
+        private static CommitManager _commitManager;
+        private static ObjectRelationManager _objectRelationManager;
+        private static ObjectRelationTypeManager _objectRelationTypeManager;
+        private static ObjectImpactManager _objectImpactManager;
+        private static ObjectOperationManager _objectOperationManager;
+        private static ObjectProgressManager _objectProgressManager;
+        private static BlueprintManager _blueprintManager;
+        private static ApprovalManager _approvalManager;
+        private static PlanningManager _planningManager;
+        private static ValueCatalogManager _valueCatalogManager;
+        private static WorkflowGuardManager _workflowGuardManager;
+        private static WorkflowValidatorManager _workflowValidatorManager;
+        private static WorkflowPostFunctionManager _workflowPostFunctionManager;
         private static SessionManager _sessionManager;
+
+        private static WqlHistoryManager _wqlHistoryManager;
+        private static NotificationCenterManager _notificationCenterManager;
+        private static IdentitySessionManager _identitySessionManager;
+        private static AccessTokenManager _accessTokenManager;
+        private static CredentialManager _credentialManager;
         private static SavedSearchManager _savedSearchManager;
+        private static SprintManager _sprintManager;
+        private static AuditManager _auditManager;
 
         /// <summary>
         /// Gets the shared instance of the component hub used for managing and coordinating application components.
@@ -62,6 +108,12 @@ namespace KleeneStar.Core
         public static IHttpServerContext HttpServerContext { get; internal set; }
 
         /// <summary>
+        /// Gets the settings of the object hierarchy (<c>Plugins:kleenestar.core:Hierarchy</c>).
+        /// Holds the defaults until the application binds the configured ones.
+        /// </summary>
+        public static WebManager.HierarchySettings HierarchySettings { get; internal set; } = new();
+
+        /// <summary>
         /// Gets the workspace manager responsible for managing workspaces within the application.
         /// </summary>
         public static IWorkspaceManager WorkspaceManager => _workspaceManager ??= ComponentHub.GetComponentManager<WorkspaceManager>();
@@ -75,6 +127,50 @@ namespace KleeneStar.Core
         /// Gets the field manager responsible for managing fields within the class.
         /// </summary>
         public static IFieldManager FieldManager => _fieldManager ??= ComponentHub.GetComponentManager<FieldManager>();
+
+        /// <summary>
+        /// Gets the security level manager responsible for the classifications of the classes
+        /// and for deciding who is cleared to see an object carrying one.
+        /// </summary>
+        public static ISecurityLevelManager SecurityLevelManager => _securityLevelManager ??= ComponentHub.GetComponentManager<SecurityLevelManager>();
+
+        /// <summary>
+        /// Gets the object kinds (document, blog, issue, asset and those of the plugins).
+        /// </summary>
+        /// <remarks>
+        /// Like the other registries below it is answered without a host too - a manager that
+        /// knows the core's own kinds - because these lookups are pure and used from code that
+        /// runs in tests and before the application is up. That stand-in is never cached as the
+        /// manager: once the host is up, the host's manager (which follows the plugins) answers.
+        /// </remarks>
+        public static IObjectKindManager ObjectKindManager => _objectKindManager ?? (_objectKindManager = ComponentHub?.GetComponentManager<ObjectKindManager>()) ?? (_objectKindManagerDetached ??= WebManager.ObjectKindManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the renderers an object is read and written through (prose, form, spreadsheet
+        /// and those of the plugins).
+        /// </summary>
+        public static IObjectRendererManager ObjectRendererManager => _objectRendererManager ?? (_objectRendererManager = ComponentHub?.GetComponentManager<ObjectRendererManager>()) ?? (_objectRendererManagerDetached ??= WebManager.ObjectRendererManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the sources accounts are authenticated by (the internal one, those of the
+        /// plugins and those registered per configuration entry).
+        /// </summary>
+        public static IAuthenticationSourceManager AuthenticationSourceManager => _authenticationSourceManager ?? (_authenticationSourceManager = ComponentHub?.GetComponentManager<AuthenticationSourceManager>()) ?? (_authenticationSourceManagerDetached ??= WebManager.AuthenticationSourceManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the tab types an insight can show.
+        /// </summary>
+        public static IInsightViewTypeManager InsightViewTypeManager => _insightViewTypeManager ?? (_insightViewTypeManager = ComponentHub?.GetComponentManager<InsightViewTypeManager>()) ?? (_insightViewTypeManagerDetached ??= WebManager.InsightViewTypeManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the file formats a single object is exported in.
+        /// </summary>
+        public static IObjectExportManager ObjectExportManager => _objectExportManager ?? (_objectExportManager = ComponentHub?.GetComponentManager<ObjectExportManager>()) ?? (_objectExportManagerDetached ??= WebManager.ObjectExportManager.CreateDetached());
+
+        /// <summary>
+        /// Gets the database seeds the plugins contribute.
+        /// </summary>
+        public static IDatabaseSeedManager DatabaseSeedManager => _databaseSeedManager ??= ComponentHub.GetComponentManager<DatabaseSeedManager>();
 
         /// <summary>
         /// Gets the form manager responsible for managing forms within the class.
@@ -102,14 +198,53 @@ namespace KleeneStar.Core
         public static IObjectManager ObjectManager => _objectManager ??= ComponentHub.GetComponentManager<ObjectManager>();
 
         /// <summary>
-        /// Gets the dashboard manager responsible for managing dashboards within the application.
+        /// Gets the insight manager responsible for managing the insights (user-defined views such as
+        /// dashboards) within the application.
         /// </summary>
-        public static IDashboardManager DashboardManager => _dashboardManager ??= ComponentHub.GetComponentManager<DashboardManager>();
+        public static IInsightManager InsightManager => _insightManager ??= ComponentHub.GetComponentManager<InsightManager>();
+
+        /// <summary>
+        /// Gets the Kanban board manager responsible for the persisted board layout (columns,
+        /// swimlanes, board filter) of the workspace object Kanban boards.
+        /// </summary>
+        public static IKanbanBoardManager KanbanBoardManager => _kanbanBoardManager ??= ComponentHub.GetComponentManager<KanbanBoardManager>();
+
+        /// <summary>
+        /// Gets the object-kind dashboard manager responsible for the persisted KPI board
+        /// layout (columns, widgets) of the workspace object Dashboard tabs.
+        /// </summary>
+        public static IKindDashboardManager KindDashboardManager => _kindDashboardManager ??= ComponentHub.GetComponentManager<KindDashboardManager>();
 
         /// <summary>
         /// Gets the tenant manager used to manage tenant-related operations within the application.
         /// </summary>
         public static ITenantManager TenantManager => _tenantManager ??= ComponentHub.GetComponentManager<TenantManager>();
+
+        /// <summary>
+        /// Gets the navigator link manager used to manage the additional links shown in the app navigator.
+        /// </summary>
+        public static INavigatorLinkManager NavigatorLinkManager => _navigatorLinkManager ??= ComponentHub.GetComponentManager<NavigatorLinkManager>();
+
+        /// <summary>
+        /// Gets the maintenance manager used to manage the maintenance notice of the installation.
+        /// </summary>
+        public static IMaintenanceManager MaintenanceManager => _maintenanceManager ??= ComponentHub.GetComponentManager<MaintenanceManager>();
+
+        /// <summary>
+        /// Gets the manager of the installation identity: the title and the icon the application
+        /// is presented under.
+        /// </summary>
+        public static IBrandingManager BrandingManager => _brandingManager ??= ComponentHub.GetComponentManager<BrandingManager>();
+
+        /// <summary>
+        /// Gets the manager of the quickfilters the users defined themselves.
+        /// </summary>
+        public static ICustomQuickfilterManager CustomQuickfilterManager => _customQuickfilterManager ??= ComponentHub.GetComponentManager<CustomQuickfilterManager>();
+
+        /// <summary>
+        /// Gets the permission manager, which administers the group-to-policy grants on a resource.
+        /// </summary>
+        public static IPermissionManager PermissionManager => _permissionManager ??= ComponentHub.GetComponentManager<PermissionManager>();
 
         /// <summary>
         /// Gets the identity manager used to manage identity-related operations within the application.
@@ -125,6 +260,12 @@ namespace KleeneStar.Core
         /// Gets the template manager responsible for managing templates within the workspace.
         /// </summary>
         public static ITemplateManager TemplateManager => _templateManager ??= ComponentHub.GetComponentManager<TemplateManager>();
+
+        /// <summary>
+        /// Gets the manager of the template hierarchies, the work structures offered beside the
+        /// templates.
+        /// </summary>
+        public static ITemplateHierarchyManager TemplateHierarchyManager => _templateHierarchyManager ??= ComponentHub.GetComponentManager<TemplateHierarchyManager>();
 
         /// <summary>
         /// Gets the object view manager responsible for managing the persisted tabs that
@@ -173,16 +314,115 @@ namespace KleeneStar.Core
         public static IObjectTagManager ObjectTagManager => _objectTagManager ??= ComponentHub.GetComponentManager<ObjectTagManager>();
 
         /// <summary>
+        /// Gets the workspace-template manager responsible for the workspace shapes the installed
+        /// plugins define - what a new workspace can be created as, and which classes it starts
+        /// with.
+        /// </summary>
+        public static IWorkspaceTemplateManager WorkspaceTemplateManager => _workspaceTemplateManager ??= ComponentHub.GetComponentManager<WorkspaceTemplateManager>();
+
+        /// <summary>
+        /// Gets the object-draft manager responsible for the unpublished working copies of the
+        /// prose attributes of objects - what the document and blog editor writes on every
+        /// change, and what publishing turns into a revision.
+        /// </summary>
+        public static IObjectDraftManager ObjectDraftManager => _objectDraftManager ??= ComponentHub.GetComponentManager<ObjectDraftManager>();
+
+        /// <summary>
+        /// Gets the appearance manager, which keeps the theme, light or dark choice and the
+        /// adjustments (accent, font size, density, motion) every identity picked for itself.
+        /// </summary>
+        public static IAppearanceManager AppearanceManager => _appearanceManager ??= ComponentHub.GetComponentManager<AppearanceManager>();
+
+        /// <summary>
         /// Gets the value manager responsible for the per-object per-field value rows
         /// that back the typed inputs on the object detail and edit views.
         /// </summary>
         public static IValueManager ValueManager => _valueManager ??= ComponentHub.GetComponentManager<ValueManager>();
 
         /// <summary>
-        /// Gets the object-link manager responsible for the typed directional links
-        /// between objects (e.g. blocked-by, duplicates, relates-to).
+        /// Gets the commit manager responsible for the append-only commit chains that record
+        /// every change made to an object, and for reconstructing and restoring past states
+        /// from them.
         /// </summary>
-        public static IObjectLinkManager ObjectLinkManager => _objectLinkManager ??= ComponentHub.GetComponentManager<ObjectLinkManager>();
+        public static ICommitManager CommitManager => _commitManager ??= ComponentHub.GetComponentManager<CommitManager>();
+
+        /// <summary>
+        /// Gets the audit manager responsible for the installation-wide, append-only,
+        /// hash-chained record of every event worth reconstructing later, and for replaying
+        /// and verifying it.
+        /// </summary>
+        public static IAuditManager AuditManager => _auditManager ??= ComponentHub.GetComponentManager<AuditManager>();
+
+        /// <summary>
+        /// Gets the object-relation manager responsible for the semantic relations an object
+        /// holds - to other objects (blocks, causes, duplicate of, ...) and to addresses
+        /// outside the installation.
+        /// </summary>
+        public static IObjectRelationManager ObjectRelationManager => _objectRelationManager ??= ComponentHub.GetComponentManager<ObjectRelationManager>();
+
+        /// <summary>
+        /// Gets the relation-type manager responsible for administering the relations an
+        /// object relation may carry, and for publishing them into the framework registry
+        /// every link surface reads.
+        /// </summary>
+        public static IObjectRelationTypeManager ObjectRelationTypeManager => _objectRelationTypeManager ??= ComponentHub.GetComponentManager<ObjectRelationTypeManager>();
+
+        /// <summary>
+        /// Gets the impact manager responsible for answering what changing an object touches -
+        /// the relations of the installation walked transitively rather than one hop at a time.
+        /// </summary>
+        public static IObjectImpactManager ObjectImpactManager => _objectImpactManager ??= ComponentHub.GetComponentManager<ObjectImpactManager>();
+
+        /// <summary>
+        /// Gets the manager of the recursive operations on subtrees (archive, restore, delete,
+        /// dissolve, clone).
+        /// </summary>
+        public static IObjectOperationManager ObjectOperationManager => _objectOperationManager ??= ComponentHub.GetComponentManager<ObjectOperationManager>();
+
+        /// <summary>
+        /// Gets the progress manager responsible for rolling the progress of an object up from
+        /// the objects it aggregates - the computed half of the relation effect
+        /// <c>AggregatesProgress</c>.
+        /// </summary>
+        public static IObjectProgressManager ObjectProgressManager => _objectProgressManager ??= ComponentHub.GetComponentManager<ObjectProgressManager>();
+
+        /// <summary>
+        /// Gets the manager keeping the classes that follow a blueprint in step with it.
+        /// </summary>
+        public static IBlueprintManager BlueprintManager => _blueprintManager ??= ComponentHub.GetComponentManager<BlueprintManager>();
+
+        /// <summary>
+        /// Gets the multi-step approvals: the policies and the approvals that follow them.
+        /// </summary>
+        public static IApprovalManager ApprovalManager => _approvalManager ??= ComponentHub.GetComponentManager<ApprovalManager>();
+
+        /// <summary>
+        /// Gets the personal planning: time tracking, estimates, capacities, milestones.
+        /// </summary>
+        public static IPlanningManager PlanningManager => _planningManager ??= ComponentHub.GetComponentManager<PlanningManager>();
+
+        /// <summary>
+        /// Gets the central value catalogs selection fields draw their options from.
+        /// </summary>
+        public static IValueCatalogManager ValueCatalogManager => _valueCatalogManager ??= ComponentHub.GetComponentManager<ValueCatalogManager>();
+
+        /// <summary>
+        /// Gets the registry of the conditions that decide whether a workflow transition may be
+        /// taken - the core's own guards plus whatever the plugins of the installation added.
+        /// </summary>
+        public static IWorkflowGuardManager WorkflowGuardManager => _workflowGuardManager ??= ComponentHub.GetComponentManager<WorkflowGuardManager>();
+
+        /// <summary>
+        /// Gets the registry of the conditions a workflow transition validates the object
+        /// against.
+        /// </summary>
+        public static IWorkflowValidatorManager WorkflowValidatorManager => _workflowValidatorManager ??= ComponentHub.GetComponentManager<WorkflowValidatorManager>();
+
+        /// <summary>
+        /// Gets the registry of the actions a workflow transition performs once it has been
+        /// applied.
+        /// </summary>
+        public static IWorkflowPostFunctionManager WorkflowPostFunctionManager => _workflowPostFunctionManager ??= ComponentHub.GetComponentManager<WorkflowPostFunctionManager>();
 
         /// <summary>
         /// Gets the session manager responsible for per-identity session/preference
@@ -191,10 +431,47 @@ namespace KleeneStar.Core
         public static ISessionManager SessionManager => _sessionManager ??= ComponentHub.GetComponentManager<SessionManager>();
 
         /// <summary>
+        /// Gets the manager of the WQL queries each identity has run, which the query
+        /// prompts offer back as their history.
+        /// </summary>
+        public static IWqlHistoryManager WqlHistoryManager => _wqlHistoryManager ??= ComponentHub.GetComponentManager<WqlHistoryManager>();
+
+        /// <summary>
+        /// Gets the notification-center manager responsible for the in-app notifications an
+        /// identity can come back to, as listed behind the bell in the header.
+        /// </summary>
+        public static INotificationCenterManager NotificationCenterManager => _notificationCenterManager ??= ComponentHub.GetComponentManager<NotificationCenterManager>();
+
+        /// <summary>
+        /// Gets the identity-session manager responsible for the devices and browsers that
+        /// are currently signed in with an identity.
+        /// </summary>
+        public static IIdentitySessionManager IdentitySessionManager => _identitySessionManager ??= ComponentHub.GetComponentManager<IdentitySessionManager>();
+
+        /// <summary>
+        /// Gets the access-token manager responsible for the personal access tokens an
+        /// identity created for API access and integrations.
+        /// </summary>
+        public static IAccessTokenManager AccessTokenManager => _accessTokenManager ??= ComponentHub.GetComponentManager<AccessTokenManager>();
+
+        /// <summary>
+        /// Gets the credential manager responsible for the passwords of internal accounts, the
+        /// one-time links that set them, and the link between an account and the external
+        /// source that authenticates it.
+        /// </summary>
+        public static ICredentialManager CredentialManager => _credentialManager ??= ComponentHub.GetComponentManager<CredentialManager>();
+
+        /// <summary>
         /// Gets the saved-search manager responsible for the per-identity saved searches
         /// that back the global search dropdown and the search-page sidebar.
         /// </summary>
         public static ISavedSearchManager SavedSearchManager => _savedSearchManager ??= ComponentHub.GetComponentManager<SavedSearchManager>();
+
+        /// <summary>
+        /// Gets the sprint manager responsible for the Scrum iterations of the
+        /// workspaces and the sprint assignment of their objects.
+        /// </summary>
+        public static ISprintManager SprintManager => _sprintManager ??= ComponentHub.GetComponentManager<SprintManager>();
 
         /// <summary>
         /// Constructs a URI for the specified endpoint type using the provided parameters.
@@ -235,11 +512,97 @@ namespace KleeneStar.Core
         /// The duration, in milliseconds, that the notification remains visible. Specify -1
         /// to use the default duration.
         /// </param>
+        /// <param name="subject">
+        /// What the notification is about — an object key, a name — appended to the entry in
+        /// the notification center so a list of otherwise identical messages stays readable.
+        /// Optional; the toast does not show it.
+        /// </param>
+        /// <param name="targetUri">
+        /// The path the notification center entry links to. Optional; the toast does not use it.
+        /// </param>
         /// <returns>
         /// An object representing the created notification.
         /// </returns>
-        public static INotification AddNotification(string header, string message, int durability = -1)
+        /// <summary>
+        /// Creates a notification about the supplied record.
+        /// </summary>
+        /// <remarks>
+        /// The name of the record and the page it lives on are derived centrally by
+        /// <see cref="NotificationSubject.Describe"/>, so a manager raising a notification does
+        /// not have to know where the pages of its own entity are routed. This is the overload
+        /// the managers use: a notification that names what it is about and links to it is the
+        /// only kind worth keeping in the center.
+        /// </remarks>
+        /// <param name="header">The i18n key of the title/heading. Cannot be null.</param>
+        /// <param name="message">The i18n key of the body text. Cannot be null.</param>
+        /// <param name="entity">
+        /// The record the notification is about. An unmapped or null record yields an entry
+        /// without a link rather than no entry at all.
+        /// </param>
+        /// <param name="durability">
+        /// The duration, in milliseconds, that the notification remains visible. Specify -1
+        /// to use the default duration.
+        /// </param>
+        /// <returns>An object representing the created notification.</returns>
+        public static INotification AddNotification(string header, string message, object entity, int durability = 5000)
         {
+            var subject = NotificationSubject.Describe(entity);
+
+            return AddNotification(header, message, durability, subject?.Label, subject?.TargetUri, subject?.IconUri);
+        }
+
+        /// <summary>
+        /// Opens a scope in which no notification is raised - neither the toast nor the entry in
+        /// the notification center.
+        /// </summary>
+        /// <remarks>
+        /// For a single act that writes many records at once, where one notification per record
+        /// would bury the reader: a workspace created from a template writes the fields,
+        /// priorities, states, workflow, forms, calendars and agreements of every class it
+        /// starts with, and each of those managers announces what it adds. The act is announced
+        /// once, by the records that stand for it (the workspace, its classes). Only the
+        /// notifications are silenced - the managers' events still fire, so the audit log keeps
+        /// recording every record. Scopes nest; disposing one restores the state before it.
+        /// </remarks>
+        /// <returns>The scope; dispose it to raise notifications again.</returns>
+        public static IDisposable BeginSilentNotifications()
+        {
+            _silentNotifications.Value++;
+
+            return new SilentNotificationsScope();
+        }
+
+        /// <summary>
+        /// The depth of the <see cref="BeginSilentNotifications"/> scopes on this call chain.
+        /// </summary>
+        private static readonly AsyncLocal<int> _silentNotifications = new();
+
+        /// <summary>
+        /// The scope handed out by <see cref="BeginSilentNotifications"/>.
+        /// </summary>
+        private sealed class SilentNotificationsScope : IDisposable
+        {
+            private bool _disposed;
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _silentNotifications.Value = Math.Max(0, _silentNotifications.Value - 1);
+            }
+        }
+
+        public static INotification AddNotification(string header, string message, int durability = -1, string subject = null, string targetUri = null, string subjectIcon = null)
+        {
+            if (_silentNotifications.Value > 0)
+            {
+                return null;
+            }
+
             // best-effort: callers (manager Add/Update/Remove) rely on this returning
             // null silently when the host is not fully initialized (e.g. in unit tests
             // where CoreHub is wired without a real component hub), rather than NREing.
@@ -249,8 +612,24 @@ namespace KleeneStar.Core
                 return null;
             }
 
+            // the toast below is transient. Recording the same event in the notification center
+            // is what lets the user find it afterwards, addressed to them and naming what it
+            // was about.
+            _notificationCenterManager ??= ComponentHub.GetComponentManager<NotificationCenterManager>();
+            _notificationCenterManager?.Record(header, message, subject, targetUri, subjectIcon);
+
             var application = WebEx.ComponentHub?.ApplicationManager?.GetApplication<KleeneStarApplication>();
             if (application is null)
+            {
+                return null;
+            }
+
+            // the toast is the actor's feedback and goes to the session of the request that
+            // acted. It used to be a global notification every connected client replayed - the
+            // subject's name included, so a customer's browser was told the title of a
+            // classified record somebody else had just changed. Work without a request (a
+            // scheduled job, the start-up) raises no toast; the center above is the record.
+            if (WebEx.CurrentRequest is not WebExpress.WebCore.WebMessage.Request request || request.Session is null)
             {
                 return null;
             }
@@ -258,11 +637,69 @@ namespace KleeneStar.Core
             return notificationManager.AddNotification
             (
                 applicationContext: application,
-                icon: ApplicationContext?.Icon?.ToUri()?.ToString(),
-                heading: I18N.Translate(header),
-                message: I18N.Translate(message),
-                durability: durability
+                request: request,
+                message: Compose(I18N.Translate(request, message), subject),
+                durability: durability,
+                heading: I18N.Translate(request, header),
+
+                // the icon of the record the notification is about, the same one the entry in
+                // the notification center carries; the application icon is the fallback for the
+                // records that carry none
+                icon: subjectIcon ?? ApplicationContext?.Icon?.ToUri()?.ToString(),
+
+                // the page of the record, the same address the notification center entry links
+                // to; null for the records that have no page of their own
+                link: targetUri
             );
+        }
+
+        /// <summary>
+        /// Appends the subject to a notification message, so the toast says what it is about.
+        /// </summary>
+        /// <param name="message">The translated message.</param>
+        /// <param name="subject">The name of the record, or <see langword="null"/>.</param>
+        /// <returns>The composed message.</returns>
+        private static string Compose(string message, string subject)
+        {
+            return string.IsNullOrWhiteSpace(subject)
+                ? message
+                : $"{message} ({subject})";
+        }
+
+        /// <summary>
+        /// The palette the accent color of an entity is drawn from: 32 distinct,
+        /// contrast-rich colors.
+        /// </summary>
+        private static readonly string[] _accentColors =
+        [
+            "#ca1554", "#25509f", "#008237", "#b76f13", "#404b91", "#368b22", "#953599", "#ed381e",
+            "#167ca0", "#d4424f", "#513e21", "#0e6a73", "#8b2443", "#20723d", "#6c2122", "#3b7d8d",
+            "#1b6d44", "#903525", "#221f53", "#41775c", "#bd6b82", "#224f44", "#6a3ba1", "#387251",
+            "#c26f1b", "#38464a", "#752b5c", "#09897c", "#998f35", "#da4040", "#2a537d", "#146459"
+        ];
+
+        /// <summary>
+        /// Returns the accent color of an entity, derived from its identifier.
+        /// </summary>
+        /// <remarks>
+        /// The color is a deterministic function of the id, so the same entity is always
+        /// shown in the same color — in its generated icon as well as anywhere the id is
+        /// rendered as a colored marker, such as the kind swatch of a template card.
+        /// </remarks>
+        /// <param name="id">The identifier the color is derived from.</param>
+        /// <returns>The color as a hexadecimal css value.</returns>
+        public static string AccentColor(Guid id)
+        {
+            var bytes = id.ToByteArray();
+            var index = 0;
+
+            for (var i = 0; i < bytes.Length; i++)
+            {
+                index = (index * 31 + bytes[i]) % _accentColors.Length;
+                if (index < 0) { index += _accentColors.Length; } // safety for negatives
+            }
+
+            return _accentColors[index];
         }
 
         /// <summary>
@@ -300,25 +737,7 @@ namespace KleeneStar.Core
                 return icon;
             }
 
-            // color palette: 32 distinct, contrast-rich colors
-            var colors = new[]
-            {
-                "#ca1554", "#25509f", "#008237", "#b76f13", "#404b91", "#368b22", "#953599", "#ed381e",
-                "#167ca0", "#d4424f", "#513e21", "#0e6a73", "#8b2443", "#20723d", "#6c2122", "#3b7d8d",
-                "#1b6d44", "#903525", "#221f53", "#41775c", "#bd6b82", "#224f44", "#6a3ba1", "#387251",
-                "#c26f1b", "#38464a", "#752b5c", "#09897c", "#998f35", "#da4040", "#2a537d", "#146459"
-            };
-
-            // calculate color index based on GUID
-            var bytes = id.ToByteArray();
-            int colorIndex = 0;
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                colorIndex = (colorIndex * 31 + bytes[i]) % colors.Length;
-                if (colorIndex < 0) { colorIndex += colors.Length; } // safety for negatives
-            }
-
-            var colorHex = colors[colorIndex];
+            var colorHex = AccentColor(id);
 
             // load the embedded kleenestar.svg resource from assembly. The manifest name is
             // produced from the csproj LogicalName template, whose %(RecursiveDir) token uses
@@ -351,6 +770,101 @@ namespace KleeneStar.Core
             File.WriteAllText(outputPath, newContent);
 
             return icon;
+        }
+
+        /// <summary>
+        /// Stores an image an avatar control submitted and returns the icon that serves it.
+        /// </summary>
+        /// <remarks>
+        /// The avatar control posts its picture inline, as
+        /// <c>file:&lt;name&gt;;data:&lt;mime&gt;;base64,&lt;payload&gt;</c>. An
+        /// <see cref="ImageIcon"/> holds a URI and nothing else, so the payload has to be put
+        /// somewhere it can be served from before the entity can point at it. It is written
+        /// next to the generated initials icons, under the same <c>assets/icons</c> route that
+        /// already serves PNG, JPEG, GIF and WebP.
+        ///
+        /// The file name carries a short hash of the content, so replacing a picture yields a
+        /// new URI: the icon route answers with a one-year immutable cache, and a stable name
+        /// would leave every browser showing the old picture. Previous files of the same owner
+        /// are removed as the new one is written.
+        /// </remarks>
+        /// <param name="ownerId">
+        /// The entity the picture belongs to; names the file and scopes the cleanup.
+        /// </param>
+        /// <param name="image">
+        /// The upload decoded and validated by the framework.
+        /// </param>
+        /// <returns>
+        /// The icon serving the stored picture, or <see langword="null"/> when the payload
+        /// carried no image.
+        /// </returns>
+        public static ImageIcon StoreIcon(Guid ownerId, WebExpress.WebApp.WebRestApi.RestApiAvatarUpload image)
+        {
+            if (image is null)
+            {
+                return null;
+            }
+
+            var iconDirectory = Path.Combine(AppContext.BaseDirectory, HttpServerContext?.DataPath, "icons");
+            var fileName = $"{ownerId}-{image.Fingerprint}{image.Extension}";
+            var outputPath = Path.Combine(iconDirectory, fileName);
+
+            Directory.CreateDirectory(iconDirectory);
+            File.WriteAllBytes(outputPath, image.Content);
+            RemoveStoredIcons(ownerId, outputPath);
+
+            return new ImageIcon(ApplicationContext.Route.Concat($"/assets/icons/{fileName}").ToUri());
+        }
+
+        /// <summary>
+        /// Removes the pictures stored for the given owner by <see cref="StoreIcon"/>.
+        /// </summary>
+        /// <remarks>
+        /// Used when a user removes their picture, so the entity falls back to the generated
+        /// initials icon and the uploaded file does not stay on disk and reachable. The
+        /// generated icon itself is named after the bare id and is therefore left alone.
+        /// </remarks>
+        /// <param name="ownerId">The entity whose stored pictures are removed.</param>
+        /// <param name="keepPath">
+        /// A file to spare, used by <see cref="StoreIcon"/> to clear the previous pictures
+        /// while writing the new one. <see langword="null"/> removes all of them.
+        /// </param>
+        public static void RemoveStoredIcons(Guid ownerId, string keepPath = null)
+        {
+            var iconDirectory = Path.Combine(AppContext.BaseDirectory, HttpServerContext?.DataPath, "icons");
+
+            if (!Directory.Exists(iconDirectory))
+            {
+                return;
+            }
+
+            foreach (var stale in Directory.EnumerateFiles(iconDirectory, $"{ownerId}-*")
+                .Where(x => !string.Equals(x, keepPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    File.Delete(stale);
+                }
+                catch (IOException)
+                {
+                    // a file still held open elsewhere is left for the next write to clean up;
+                    // failing here would lose the picture the user just uploaded
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the address of the link library, for <c>ControlFormItemInputText.LinkLibraryUri</c>.
+        /// </summary>
+        /// <param name="renderContext">The render context.</param>
+        /// <returns>The address, or <see langword="null"/> where the sitemap does not know it.</returns>
+        public static IUri EditorLinkLibrary(IRenderControlContext renderContext)
+        {
+            // without a running host there is no sitemap, and an editor without a library is
+            // still an editor
+            return CoreHub.ComponentHub?.SitemapManager is null || CoreHub.ApplicationContext is null
+                ? null
+                : CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Editor.Links>();
         }
     }
 }

@@ -52,8 +52,9 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(objectKey);
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == objectKey.Value);
+            // through the object manager, so a key the caller may not read - by its grants
+            // or its security level - has nothing to show
+            var obj = CoreHub.ObjectManager.GetObjectByKey(objectKey.Value);
             if (obj is null)
             {
                 return [];
@@ -142,7 +143,7 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Add(tag);
             TagAdded?.Invoke(this, tag);
-            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.tag.created");
+            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.tag.created", CoreHub.ObjectManager.GetObject(objectId));
 
             return tag;
         }
@@ -165,7 +166,7 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Remove(existing);
             TagRemoved?.Invoke(this, existing);
-            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.tag.deleted");
+            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.tag.deleted", CoreHub.ObjectManager.GetObject(existing.ObjectId));
 
             return true;
         }
@@ -184,11 +185,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="titleKey">The i18n key of the notification title.</param>
         /// <param name="messageKey">The i18n key of the notification message.</param>
-        private static void TryAddNotification(string titleKey, string messageKey)
+        private static void TryAddNotification(string titleKey, string messageKey, object subject)
         {
             try
             {
-                CoreHub.AddNotification(titleKey, messageKey, 5000);
+                CoreHub.AddNotification(titleKey, messageKey, subject);
             }
             catch
             {

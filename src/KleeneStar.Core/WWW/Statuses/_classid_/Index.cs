@@ -49,7 +49,7 @@ namespace KleeneStar.Core.WWW.Statuses._classid_
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = @class?.Workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                         .BindParameters(new WorkspaceKeyParameter(workspace?.Key))
                         .BindParameters(renderContext.Request)
                 })
@@ -75,7 +75,11 @@ namespace KleeneStar.Core.WWW.Statuses._classid_
 
             visualTree.BreadcrumbUri = uri;
 
-            visualTree.Content.MainPanel.Headline.Title = $"{@class.Name} - {I18N.Translate(renderContext, renderContext.PageContext.PageTitle)}";
+            // the class id comes from the url and may address a class that no longer
+            // exists, so the headline falls back to the page title alone
+            var page = I18N.Translate(renderContext, renderContext.PageContext.PageTitle);
+
+            visualTree.Content.MainPanel.Headline.Title = @class is null ? page : $"{@class.Name} - {page}";
         }
     }
 }

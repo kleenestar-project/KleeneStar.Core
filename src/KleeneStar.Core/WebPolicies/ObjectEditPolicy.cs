@@ -13,7 +13,9 @@ namespace KleeneStar.Core.WebPolicies
     [Permission<ObjectUpdatePermission>()]
     [Permission<ObjectCommentPermission>()]
     [Permission<ObjectAttachPermission>()]
-    [Permission<ObjectLinkingPermission>()]
+    [Permission<ObjectRelationPermission>()]
+    [Permission<ObjectReadHistoryPermission>()]
+    [Permission<ObjectRestoreStatePermission>()]
     public sealed class ObjectEditPolicy : IIdentityPolicy
     {
     }

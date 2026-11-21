@@ -1,8 +1,9 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -16,13 +17,16 @@ namespace KleeneStar.Core.WebFragment.Object
     /// tree and can be re-parented by drag and drop.
     /// </summary>
     /// <remarks>
-    /// The dialog is a workspace-scoped page (<c>Objects/${workspacekey}/organize</c>); the
-    /// workspace is resolved from the current object. The dialog content is fetched into the modal
-    /// on demand and its inline scripts would not run there, so this fragment loads the persistence
-    /// controller (<c>assets/js/objectmovetree.js</c>) onto the parent page during render.
+    /// The dialog is a workspace-scoped page (<c>Issues/${workspacekey}/organize</c>); the
+    /// workspace is resolved from the current object, which the address names as
+    /// <c>select</c>, so the tree opens on it.
     /// </remarks>
     [Section<SectionHeadlineMorePrimary>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
+    [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Cache]
     public sealed class ObjectItemOrganizeMoreFragment : FragmentControlDropdownItemLink
     {
@@ -49,21 +53,23 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Convert the fragment to HTML. Loads the object-move-tree client controller onto the
-        /// current (parent) page before emitting the dropdown item, and suppresses the item when
-        /// the object (and thus its workspace) cannot be resolved.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragment, or <c>null</c> when suppressed.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             if (ResolveOrganizeUri(renderContext) is null)
             {
                 return null;
             }
-
-            visualTree.AddHeaderScriptLink(renderContext.PageContext.ApplicationContext.Route.Concat("assets/js/objectmovetree.js").ToString());
 
             return base.Render(renderContext, visualTree);
         }
@@ -85,8 +91,9 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Organize>()?
-                .BindParameters(new WorkspaceKeyParameter(workspace.Key));
+            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Organize>()?
+                .BindParameters(new WorkspaceKeyParameter(workspace.Key))?
+                .Add(new WebExpress.WebCore.WebUri.UriQuery(Workspace.WorkspaceObjectsOrganizeFragment.SelectParameter, @object.Id.ToString()));
         }
     }
 }

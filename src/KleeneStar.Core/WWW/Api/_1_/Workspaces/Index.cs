@@ -1,9 +1,13 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebManager;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -15,8 +19,21 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
     /// Provides CRUD operations for workspace items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Workspace>
+    public sealed partial class Index : RestApiCrud<Workspace>
     {
+        /// <summary>
+        /// The shape a workspace key has to have: it becomes the prefix of every object key in
+        /// the workspace (<c>SD-17</c>) and a segment of its URLs, so it stays short and free of
+        /// anything that would have to be escaped.
+        /// </summary>
+        /// <remarks>
+        /// Upper case is allowed because the keys the product itself proposes are upper case -
+        /// the seeded workspaces and every template's <c>SuggestedKey</c>. A pattern that refused
+        /// them would refuse the wizard's own suggestion.
+        /// </remarks>
+        [GeneratedRegex(@"^[a-zA-Z0-9-]{1,10}$")]
+        private static partial Regex KeyRegex();
+
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -27,17 +44,87 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// <summary>
         /// Retrieves the response for the specified request using the configured retrieval logic.
         /// </summary>
+        /// <remarks>
+        /// The dialog modes - the data the edit, clone and delete forms are filled from - are
+        /// gated the way the dialog pages are, so the form data of a refused dialog is not
+        /// answered to a caller who asks the endpoint directly. Reading a workspace as such is
+        /// not guarded: the list narrows by nothing yet, and a read gate here would only make
+        /// the dialog modes stricter than the listing they sit beside.
+        /// </remarks>
         /// <param name="request">
         /// The request object containing the parameters for the retrieval operation. Must not be null.
         /// </param>
         /// <returns>
-        /// An IResponse object that represents the result of the retrieval operation. The response 
+        /// An IResponse object that represents the result of the retrieval operation. The response
         /// contains the data requested according to the parameters provided.
         /// </returns>
         [Method(RequestMethod.GET)]
         public override IResponse Retrieve(IRequest request)
         {
-            return base.Retrieve(request);
+            var workspace = WorkspaceAuthorization.ResolveById(request);
+
+            var authorized = request?.GetParameter("mode")?.Value switch
+            {
+                "edit" => WorkspaceAuthorization.MayUpdate(workspace, request),
+                "delete" => WorkspaceAuthorization.MayDelete(workspace, request),
+                "clone" or "new" => WorkspaceAuthorization.MayClone(workspace, request),
+                _ => true
+            };
+
+            return authorized ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates a workspace, or clones one when the request names an original.
+        /// </summary>
+        /// <remarks>
+        /// The clone is guarded on the original: the copy does not exist yet and is on no chain.
+        /// Neither is a workspace created from nothing, so no grant can say who may create one -
+        /// but a caller who is not signed in may not (the add page refuses them too), because the
+        /// workspace a template sets up is set up for whoever creates it.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            var original = WorkspaceAuthorization.ResolveById(request);
+
+            if (original is null && !WebPermission.RouteAuthorization.IsSignedIn(request))
+            {
+                return new ResponseForbidden();
+            }
+
+            return WorkspaceAuthorization.MayClone(original, request)
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes a workspace, once the caller may.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return WorkspaceAuthorization.MayUpdate(WorkspaceAuthorization.ResolveById(request), request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes a workspace, once the caller may.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return WorkspaceAuthorization.MayDelete(WorkspaceAuthorization.ResolveById(request), request)
+                ? base.Delete(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>
@@ -71,7 +158,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IEnumerable<Workspace> Retrieve(IQuery<Workspace> query, IQueryContext context, IRequest request)
         {
-            return CoreHub.WorkspaceManager.GetWorkspaces(query, context);
+            // a list shows only the workspaces the caller may read
+            return CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context);
         }
 
         /// <summary>
@@ -83,9 +171,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// <returns>
         /// An object containing the information necessary to initialize a new workspace for creation.
         /// </returns>
+        /// <remarks>
+        /// The form starts on the values a create stores when they are left empty: the access
+        /// modifier <i>public</i> and no inherited workspace (<i>None</i>, the empty guid).
+        /// </remarks>
         protected override IRestApiCrudResultRetrieve RetrieveForCreate(IRequest request)
         {
-            return base.RetrieveForCreate(request);
+            return new RestApiCrudResultRetrieve()
+            {
+                Data = new Dictionary<string, object>()
+                {
+                    [nameof(Workspace.AccessModifier)] = WorkspaceAccessModifier.Public.Id().ToString(),
+                    [nameof(Workspace.InheritedId)] = Guid.Empty.ToString()
+                }
+            };
         }
 
         /// <summary>
@@ -171,11 +270,25 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         }
 
         /// <summary>
-        /// Validate the data for create or update operations. When creating, existingItem will 
-        /// be null and proposedItem contains the values to create. When updating, existingItem 
-        /// is the currently persisted entity and proposedItem contains the incoming values to 
+        /// Validate the data for create or update operations. When creating, existingItem will
+        /// be null and proposedItem contains the values to create. When updating, existingItem
+        /// is the currently persisted entity and proposedItem contains the incoming values to
         /// validate.
         /// </summary>
+        /// <remarks>
+        /// The base validation reads the <c>Validate…</c> attributes of the entity, and it reads
+        /// them <b>per field the payload carries</b> - a field the payload leaves out is not
+        /// checked, because for an update "not mentioned" means "unchanged". On a create there is
+        /// nothing to leave unchanged, so the two fields a workspace cannot exist without are
+        /// demanded here whether the payload mentions them or not. Without this, a create that
+        /// simply omits the name answers 200 and leaves a row no list can address.
+        /// <para>
+        /// Uniqueness is checked here as well rather than only by
+        /// <see cref="UniqueKey"/> / <see cref="UniqueName"/>. Those endpoints serve the form
+        /// while it is being filled in; they are advice, not a gate, and every caller that is not
+        /// the form skips them entirely.
+        /// </para>
+        /// </remarks>
         /// <param name="existingItem">
         /// The currently persisted item (null for create).
         /// </param>
@@ -190,7 +303,154 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         protected override IRestApiValidationResult Validate(Workspace existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            var result = AvatarStorage.Validate(payload, nameof(Workspace.Icon), base.Validate(existingItem, payload, request), existingItem?.Icon);
+            var creating = existingItem is null;
+
+            var (key, keySent) = ReadField(payload, nameof(Workspace.Key));
+            var (name, nameSent) = ReadField(payload, nameof(Workspace.Name));
+
+            if (creating || keySent)
+            {
+                ValidateKey(result, key, keySent, existingItem, request);
+            }
+
+            if (creating || nameSent)
+            {
+                ValidateName(result, name, nameSent, existingItem, request);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Checks the submitted key: present, of a usable shape, not one of the routes the
+        /// application owns, and not already taken.
+        /// </summary>
+        /// <param name="result">The result the errors are collected in.</param>
+        /// <param name="key">The submitted key.</param>
+        /// <param name="sent">Whether the payload carried the field at all.</param>
+        /// <param name="existingItem">The persisted workspace on an update, otherwise null.</param>
+        /// <param name="request">The request, for the culture the messages are written in.</param>
+        private static void ValidateKey(IRestApiValidationResult result, string key, bool sent, Workspace existingItem, IRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                // a field the payload carried has already been reported blank by the entity's own
+                // ValidateRequired; saying it twice reads as two separate faults
+                if (!sent)
+                {
+                    result.Add(Translate(request, "kleenestar.core:workspace.key.validation.required"), nameof(Workspace.Key));
+                }
+
+                return;
+            }
+
+            key = key.Trim();
+
+            if (WorkspaceManager.ReservedWorkspaceKeys.Contains(key.ToLowerInvariant()))
+            {
+                result.Add(Translate(request, "kleenestar.core:workspace.key.validation.reserved"), nameof(Workspace.Key));
+
+                return;
+            }
+
+            if (!KeyRegex().IsMatch(key))
+            {
+                result.Add(Translate(request, "kleenestar.core:workspace.key.validation.pattern"), nameof(Workspace.Key));
+
+                return;
+            }
+
+            if (IsTaken(x => x.WhereEqualsIgnoreCase(y => y.Key, key), existingItem))
+            {
+                result.Add(Translate(request, "kleenestar.core:workspace.key.validation.taken"), nameof(Workspace.Key));
+            }
+        }
+
+        /// <summary>
+        /// Checks the submitted name: present and not already taken.
+        /// </summary>
+        /// <param name="result">The result the errors are collected in.</param>
+        /// <param name="name">The submitted name.</param>
+        /// <param name="sent">Whether the payload carried the field at all.</param>
+        /// <param name="existingItem">The persisted workspace on an update, otherwise null.</param>
+        /// <param name="request">The request, for the culture the messages are written in.</param>
+        private static void ValidateName(IRestApiValidationResult result, string name, bool sent, Workspace existingItem, IRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                // see ValidateKey: a field that was sent blank is already reported by the entity's
+                // own ValidateRequired
+                if (!sent)
+                {
+                    result.Add(Translate(request, "kleenestar.core:workspace.name.validation.required"), nameof(Workspace.Name));
+                }
+
+                return;
+            }
+
+            name = name.Trim();
+
+            if (IsTaken(x => x.WhereEqualsIgnoreCase(y => y.Name, name), existingItem))
+            {
+                result.Add(Translate(request, "kleenestar.core:workspace.name.validation.taken"), nameof(Workspace.Name));
+            }
+        }
+
+        /// <summary>
+        /// Determines whether a workspace other than the one being edited already matches the
+        /// supplied criteria.
+        /// </summary>
+        /// <param name="criteria">Narrows the query to the value being checked.</param>
+        /// <param name="existingItem">The workspace being edited, which never counts against
+        /// itself, or null on a create.</param>
+        /// <returns><see langword="true"/> when the value is already in use.</returns>
+        private static bool IsTaken(Func<IQuery<Workspace>, IQuery<Workspace>> criteria, Workspace existingItem)
+        {
+            using var context = ModelHub.CreateDbContext();
+
+            return CoreHub.WorkspaceManager
+                .GetWorkspaces(criteria(new Query<Workspace>()), context)
+                .Any(x => existingItem is null || x.Id != existingItem.Id);
+        }
+
+        /// <summary>
+        /// Reads a field out of the submitted payload.
+        /// </summary>
+        /// <remarks>
+        /// The payload parser lower-cases every property name it reads off the wire, so a lookup
+        /// spelled the way the property is declared misses - silently, because a missing key is
+        /// indistinguishable from an unsent field. Both spellings are tried so the endpoint reads
+        /// the same value whether the form or a hand-written client sent it.
+        /// </remarks>
+        /// <param name="payload">The submitted form data.</param>
+        /// <param name="field">The name of the field, as the property spells it.</param>
+        /// <returns>The value, and whether the payload carried the field at all - which is a
+        /// different thing from carrying it empty, and the two are answered differently.</returns>
+        private static (string Value, bool Sent) ReadField(RestApiCrudFormData payload, string field)
+        {
+            if (payload is null)
+            {
+                return (null, false);
+            }
+
+            if (payload.TryGetValue(field.ToLowerInvariant(), out var lower))
+            {
+                return (lower?.ToString(), true);
+            }
+
+            return payload.TryGetValue(field, out var exact) ? (exact?.ToString(), true) : (null, false);
+        }
+
+        /// <summary>
+        /// Translates a message into the culture of the request.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <param name="key">The internationalization key.</param>
+        /// <returns>The translated message.</returns>
+        private static string Translate(IRequest request, string key)
+        {
+            return request is null ? I18N.Translate(key) : I18N.Translate(request, key);
         }
 
         /// <summary>
@@ -218,14 +478,135 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             newItem = new Workspace(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
-                State = WorkspaceState.Active
+                State = WorkspaceState.Active,
+                AccessModifier = WorkspaceAccessModifier.Public
             };
+
+            var tenants = DetachTenants(fieldMap);
 
             fieldMap.BindTo(newItem);
 
+            newItem.Tenants = tenants ?? [];
+
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
+            // the home page is created below; a payload cannot reference one
+            newItem.HomeId = null;
+
             CoreHub.WorkspaceManager.Add(newItem);
 
+            ApplyTemplate(fieldMap, newItem, request);
+            ApplyBlueprint(fieldMap, newItem);
+            EnsureHome(newItem, request);
+            RecordCreationAsVisit(newItem, request);
+
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Records the creation as the creator's most recent visit to the workspace.
+        /// </summary>
+        /// <remarks>
+        /// The workspace dropdown is a list of recently visited workspaces, and a visit is
+        /// stamped by the workspace pages when they are opened. A workspace that was just
+        /// created has been opened by nobody, so without this it is the one workspace missing
+        /// from the menu of the person who made it - and it stays missing until they navigate
+        /// to it, which is what the menu was to be used for.
+        /// <para>
+        /// Creating a workspace is treated as the first visit rather than as a special case in
+        /// the dropdown, because the reading is the honest one - the creator was just there,
+        /// in the wizard - and because it holds for every caller that creates a workspace, not
+        /// only for the wizard the menu offers.
+        /// </para>
+        /// </remarks>
+        /// <param name="workspace">The workspace that was just created.</param>
+        /// <param name="request">The request naming the identity that created it.</param>
+        private static void RecordCreationAsVisit(Workspace workspace, IRequest request)
+        {
+            var ownerId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            if (ownerId != Guid.Empty && workspace is not null)
+            {
+                CoreHub.WorkspaceManager.RecordVisit(ownerId, workspace.Id);
+            }
+        }
+
+        /// <summary>
+        /// Sets the workspace up from the template the creation wizard chose: its classes, the
+        /// starting views of its issue and asset overviews, its home page and the post announcing
+        /// it.
+        /// </summary>
+        /// <remarks>
+        /// It runs after the workspace rather than with it, because everything it creates belongs
+        /// to the workspace: there is nothing to attach any of it to until it exists, and a
+        /// workspace that was stored while its setup failed is one an administrator can finish by
+        /// hand - the other order would leave classes belonging to nothing.
+        /// <para>
+        /// A payload without the field, or carrying the wizard's "no template" value, creates
+        /// none of it. That is the ordinary case for every caller that is not the wizard - the
+        /// REST API itself, an import - and it must stay the default rather than an error.
+        /// </para>
+        /// </remarks>
+        /// <param name="fieldMap">The submitted form data.</param>
+        /// <param name="workspace">The workspace that was just created.</param>
+        /// <param name="request">The request, naming the identity the two pages are authored by.</param>
+        private static void ApplyTemplate(RestApiCrudFormData fieldMap, Workspace workspace, IRequest request)
+        {
+            // the payload parser lower-cases every property name it reads off the wire, so a
+            // lookup spelled the way the field is declared misses - silently, because a missing
+            // key is indistinguishable from an unsent field
+            if (fieldMap is null ||
+                !fieldMap.TryGetValue(WebFragment.Workspace.WorkspaceAddFormFragment.TemplateField.ToLowerInvariant(), out var value))
+            {
+                return;
+            }
+
+            var key = value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(key) ||
+                string.Equals(key, WebFragment.Workspace.WorkspaceAddFormFragment.NoTemplate, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            CoreHub.WorkspaceTemplateManager.Apply
+            (
+                key,
+                workspace.Id,
+                CoreHub.SessionManager.GetCurrentIdentityId(request),
+
+                // the pages are written once and read as they were written, so they are written
+                // in the language of whoever is creating the workspace rather than the
+                // installation's default - which on this installation is not the one the wizard
+                // was just filled in in
+                request?.Culture
+            );
+        }
+
+        /// <summary>
+        /// Sets a new workspace up to follow the blueprint classes of the blueprint workspace the
+        /// payload names.
+        /// </summary>
+        /// <remarks>
+        /// Only a workspace the caller may read is followed - its structures are copied into the new
+        /// workspace. A class the template already created under the same name is adopted rather
+        /// than doubled (<see cref="IBlueprintManager.ApplyWorkspace"/>).
+        /// </remarks>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="workspace">The new workspace.</param>
+        private static void ApplyBlueprint(RestApiCrudFormData fieldMap, Workspace workspace)
+        {
+            if (fieldMap is null
+                || !fieldMap.TryGetValue(WebFragment.Workspace.WorkspaceAddFormFragment.BlueprintField.ToLowerInvariant(), out var value)
+                || !Guid.TryParse(value?.ToString(), out var blueprintWorkspaceId)
+                || blueprintWorkspaceId == Guid.Empty
+                || !WebPermission.ContentVisibility.MayRead(blueprintWorkspaceId))
+            {
+                return;
+            }
+
+            CoreHub.BlueprintManager.ApplyWorkspace(blueprintWorkspaceId, workspace.Id);
         }
 
         /// <summary>
@@ -256,14 +637,99 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             newItem = new Workspace(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
-                State = WorkspaceState.Active
+                State = WorkspaceState.Active,
+                AccessModifier = WorkspaceAccessModifier.Public
             };
+
+            var tenants = DetachTenants(fieldMap);
 
             fieldMap.BindTo(newItem);
 
+            // a payload without a tenant list keeps the assignments of the original
+            newItem.Tenants = tenants ?? [.. existingItem?.Tenants ?? []];
+
+            // an inline picture of the dialog is stored under the new id
+            newItem.Icon = AvatarStorage.Adopt(id, newItem.Icon, () => CoreHub.GenerateIcon(id));
+
+            // the original's home page belongs to the original
+            newItem.HomeId = null;
+
             CoreHub.WorkspaceManager.Add(newItem);
 
+            EnsureHome(newItem, request);
+
             return new RestApiCrudResultCreate();
+        }
+
+        /// <summary>
+        /// Takes the tenant list out of the payload and resolves it to the tenants it names.
+        /// </summary>
+        /// <remarks>
+        /// The dialogs submit <see cref="Workspace.TenantIds"/>, a projection without a setter, so
+        /// the binder does not reach it. The list is removed from the payload and answered as the
+        /// stored tenants; an id that names no tenant is dropped.
+        /// </remarks>
+        /// <param name="payload">The submitted form data.</param>
+        /// <returns>
+        /// The tenants the payload names, an empty list for an empty selection, or null when the
+        /// payload carries no tenant list.
+        /// </returns>
+        private static List<Tenant> DetachTenants(RestApiCrudFormData payload)
+        {
+            if (payload is null || !payload.Detach(nameof(Workspace.TenantIds), out var submitted))
+            {
+                return null;
+            }
+
+            var ids = new Model.Converters.GuidListConverter().FromRaw(submitted, typeof(List<Guid>)) as List<Guid> ?? [];
+
+            return [.. ids
+                .Select(CoreHub.TenantManager.GetTenant)
+                .Where(x => x is not null)];
+        }
+
+        /// <summary>
+        /// Creates the home page of a new workspace unless the template created it already.
+        /// </summary>
+        /// <param name="workspace">The workspace that was just created.</param>
+        /// <param name="request">The request, naming the author and the language of the page.</param>
+        private static void EnsureHome(Workspace workspace, IRequest request)
+        {
+            CoreHub.WorkspaceManager.EnsureHome
+            (
+                workspace.Id,
+                CoreHub.SessionManager.GetCurrentIdentityId(request),
+                request?.Culture
+            );
+        }
+
+        /// <summary>
+        /// Gets the image formats the avatar dialog may send (<see cref="AvatarStorage.Options"/>).
+        /// </summary>
+        protected override RestApiAvatarUploadOptions ImageOptions => AvatarStorage.Options;
+
+        /// <summary>
+        /// Stores the picture an update sends in the icons directory (<see cref="AvatarStorage.Store"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property the picture belongs to.</param>
+        /// <param name="image">The decoded and checked picture.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns>The address of the stored picture, or null when nothing was stored.</returns>
+        protected override string StoreImage(Workspace item, string field, RestApiAvatarUpload image, IRequest request)
+        {
+            return AvatarStorage.Store(item?.Id, image, request);
+        }
+
+        /// <summary>
+        /// Removes the stored pictures when an update empties the picture (<see cref="AvatarStorage.Remove"/>).
+        /// </summary>
+        /// <param name="item">The persisted record; the source on a clone, null on a create.</param>
+        /// <param name="field">The property whose picture is removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        protected override void RemoveImage(Workspace item, string field, IRequest request)
+        {
+            AvatarStorage.Remove(item?.Id, request);
         }
 
         /// <summary>
@@ -280,7 +746,22 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Workspace existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // the home page is the workspace's dedicated document; it is not re-pointed through
+            // the workspace's own form or a hand-written payload
+            payload.Detach(nameof(Workspace.HomeId), out _);
+
+            var tenants = DetachTenants(payload);
+
             var res = base.Update(existingItem, payload, request);
+
+            // a payload without a tenant list leaves the assignments as they are
+            if (tenants is not null)
+            {
+                existingItem.Tenants = tenants;
+            }
+
+            // an emptied picture binds null; the record then carries its generated icon
+            existingItem.Icon ??= CoreHub.GenerateIcon(existingItem.Id);
 
             CoreHub.WorkspaceManager.Update(existingItem);
 

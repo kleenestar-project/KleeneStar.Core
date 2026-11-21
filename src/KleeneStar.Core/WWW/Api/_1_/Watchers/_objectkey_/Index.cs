@@ -14,7 +14,7 @@ using WebExpress.WebIndex.Queries;
 namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
 {
     /// <summary>
-    /// REST endpoint backing the <c>ControlRestObserver</c> hosted by
+    /// REST endpoint backing the <c>ControlDataWatcher</c> hosted by
     /// <see cref="WebFragment.Object.ObjectPropertyPeopleCardFragment"/> on an object
     /// detail page. The URL is <c>/api/1/watchers/{objectkey}</c>; the
     /// <c>{objectkey}</c> URL segment is declared via
@@ -25,15 +25,15 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
     /// <remarks>
     /// Persistence is delegated to <see cref="CoreHub.WatcherManager"/>, which keeps
     /// one <see cref="ObjectWatcher"/> row per (object, identity) pair. The
-    /// <see cref="RestApiObserverItem"/> DTO consumed by the client-side observer
-    /// control does not match an entity 1:1: <see cref="RestApiObserverItem.Initials"/>
-    /// and <see cref="RestApiObserverItem.Color"/> are derived deterministically from
+    /// <see cref="RestApiWatcherItem"/> DTO consumed by the client-side watcher
+    /// control does not match an entity 1:1: <see cref="RestApiWatcherItem.Initials"/>
+    /// and <see cref="RestApiWatcherItem.Color"/> are derived deterministically from
     /// the identity name and id so the avatar bubble keeps a stable look without
     /// needing dedicated stored columns.
     /// <para>
     /// <see cref="IncludeSubPathsAttribute"/> is REQUIRED so that the
     /// <c>DELETE {base}/{userId}</c> sub-route is dispatched to this endpoint's
-    /// <see cref="RemoveObserver"/> override — without it the sub-path 404s and the
+    /// <see cref="RemoveWatcher"/> override — without it the sub-path 404s and the
     /// "click avatar to remove" affordance silently degrades.
     /// </para>
     /// </remarks>
@@ -41,7 +41,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
     [ObjectKeySegment]
     [IncludeSubPaths(true)]
     [Cache]
-    public sealed class Index : RestApiObserver<Model.Entities.Object>
+    public sealed class Index : RestApiWatcher<Model.Entities.Object>
     {
         /// <summary>
         /// Initializes a new instance of the class.
@@ -58,7 +58,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The materialized list of observer items.</returns>
-        protected override IEnumerable<RestApiObserverItem> RetrieveObservers(IQuery<Model.Entities.Object> query, IQueryContext context, IRequest request)
+        protected override IEnumerable<RestApiWatcherItem> RetrieveWatchers(IQuery<Model.Entities.Object> query, IQueryContext context, IRequest request)
         {
             var objectId = ResolveObjectId(request);
             if (objectId == Guid.Empty)
@@ -69,7 +69,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
             return CoreHub.WatcherManager
                 .GetWatchers(objectId)
                 .Where(w => w.Identity is not null)
-                .Select(w => ToObserverItem(w.Identity))
+                .Select(w => ToWatcherItem(w.Identity))
                 .ToList();
         }
 
@@ -84,10 +84,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns>The newly added observer record, or <see langword="null"/>.</returns>
-        protected override RestApiObserverItem AddObserver(string userId, IQueryContext context, IRequest request)
+        protected override RestApiWatcherItem AddWatcher(string userId, IQueryContext context, IRequest request)
         {
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId))
+            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId) || !MayChangeWatchers(objectId, identityId, request))
             {
                 return null;
             }
@@ -100,7 +100,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
 
             using var db = ModelHub.CreateDbContext();
             var identity = db.Identities.AsNoTracking().FirstOrDefault(i => i.Id == identityId);
-            return identity is null ? null : ToObserverItem(identity);
+            return identity is null ? null : ToWatcherItem(identity);
         }
 
         /// <summary>
@@ -113,10 +113,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
         /// <param name="context">The query context.</param>
         /// <param name="request">The HTTP request providing operational context.</param>
         /// <returns><see langword="true"/> when the watcher existed and was removed.</returns>
-        protected override bool RemoveObserver(string userId, IQueryContext context, IRequest request)
+        protected override bool RemoveWatcher(string userId, IQueryContext context, IRequest request)
         {
             var objectId = ResolveObjectId(request);
-            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId))
+            if (objectId == Guid.Empty || !Guid.TryParse(userId, out var identityId) || !MayChangeWatchers(objectId, identityId, request))
             {
                 return false;
             }
@@ -139,24 +139,39 @@ namespace KleeneStar.Core.WWW.Api._1_.Watchers._objectkey_
                 return Guid.Empty;
             }
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == keyParam.Value);
-            return obj?.Id ?? Guid.Empty;
+            // through the object manager, so an object the caller may not read has no watchers
+            // to show or change either
+            return CoreHub.ObjectManager.GetObjectByKey(keyParam.Value)?.Id ?? Guid.Empty;
+        }
+
+        /// <summary>
+        /// Determines whether the caller may add or remove a watcher: themselves whenever they
+        /// may read the object (the resolve above already asked), somebody else only when they
+        /// may change the object.
+        /// </summary>
+        /// <param name="objectId">The object.</param>
+        /// <param name="identityId">The watcher being added or removed.</param>
+        /// <param name="request">The HTTP request.</param>
+        /// <returns><see langword="true"/> when the change may proceed.</returns>
+        private static bool MayChangeWatchers(Guid objectId, Guid identityId, IRequest request)
+        {
+            return identityId == CoreHub.SessionManager.GetCurrentIdentityId(request)
+                || global::KleeneStar.Core.WebRestApi.ContentAuthorization.MayWrite(CoreHub.ObjectManager.GetObject(objectId), request);
         }
 
         /// <summary>
         /// Projects an <see cref="Identity"/> row onto the
-        /// <see cref="RestApiObserverItem"/> DTO consumed by the client-side observer
+        /// <see cref="RestApiWatcherItem"/> DTO consumed by the client-side watcher
         /// control. The team slot is left empty because the identity model does not
         /// surface a single primary team; initials and avatar background colour are
         /// derived deterministically from the display name and id so the avatar bubble
         /// keeps a stable look without needing a stored colour column.
         /// </summary>
         /// <param name="identity">The identity row.</param>
-        /// <returns>The observer DTO.</returns>
-        internal static RestApiObserverItem ToObserverItem(Identity identity)
+        /// <returns>The watcher DTO.</returns>
+        internal static RestApiWatcherItem ToWatcherItem(Identity identity)
         {
-            return new RestApiObserverItem
+            return new RestApiWatcherItem
             {
                 Id = identity.Id.ToString(),
                 Name = identity.Name ?? string.Empty,

@@ -1,0 +1,735 @@
+﻿using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebWorkspaceTemplate;
+using KleeneStar.Model;
+using KleeneStar.Model.Entities;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Linq;
+using WebExpress.WebCore;
+using WebExpress.WebCore.Internationalization;
+using WebExpress.WebCore.WebComponent;
+using WebExpress.WebCore.WebLog;
+using WebExpress.WebCore.WebPlugin;
+using WebExpress.WebIndex.Queries;
+using WebExpress.WebUI.WebIcon;
+
+namespace KleeneStar.Core.WebManager
+{
+    /// <summary>
+    /// Manages the workspace templates the installed plugins define.
+    /// </summary>
+    /// <remarks>
+    /// The templates are collected by WebExpress's <see cref="PluginTypeCatalog{TItem}"/>: every
+    /// <b>public sealed</b> <see cref="IWorkspaceTemplate"/> with a public parameterless constructor
+    /// in a plugin assembly, keyed by <see cref="IWorkspaceTemplate.Key"/> (compared without case).
+    /// The catalog builds an <see cref="IWorkspaceTemplateContext"/> per type, naming the plugin
+    /// and the type. A type that misses the convention is skipped silently, one whose constructor
+    /// throws or whose key is blank is logged and skipped. The latest offer of a key is in use; a
+    /// plugin that leaves takes only the keys it still provides. <see cref="Register"/> adds a
+    /// template that is no plugin type (a test's stand-in).
+    /// </remarks>
+    public sealed class WorkspaceTemplateManager : IWorkspaceTemplateManager
+    {
+        private readonly IComponentHub _componentHub;
+        private readonly IHttpServerContext _httpServerContext;
+
+        /// <summary>
+        /// The templates of the plugins and the registered ones.
+        /// </summary>
+        private readonly PluginTypeCatalog<IWorkspaceTemplateContext> _catalog;
+
+        /// <summary>
+        /// Raised after a template has been registered.
+        /// </summary>
+        public event EventHandler<IWorkspaceTemplateContext> AddWorkspaceTemplate;
+
+        /// <summary>
+        /// Raised after a template has been dropped.
+        /// </summary>
+        public event EventHandler<IWorkspaceTemplateContext> RemoveWorkspaceTemplate;
+
+        /// <summary>
+        /// Raised when a template was applied to a workspace - after its structure, pages and
+        /// approval policies, before its default permissions.
+        /// </summary>
+        public event EventHandler<WorkspaceTemplateApplication> TemplateApplied;
+
+        /// <summary>
+        /// Gets every registered template, in catalogue order.
+        /// </summary>
+        public IEnumerable<IWorkspaceTemplateContext> WorkspaceTemplates => Order(_catalog.Items);
+
+        /// <summary>
+        /// Initializes a new instance of the manager. Invoked by WebExpress via reflection.
+        /// </summary>
+        /// <param name="componentHub">The component hub, or <see langword="null"/> without a host.</param>
+        /// <param name="httpServerContext">The HTTP server context, or <see langword="null"/>.</param>
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "Used via reflection.")]
+        private WorkspaceTemplateManager(IComponentHub componentHub, IHttpServerContext httpServerContext)
+        {
+            _componentHub = componentHub;
+            _httpServerContext = httpServerContext;
+
+            _catalog = new PluginTypeCatalog<IWorkspaceTemplateContext>(x => x.Template?.Key, typeof(IWorkspaceTemplate), Create);
+            _catalog.Added += OnAdded;
+            _catalog.Removed += OnRemoved;
+
+            if (_componentHub?.PluginManager is not null)
+            {
+                _catalog.Attach(_componentHub, _httpServerContext);
+            }
+        }
+
+        /// <summary>
+        /// Builds the registration of a discovered template type.
+        /// </summary>
+        /// <param name="origin">The type and the plugin that ships it.</param>
+        /// <returns>The registration.</returns>
+        private static IWorkspaceTemplateContext Create(PluginTypeOrigin origin)
+        {
+            return new WorkspaceTemplateContext
+            {
+                PluginContext = origin.PluginContext,
+                TemplateType = origin.Type,
+                Template = (IWorkspaceTemplate)Activator.CreateInstance(origin.Type)
+            };
+        }
+
+        /// <summary>
+        /// Collects the templates of a plugin; collecting a plugin again does nothing.
+        /// </summary>
+        /// <param name="pluginContext">The plugin to scan.</param>
+        private void Register(IPluginContext pluginContext)
+        {
+            if (pluginContext?.Assembly is not null)
+            {
+                _catalog.Collect(pluginContext);
+            }
+        }
+
+        /// <summary>
+        /// Registers a template that is no plugin type; no plugin removal takes it away.
+        /// </summary>
+        /// <param name="template">The template.</param>
+        /// <exception cref="ArgumentException">The template carries no key.</exception>
+        public void Register(IWorkspaceTemplate template)
+        {
+            ArgumentNullException.ThrowIfNull(template);
+
+            if (string.IsNullOrWhiteSpace(template.Key))
+            {
+                throw new ArgumentException("A workspace template must carry a key.", nameof(template));
+            }
+
+            _catalog.Register(new WorkspaceTemplateContext
+            {
+                TemplateType = template.GetType(),
+                Template = template
+            });
+        }
+
+        /// <summary>
+        /// Announces a template the catalog took into use.
+        /// </summary>
+        /// <param name="sender">The catalog.</param>
+        /// <param name="e">The template.</param>
+        private void OnAdded(object sender, PluginTypeCatalogEventArgs<IWorkspaceTemplateContext> e)
+        {
+            _httpServerContext?.Log?.Info("Workspace template '" + e.Key + "' of '" + (e.PluginContext?.PluginId?.ToString() ?? "-") + "'.");
+
+            AddWorkspaceTemplate?.Invoke(this, e.Item);
+        }
+
+        /// <summary>
+        /// Announces a template the catalog dropped.
+        /// </summary>
+        /// <param name="sender">The catalog.</param>
+        /// <param name="e">The template.</param>
+        private void OnRemoved(object sender, PluginTypeCatalogEventArgs<IWorkspaceTemplateContext> e)
+        {
+            RemoveWorkspaceTemplate?.Invoke(this, e.Item);
+        }
+
+        /// <summary>
+        /// Returns the templates the supplied plugin defines.
+        /// </summary>
+        /// <param name="pluginContext">The plugin.</param>
+        /// <returns>Its templates in use, in catalogue order.</returns>
+        public IEnumerable<IWorkspaceTemplateContext> GetWorkspaceTemplates(IPluginContext pluginContext)
+        {
+            return pluginContext is null
+                ? []
+                : Order(_catalog.Items.Where(x => ReferenceEquals(x.PluginContext, pluginContext)));
+        }
+
+        /// <summary>
+        /// Returns the template with the supplied key.
+        /// </summary>
+        /// <param name="key">The stable key of the template.</param>
+        /// <returns>The registration, or <see langword="null"/>.</returns>
+        public IWorkspaceTemplateContext GetWorkspaceTemplate(string key)
+        {
+            return string.IsNullOrWhiteSpace(key) ? null : _catalog.Find(key.Trim());
+        }
+
+        /// <summary>
+        /// Sets a workspace up from a template: its classes, the starting views of its issue and
+        /// asset overviews, its home page and the post announcing it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// It is four steps rather than one because an empty workspace is worth almost nothing.
+        /// A workspace created from a template used to arrive with its classes and nothing else -
+        /// every overview an empty tab strip, no page saying what the place is for, no first
+        /// entry in its timeline - and the afternoon the templates exist to save was spent
+        /// clicking those together instead.
+        /// </para>
+        /// <para>
+        /// The order is the order of dependence: the classes belong to the workspace, the views
+        /// present the objects of a kind, and the two pages are objects and need a class of the
+        /// right kind to live in. Each step is skipped where the workspace already carries what
+        /// it would create, so applying a template twice - a retried create, or a template
+        /// applied to a workspace somebody had already set up by hand - adds what is missing
+        /// instead of a second set of everything.
+        /// </para>
+        /// <para>
+        /// A step that finds nothing to work with does nothing and does not stop the ones after
+        /// it. A workspace whose classes were created while its home page failed is one an
+        /// administrator can finish by hand; a create that failed halfway and rolled the classes
+        /// back would leave them with nothing.
+        /// </para>
+        /// </remarks>
+        /// <param name="key">The stable key of the template to apply.</param>
+        /// <param name="workspaceId">The workspace to set up.</param>
+        /// <param name="identityId">Who is doing this, recorded as the author of the two pages
+        /// and of the commits that create them. Empty when it is not known.</param>
+        /// <param name="culture">The language the two pages and the class descriptions are written
+        /// in. Null falls back to the installation's own, which is what a caller with no request
+        /// behind it has.</param>
+        /// <returns>What was created.</returns>
+        public WorkspaceTemplateResult Apply(string key, Guid workspaceId, Guid identityId = default, CultureInfo culture = null)
+        {
+            var template = GetWorkspaceTemplate(key)?.Template;
+            var workspace = workspaceId == Guid.Empty ? null : CoreHub.WorkspaceManager.GetWorkspace(workspaceId);
+
+            if (template is null || workspace is null)
+            {
+                return WorkspaceTemplateResult.Empty;
+            }
+
+            var structure = new WorkspaceTemplateStructureResult();
+            var classes = new List<Class>(ApplyClasses(template, workspaceId, culture, structure));
+            var views = ApplyViews(workspaceId);
+
+            // the pages describe the workspace as it now stands, so they are written from every
+            // class it carries rather than only from the ones this call created - a template
+            // applied to a workspace that already had classes would otherwise leave its home
+            // page listing half of it
+            var all = CoreHub.ClassManager
+                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
+                .ToList();
+
+            // both prose classes are settled before either page is written, so each page lists
+            // the workspace as it finally stands rather than as it stood halfway through
+            foreach (var kind in new[] { ObjectKind.Document, ObjectKind.Blog })
+            {
+                if (all.Any(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                var host = CreateProseClass(workspaceId, kind, culture);
+
+                if (host is not null)
+                {
+                    classes.Add(host);
+                    all.Add(host);
+                }
+            }
+
+            all = [.. all.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)];
+
+            // the home page is created by the workspace manager; the result names it only when
+            // this call created it
+            var priorHome = CoreHub.WorkspaceManager.GetWorkspace(workspaceId)?.HomeId;
+            var home = CoreHub.WorkspaceManager.EnsureHome(workspaceId, identityId, culture, template);
+
+            if (home is not null && home.Id == priorHome)
+            {
+                home = null;
+            }
+
+            var openingPost = ApplyProse(workspace, template, all, ObjectKind.Blog, identityId, culture);
+
+            // the processes come after the structure they run on: a policy names states, a rule
+            // names classes, and both are validated against what now exists
+            var processes = WorkspaceTemplateProcesses.Apply(template, workspaceId, identityId, culture);
+
+            // what the core does not know - the automation rules of the templates plugin - is set
+            // up by whoever listens, on the structure that now exists
+            TemplateApplied?.Invoke(this, new WorkspaceTemplateApplication(template, workspaceId, identityId, culture, processes));
+
+            foreach (var skipped in processes.Skipped)
+            {
+                CoreHub.HttpServerContext?.Log?.Warning($"Workspace template '{key}': {skipped}");
+            }
+
+            return new WorkspaceTemplateResult
+            {
+                Classes = classes,
+                Fields = structure.Fields,
+                Priorities = structure.Priorities,
+                Statuses = structure.Statuses,
+                Workflows = structure.Workflows,
+                Forms = structure.Forms,
+                Calendars = structure.Calendars,
+                Slas = structure.Slas,
+                Views = views,
+                Home = home,
+                OpeningPost = openingPost,
+                Processes = processes,
+                // last, so everything above was set up while the workspace was still the
+                // creator's alone to shape, and the grants describe the finished workspace
+                Permissions = ApplyPermissions(workspaceId)
+            };
+        }
+
+        /// <summary>
+        /// Grants the workspace its default permissions (<see cref="WorkspacePermissionDefaults"/>):
+        /// the installation's administrators administer it, every signed-in account works in it,
+        /// and a visitor who is not signed in - granted nothing - is left out.
+        /// </summary>
+        /// <remarks>
+        /// Skipped where the workspace already carries any grant: somebody administered it, and
+        /// adding "every signed-in account may edit" on top of their choice would undo it. A
+        /// default naming a group the store does not carry is not granted (the permission
+        /// manager refuses it); the built-in groups are ensured at start-up, so that is a store
+        /// nobody has started since.
+        /// </remarks>
+        /// <param name="workspaceId">The workspace.</param>
+        /// <returns>The grants written.</returns>
+        private static IReadOnlyList<PermissionAssignment> ApplyPermissions(Guid workspaceId)
+        {
+            var scopeId = workspaceId.ToString();
+
+            if (CoreHub.PermissionManager.GetAssignments(PermissionScope.Workspace, scopeId).Any())
+            {
+                return [];
+            }
+
+            return [.. WorkspacePermissionDefaults.Grants
+                .Select(x => CoreHub.PermissionManager.Assign(PermissionScope.Workspace, scopeId, x.GroupId, x.Policy))
+                .Where(x => x is not null)];
+        }
+
+        /// <summary>
+        /// Creates the classes the template describes, each with the structure the template
+        /// declares for it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A name the workspace already carries is skipped rather than duplicated. The name is
+        /// what is compared, not the descriptor: a class an administrator renamed is a different
+        /// class, and one they kept is the same one however it was created.
+        /// </para>
+        /// <para>
+        /// The structure - fields, forms, priorities, workflow, calendars, agreements - is
+        /// written only into a class created here. A class the workspace already carried is
+        /// left as it is: its administrator has shaped it, and a second priority scale or
+        /// workflow beside theirs would be the destructive kind of help. Writing it raises no
+        /// notification per record (<see cref="CoreHub.BeginSilentNotifications"/>); the class
+        /// itself is still announced, and the audit log still records every record.
+        /// </para>
+        /// </remarks>
+        /// <param name="template">The template being applied.</param>
+        /// <param name="workspaceId">The workspace the classes are created in.</param>
+        /// <param name="culture">The language the descriptions are written in.</param>
+        /// <param name="structure">Collects the structure written into the classes.</param>
+        /// <returns>The classes created.</returns>
+        private static IReadOnlyList<Class> ApplyClasses(IWorkspaceTemplate template, Guid workspaceId, CultureInfo culture, WorkspaceTemplateStructureResult structure)
+        {
+            var existing = CoreHub.ClassManager
+                .GetClasses(new Query<Class>().WhereEquals(x => x.WorkspaceId, workspaceId))
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var created = new List<Class>();
+
+            foreach (var descriptor in template.Classes ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(descriptor.Name) || !existing.Add(descriptor.Name))
+                {
+                    continue;
+                }
+
+                var @class = CreateClass
+                (
+                    workspaceId,
+                    descriptor.Name,
+                    Describe(descriptor.Description, culture),
+                    descriptor.Icon,
+                    descriptor.Kind,
+                    descriptor.Renderer,
+                    descriptor.PortalVisible,
+                    descriptor.Sealed,
+                    descriptor.AccessModifier
+                );
+
+                created.Add(@class);
+
+                using (CoreHub.BeginSilentNotifications())
+                {
+                    WorkspaceTemplateStructure.Apply(@class, descriptor, culture, structure);
+                }
+            }
+
+            return created;
+        }
+
+        /// <summary>
+        /// Creates one class in a workspace.
+        /// </summary>
+        /// <param name="workspaceId">The workspace the class belongs to.</param>
+        /// <param name="name">The class name.</param>
+        /// <param name="description">What the class holds, as the text the class will carry - a
+        /// template's key is resolved by the caller first, see <see cref="Describe"/>.</param>
+        /// <param name="icon">The path of the icon, or null.</param>
+        /// <param name="kind">The kind of object the class holds.</param>
+        /// <param name="renderer">The renderer the objects are read and written through, or null
+        /// to follow the default of the kind.</param>
+        /// <param name="portalVisible">Whether customers may file objects of it.</param>
+        /// <param name="sealed">Whether the class may be specialized further.</param>
+        /// <param name="accessModifier">Who may see it.</param>
+        /// <returns>The class.</returns>
+        private static Class CreateClass
+        (
+            Guid workspaceId,
+            string name,
+            string description,
+            string icon,
+            string kind,
+            string renderer = null,
+            bool portalVisible = false,
+            bool @sealed = false,
+            AccessModifier accessModifier = AccessModifier.Public
+        )
+        {
+            var @class = new Class
+            {
+                Name = name,
+                Description = description,
+                Icon = string.IsNullOrWhiteSpace(icon) ? null : ImageIcon.FromString(icon),
+                Kind = kind,
+                Renderer = renderer,
+                PortalVisible = portalVisible,
+                Sealed = @sealed,
+                AccessModifier = accessModifier,
+                WorkspaceId = workspaceId,
+                State = ClassState.Active,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            };
+
+            CoreHub.ClassManager.Add(@class);
+
+            return @class;
+        }
+
+        /// <summary>
+        /// Creates the standard tabs of the issue and asset overviews.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The two overviews keep separate tab sets - the same layout can exist once for issues
+        /// and once for assets - and each kind leads with its own curated view, because that is
+        /// the default entry of the page hosting the tab control and the tab strip has no
+        /// built-in first entry: what a workspace opens on is whichever view is ordered first.
+        /// </para>
+        /// <para>
+        /// It is a <b>starting</b> set, not the full catalogue. The seeded workspaces carry every
+        /// layout, and giving a new workspace all of them the same way turned out to be the wrong
+        /// default: a table and a list of the same rows, beside a board nobody had asked for, is
+        /// six tabs to read before the first item exists. What is created is the curated list to
+        /// land on, the dashboard to see the shape of the work, and - for issues - the Scrum
+        /// view. Table, list and Kanban are one click away in the tab strip's own template
+        /// picker, and are left to whoever decides they want them.
+        /// </para>
+        /// <para>
+        /// Assets get no Scrum view: the asset overview embeds no Scrum template, so the type is
+        /// neither offered nor resolvable there.
+        /// </para>
+        /// </remarks>
+        /// <param name="workspaceId">The workspace the tabs belong to.</param>
+        /// <returns>The tabs created.</returns>
+        private static IReadOnlyList<ObjectView> ApplyViews(Guid workspaceId)
+        {
+            var created = new List<ObjectView>();
+
+            created.AddRange(ApplyViews(workspaceId, ObjectKind.Issue,
+            [
+                (ObjectViewType.Issues, "Issues"),
+                (ObjectViewType.Dashboard, "Dashboard"),
+                (ObjectViewType.ScrumSprint, "Scrum")
+            ]));
+
+            created.AddRange(ApplyViews(workspaceId, ObjectKind.Asset,
+            [
+                (ObjectViewType.Assets, "Assets"),
+                (ObjectViewType.Dashboard, "Dashboard")
+            ]));
+
+            return created;
+        }
+
+        /// <summary>
+        /// Creates the tab set of one object kind.
+        /// </summary>
+        /// <param name="workspaceId">The workspace the tabs belong to.</param>
+        /// <param name="kind">The object kind whose overview the tabs belong to.</param>
+        /// <param name="views">The tabs, in the order they are offered in.</param>
+        /// <returns>The tabs created.</returns>
+        private static IReadOnlyList<ObjectView> ApplyViews(Guid workspaceId, string kind, (ObjectViewType Type, string Name)[] views)
+        {
+            var existing = CoreHub.ObjectViewManager
+                .GetViewsForWorkspace(workspaceId, kind)
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var created = new List<ObjectView>();
+
+            for (var order = 0; order < views.Length; order++)
+            {
+                var (type, name) = views[order];
+
+                if (!existing.Add(name))
+                {
+                    continue;
+                }
+
+                var view = new ObjectView
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    Description = ViewDescription(type, kind),
+                    Kind = kind,
+                    ViewType = type,
+                    Order = order,
+                    State = ObjectViewState.Active,
+                    WorkspaceId = workspaceId,
+                    Created = DateTime.UtcNow,
+                    Updated = DateTime.UtcNow
+                };
+
+                CoreHub.ObjectViewManager.AddObjectView(view);
+                created.Add(view);
+            }
+
+            return created;
+        }
+
+        /// <summary>
+        /// Returns what a tab is described as in the view administration.
+        /// </summary>
+        /// <remarks>
+        /// The description is stored, and it is stored untranslated, exactly as the seeder writes
+        /// it and as the tab control's own "add view" writes the name: a view is data an
+        /// administrator renames and rewrites, not a caption of the product.
+        /// </remarks>
+        /// <param name="type">The kind of view.</param>
+        /// <param name="kind">The object kind the view presents.</param>
+        /// <returns>The description, or null for a type this does not create - which is what a
+        /// tab added by hand carries too.</returns>
+        private static string ViewDescription(ObjectViewType type, string kind)
+        {
+            var subject = string.Equals(kind, ObjectKind.Asset, StringComparison.OrdinalIgnoreCase)
+                ? "assets"
+                : "issues";
+
+            return type switch
+            {
+                ObjectViewType.Issues or ObjectViewType.Assets => $"Most recently updated {subject} with personal filters.",
+                ObjectViewType.Dashboard => $"Aggregated dashboard of the {subject}.",
+                ObjectViewType.ScrumSprint => "Active Scrum sprint and product backlog.",
+                _ => null
+            };
+        }
+
+        /// <summary>
+        /// Writes the page of one prose kind - the home page for documents, the opening post for
+        /// blogs - into a class of that kind.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The class it is written into is one the workspace already has, which is one the
+        /// template named when it named one - so a template with a knowledge base or an
+        /// announcement channel gets its page there rather than beside it - and otherwise the
+        /// one the caller created for it. A home page is not an optional extra of a workspace,
+        /// and a class holding one page is a smaller surprise than a workspace with nowhere to
+        /// write.
+        /// </para>
+        /// <para>
+        /// Nothing is written when the workspace already holds a page of that kind. That is the
+        /// idempotency of the whole step, and it is deliberately coarse: what must not happen on
+        /// a retried create is a second home page, and any document in the workspace means
+        /// somebody - or an earlier run - has already had that thought.
+        /// </para>
+        /// </remarks>
+        /// <param name="workspace">The workspace the page belongs to.</param>
+        /// <param name="template">The template being applied.</param>
+        /// <param name="classes">Every class the workspace carries.</param>
+        /// <param name="kind">The prose kind to write.</param>
+        /// <param name="identityId">The author.</param>
+        /// <param name="culture">The language the page is written in.</param>
+        /// <returns>The page, or <see langword="null"/> when one already existed or the workspace
+        /// has no class of the kind to write it into.</returns>
+        private static Model.Entities.Object ApplyProse
+        (
+            Workspace workspace,
+            IWorkspaceTemplate template,
+            IReadOnlyList<Class> classes,
+            string kind,
+            Guid identityId,
+            CultureInfo culture
+        )
+        {
+            var host = classes.FirstOrDefault(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase));
+
+            if (host is null)
+            {
+                return null;
+            }
+
+            var occupied = CoreHub.ObjectManager
+                .GetObjects(new Query<Model.Entities.Object>().WhereEquals(x => x.WorkspaceId, workspace.Id))
+                .Any(x => string.Equals(x.Kind, kind, StringComparison.OrdinalIgnoreCase));
+
+            if (occupied)
+            {
+                return null;
+            }
+
+            var document = string.Equals(kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase);
+
+            var page = new Model.Entities.Object
+            {
+                Id = Guid.NewGuid(),
+                Key = CoreHub.ObjectManager.NextObjectKey(workspace.Id),
+                Summary = document
+                    ? WorkspaceTemplateContent.HomeSummary(workspace, culture)
+                    : WorkspaceTemplateContent.OpeningPostSummary(workspace, culture),
+                Description = document
+                    ? WorkspaceTemplateContent.HomeBody(workspace, classes, culture)
+                    : WorkspaceTemplateContent.OpeningPostBody(workspace, template, classes, culture),
+                Icon = host.Icon,
+                Kind = kind,
+                State = WorkspaceState.Active,
+                WorkspaceId = workspace.Id,
+                ClassId = host.Id,
+                CreatorId = identityId == Guid.Empty ? null : identityId,
+                UpdaterId = identityId == Guid.Empty ? null : identityId,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            };
+
+            CoreHub.ObjectManager.Add(page);
+
+            return page;
+        }
+
+        /// <summary>
+        /// Creates the class a prose page needs when the template names none of that kind.
+        /// </summary>
+        /// <remarks>
+        /// The names are untranslated, like every other class name: a class name is data an
+        /// administrator renames, not a caption of the product. The descriptions are written in
+        /// the language the workspace is being created in, like the ones a template names.
+        /// </remarks>
+        /// <param name="workspaceId">The workspace the class belongs to.</param>
+        /// <param name="kind">The prose kind the class holds.</param>
+        /// <param name="culture">The language the description is written in.</param>
+        /// <returns>The class, or <see langword="null"/> for a kind that is not a prose kind.</returns>
+        internal static Class CreateProseClass(Guid workspaceId, string kind, CultureInfo culture)
+        {
+            if (string.Equals(kind, ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateClass
+                (
+                    workspaceId,
+                    "Page",
+                    Describe("kleenestar.core:workspace.template.class.page", culture),
+                    "/kleenestar/assets/icons/doc.svg",
+                    ObjectKind.Document
+                );
+            }
+
+            if (string.Equals(kind, ObjectKind.Blog, StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateClass
+                (
+                    workspaceId,
+                    "News",
+                    Describe("kleenestar.core:workspace.template.class.news", culture),
+                    "/kleenestar/assets/icons/release.svg",
+                    ObjectKind.Blog
+                );
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves the description a template gives a class into the text the class carries.
+        /// </summary>
+        /// <remarks>
+        /// A template names its class descriptions as internationalization keys, because a
+        /// template is code and code speaks every language of the installation. A class is not:
+        /// its description is data an administrator reads in the class table, edits in the class
+        /// dialog and sees on every surface that shows it, none of which translates a stored
+        /// string - so a key stored as-is stayed a key everywhere but in the opening post, which
+        /// happened to pass it through the translator. The key is therefore resolved once, here,
+        /// in the language of whoever is creating the workspace - the same choice the home page
+        /// and the opening post make - and the class carries a sentence. A description that is
+        /// not a key comes back unchanged, so a template may name free text as well.
+        /// </remarks>
+        /// <param name="description">The description as the template names it.</param>
+        /// <param name="culture">The language to resolve it in; null for the installation's own.</param>
+        /// <returns>The resolved description, or <see langword="null"/> when there is none.</returns>
+        private static string Describe(string description, CultureInfo culture)
+        {
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                return description;
+            }
+
+            return culture is null
+                ? I18N.Translate(description)
+                : I18N.Translate(culture, description);
+        }
+
+        /// <summary>
+        /// Puts a set of registrations into the order they are offered in.
+        /// </summary>
+        /// <param name="templates">The registrations.</param>
+        /// <returns>The ordered registrations.</returns>
+        private static IEnumerable<IWorkspaceTemplateContext> Order(IEnumerable<IWorkspaceTemplateContext> templates)
+        {
+            return [.. templates
+                .OrderBy(x => x.Template.Order)
+                .ThenBy(x => x.Template.Key, StringComparer.OrdinalIgnoreCase)];
+        }
+
+        /// <summary>
+        /// Stops following the plugins.
+        /// </summary>
+        public void Dispose()
+        {
+            _catalog.Added -= OnAdded;
+            _catalog.Removed -= OnRemoved;
+            _catalog.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+    }
+}

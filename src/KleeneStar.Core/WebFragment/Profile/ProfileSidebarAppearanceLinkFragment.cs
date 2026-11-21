@@ -1,8 +1,9 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebUri;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -13,14 +14,16 @@ namespace KleeneStar.Core.WebFragment.Profile
     /// <summary>
     /// Sidebar link to the appearance page (theme, accent, density, font scale).
     /// </summary>
-    [Section<SectionSidebarPrimary>]
+    [Section<SectionSidebarPreferences>]
+    [Order(3)]
     [Scope<global::KleeneStar.Core.WWW.Profile.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Account>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tenant>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Appearance>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Notifications>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Security>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Integrations>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Data>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Delete>]

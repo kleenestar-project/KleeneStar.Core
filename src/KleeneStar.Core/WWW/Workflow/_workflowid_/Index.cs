@@ -4,6 +4,7 @@ using KleeneStar.Core.WebUri;
 using System;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebPage;
 using WebExpress.WebCore.WebUri;
@@ -41,11 +42,24 @@ namespace KleeneStar.Core.WWW.Workflow._workflowid_
             var workflow = CoreHub.WorkflowManager.GetWorkflow(guid);
             var @class = workflow?.Class;
             var workspace = workflow?.Class?.Workspace;
+
+            // the id in the url is whatever the caller typed or kept in a bookmark, so it
+            // may address a workflow that no longer exists. The breadcrumb is built from the
+            // class the workflow belongs to and cannot be assembled without it; the page
+            // then states that the workflow was not found instead of failing to render.
+            if (workflow is null || @class is null)
+            {
+                visualTree.Title ??= I18N.Translate(renderContext, "kleenestar.core:workflow.notfound.title");
+                visualTree.Content.MainPanel.Headline.Title = I18N.Translate(renderContext, "kleenestar.core:workflow.notfound.title");
+
+                return;
+            }
+
             var uri = renderContext.PageContext.ApplicationContext.Route
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                         .BindParameters(new WorkspaceKeyParameter(workspace?.Key))
                         .BindParameters(renderContext.Request)
                 })

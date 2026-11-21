@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebParameter;
 using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
@@ -9,6 +9,7 @@ using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 {
@@ -53,6 +54,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         }
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Retrieves a queryable collection of index items that match the specified query criteria.
         /// </summary>
         /// <param name="query">
@@ -77,7 +84,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // when the user is searching, keep the full searchable list across all workspaces
             if (!string.IsNullOrWhiteSpace(filter) && filter != "null")
             {
-                return CoreHub.WorkspaceManager?.GetWorkspaces(query, context)
+                return CoreHub.WorkspaceManager?.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                     .Select(x => ToItem(x, request));
             }
 
@@ -92,7 +99,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             foreach (var recent in CoreHub.WorkspaceManager.GetRecentWorkspaces(ownerId, MaxRecent))
             {
-                if (recent is not null && seen.Add(recent.Id))
+                if (recent is not null && global::KleeneStar.Core.WebPermission.ContentVisibility.MayRead(recent.Id) && seen.Add(recent.Id))
                 {
                     items.Add(ToItem(recent, request, pinned: favoriteIds.Contains(recent.Id)));
                 }
@@ -100,7 +107,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             foreach (var favorite in favorites)
             {
-                if (favorite is not null && seen.Add(favorite.Id))
+                if (favorite is not null && global::KleeneStar.Core.WebPermission.ContentVisibility.MayRead(favorite.Id) && seen.Add(favorite.Id))
                 {
                     items.Add(ToItem(favorite, request, pinned: true));
                 }
@@ -110,7 +117,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
             // dropdown is never empty on first use
             if (items.Count == 0)
             {
-                return CoreHub.WorkspaceManager?.GetWorkspaces(query, context)
+                return CoreHub.WorkspaceManager?.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context)
                     .Select(x => ToItem(x, request));
             }
 
@@ -183,7 +190,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// </returns>
         private static IUri GetUri(Workspace item, IRequest request)
         {
-            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()?
+            // a workspace opens on the document overview, which shows its home page
+            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>()?
                 .BindParameters(new WorkspaceKeyParameter(item?.Key));
         }
     }

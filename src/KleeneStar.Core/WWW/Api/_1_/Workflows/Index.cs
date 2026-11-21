@@ -1,4 +1,5 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebRestApi;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
@@ -15,13 +16,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
     /// Provides CRUD operations for workflow items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Model.Entities.Workflow>
+    public sealed class Index : global::KleeneStar.Core.WebRestApi.RestApiCrudClassStructure<Model.Entities.Workflow>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to, which decides who may change it.
+        /// </summary>
+        /// <param name="item">The record.</param>
+        /// <returns>The class id.</returns>
+        protected override System.Guid? ClassOf(Model.Entities.Workflow item)
+        {
+            return item?.ClassId;
         }
 
         /// <summary>
@@ -168,7 +179,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Workflow existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            // the class is a reference the record cannot be stored without. Left to the
+            // database it surfaces as a foreign key violation the caller cannot act on, so
+            // it is named here instead.
+            return base.Validate(existingItem, payload, request)
+                .ValidateClass(payload, request, existingItem?.ClassId);
         }
 
         /// <summary>
@@ -239,6 +254,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
 
             fieldMap.BindTo(newItem);
 
+            // a clone stays in the class of its original when the payload names none
+            if (newItem.ClassId == Guid.Empty)
+            {
+                newItem.ClassId = existingItem?.ClassId ?? Guid.Empty;
+            }
+
             CoreHub.WorkflowManager.Add(newItem);
 
             return new RestApiCrudResultCreate();
@@ -283,5 +304,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
 
             return base.Delete(existingItem, request);
         }
+
     }
 }

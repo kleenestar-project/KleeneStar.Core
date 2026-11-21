@@ -1,7 +1,10 @@
-﻿using KleeneStar.Core.WebParameter;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,32 +19,30 @@ namespace KleeneStar.Core.WebFragment.Status
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Status._statusid_.Clone>]
     [Cache]
-    public sealed class StatusCloneFormFragment : FragmentControlRestFormClone
+    public sealed class StatusCloneFormFragment : FragmentControlDataFormClone
     {
         /// <summary>
         /// Gets the input text control for specifying the name of the state.
         /// </summary>
-        public ControlRestFormItemInputUnique StateName { get; } = new()
+        public ControlDataFormItemInputUnique StateName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.Name),
             Label = _ => "kleenestar.core:status.name.label",
             Placeholder = _ => "kleenestar.core:status.name.placeholder",
             Help = _ => "kleenestar.core:status.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input selection control for the category status resource.
         /// </summary>
-        public ControlRestFormItemInputSelection Category { get; } = new()
+        public ControlDataFormItemInputSelection Category { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.Category),
             Label = _ => "kleenestar.core:status.category.label",
             Placeholder = _ => "kleenestar.core:status.category.placeholder",
             Help = _ => "kleenestar.core:status.category.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Category>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Category>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the state.
@@ -52,21 +53,21 @@ namespace KleeneStar.Core.WebFragment.Status
             Label = _ => "kleenestar.core:status.description.label",
             Placeholder = _ => "kleenestar.core:status.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection StatusState { get; } = new()
+        public StateInputSelection StatusState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.StatusStateExtensions.Id(global::KleeneStar.Model.Entities.StatusState.Active).ToString(),
             Label = _ => "kleenestar.core:status.state.label",
             Placeholder = _ => "kleenestar.core:status.state.placeholder",
             Help = _ => "kleenestar.core:status.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -80,7 +81,7 @@ namespace KleeneStar.Core.WebFragment.Status
             Add(Description);
             Add(StatusState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Statuses.Index>();
             ItemId = renderContext =>
             {
                 var stateId = renderContext.Request.GetParameter<WorkflowStateIdParameter>();

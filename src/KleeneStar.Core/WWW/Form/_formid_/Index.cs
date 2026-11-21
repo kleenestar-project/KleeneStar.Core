@@ -2,6 +2,7 @@
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Core.WebUri;
 using System;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebCore.WebAttribute;
@@ -41,11 +42,24 @@ namespace KleeneStar.Core.WWW.Form._formid_
             var form = CoreHub.FormManager.GetForm(guid);
             var @class = form?.Class;
             var workspace = form?.Class?.Workspace;
+
+            // the id in the url is whatever the caller typed or kept in a bookmark, so it
+            // may address a form that no longer exists. The breadcrumb is built from the
+            // class the form belongs to and cannot be assembled without it; the page then
+            // states that the form was not found instead of failing to render at all.
+            if (form is null || @class is null)
+            {
+                visualTree.Title ??= I18N.Translate(renderContext, "kleenestar.core:form.notfound.title");
+                visualTree.Content.MainPanel.Headline.Title = I18N.Translate(renderContext, "kleenestar.core:form.notfound.title");
+
+                return;
+            }
+
             var uri = renderContext.PageContext.ApplicationContext.Route
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                         .BindParameters(new WorkspaceKeyParameter(workspace?.Key))
                         .BindParameters(renderContext.Request)
                 })

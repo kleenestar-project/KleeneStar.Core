@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Model.Entities;
 
 namespace KleeneStar.Core.Test.WebManager
@@ -65,13 +64,13 @@ namespace KleeneStar.Core.Test.WebManager
             Seed(nameof(GetViewsForWorkspace_ReturnsOnlyOwnWorkspaceOrderedByOrder));
 
             CoreHub.ObjectViewManager.AddObjectView(Sample("Backlog", order: 2));
-            CoreHub.ObjectViewManager.AddObjectView(Sample("Board",   order: 1));
-            CoreHub.ObjectViewManager.AddObjectView(Sample("Other",   order: 1, workspaceId: OtherWorkspaceId));
+            CoreHub.ObjectViewManager.AddObjectView(Sample("Board", order: 1));
+            CoreHub.ObjectViewManager.AddObjectView(Sample("Other", order: 1, workspaceId: OtherWorkspaceId));
 
             var result = CoreHub.ObjectViewManager.GetViewsForWorkspace(WorkspaceId).ToList();
 
             Assert.Equal(2, result.Count);
-            Assert.Equal("Board",   result[0].Name);
+            Assert.Equal("Board", result[0].Name);
             Assert.Equal("Backlog", result[1].Name);
         }
 
@@ -109,7 +108,7 @@ namespace KleeneStar.Core.Test.WebManager
             var view = Sample("DeleteMe");
             CoreHub.ObjectViewManager.AddObjectView(view);
 
-            ObjectView? raised = null;
+            ObjectView raised = null;
             CoreHub.ObjectViewManager.ObjectViewRemoved += (_, v) => raised = v;
 
             CoreHub.ObjectViewManager.RemoveObjectView(view);

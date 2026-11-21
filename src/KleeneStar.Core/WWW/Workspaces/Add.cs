@@ -12,7 +12,10 @@ namespace KleeneStar.Core.WWW.Workspaces
     /// </summary>
     [WebIcon<IconPlus>]
     [Title("kleenestar.core:workspace.add.label")]
-    //[Policy<WorkspaceCreatorPolicy>]
+    // creating a workspace is administered on nothing this application has a grant for: the
+    // permission chain starts at the workspace and there is none yet. Until an installation-level
+    // resource exists the page is open, and a page-level policy attribute would not help (see
+    // WebPermission.PageAuthorization for why none is active)
     [Scope<IScopeGeneral>]
     public sealed class Add : IPage<VisualTreeWebApp>, IScope
     {

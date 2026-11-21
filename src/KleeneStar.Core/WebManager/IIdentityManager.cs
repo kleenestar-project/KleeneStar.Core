@@ -3,6 +3,7 @@ using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
 using WebExpress.WebCore.WebComponent;
+using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
 
 namespace KleeneStar.Core.WebManager
@@ -43,6 +44,42 @@ namespace KleeneStar.Core.WebManager
         Identity GetIdentity(IdentityIdParameter identityId);
 
         /// <summary>
+        /// Returns the identity that signs in under the supplied name: the account whose user
+        /// name or e-mail address it is, compared case-insensitively.
+        /// </summary>
+        /// <remarks>
+        /// This is the one lookup a login goes through, and the one the session resolver goes
+        /// through for an identity that names itself rather than carrying our id - a person
+        /// types the same string into the login form either way, and both paths have to agree
+        /// on which account it means. An account that is not
+        /// <see cref="Model.Entities.IdentityState.Active"/> is not answered: a locked or
+        /// retired account may not sign in, and may not be attributed with anything either.
+        /// </remarks>
+        /// <param name="name">The user name or e-mail address. May be null.</param>
+        /// <returns>The identity, or <see langword="null"/> when no active account carries
+        /// that name.</returns>
+        Identity GetIdentityByLogin(string name);
+
+        /// <summary>
+        /// Returns the account an external source knows by the supplied subject, whatever its
+        /// state - the caller decides what an inactive one means.
+        /// </summary>
+        /// <param name="source">The key of the source.</param>
+        /// <param name="subject">The identifier the source knows the account by.</param>
+        /// <returns>The identity, or <see langword="null"/>.</returns>
+        Identity GetIdentityBySource(string source, string subject);
+
+        /// <summary>
+        /// Returns the identity the given request is served for — the account whose profile
+        /// settings the profile pages read and write.
+        /// </summary>
+        /// <param name="request">The current HTTP request.</param>
+        /// <returns>
+        /// The identity of the caller, or <see langword="null"/> when no identity can be resolved.
+        /// </returns>
+        Identity GetCurrentIdentity(IRequest request);
+
+        /// <summary>
         /// Retrieves a collection of identities that satisfy the specified filter criteria.
         /// </summary>
         /// <param name="query">The query criteria.</param>
@@ -56,6 +93,17 @@ namespace KleeneStar.Core.WebManager
         /// <param name="context">The query context.</param>
         /// <returns>An enumerable collection of identities.</returns>
         IEnumerable<Identity> GetIdentities(IQuery<Identity> query, IQueryContext context);
+
+        /// <summary>
+        /// Returns how many identities satisfy the supplied filter criteria without loading
+        /// them - the figure behind a headline such as the landing page's people count.
+        /// </summary>
+        /// <param name="query">
+        /// The query criteria used to filter the counted identities. Paging must be left
+        /// off: a query carrying it counts the page, not the whole result.
+        /// </param>
+        /// <returns>The number of matching identities.</returns>
+        int CountIdentities(IQuery<Identity> query);
 
         /// <summary>
         /// Adds an identity.

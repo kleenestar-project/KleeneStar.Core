@@ -1,7 +1,8 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -14,7 +15,11 @@ namespace KleeneStar.Core.WebFragment.Object
     /// export dialog for the current object.
     /// </summary>
     [Section<SectionHeadlineMorePrimary>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
+    [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Cache]
     public sealed class ObjectItemExportMoreFragment : FragmentControlDropdownItemLink
     {
@@ -33,7 +38,7 @@ namespace KleeneStar.Core.WebFragment.Object
             PrimaryAction = renderContext => new ActionModal
             (
                 "modal-form",
-                CoreHub.GetUri<global::KleeneStar.Core.WWW.Object._objectkey_.Export>()
+                CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Export>()
                     .BindParameters(renderContext.Request),
                 TypeModalSize.Large
             );

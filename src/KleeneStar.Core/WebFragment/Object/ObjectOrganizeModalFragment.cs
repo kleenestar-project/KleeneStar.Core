@@ -1,4 +1,4 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -14,7 +14,7 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// A <c>wx-webui-modal-page</c> (not <c>-form</c>) modal is required because the dialog content
-    /// is a tree/card, not a <c>&lt;form&gt;</c>: the form modal only injects the children of a
+    /// is a tree in a flat section, not a <c>&lt;form&gt;</c>: the form modal only injects the children of a
     /// <c>&lt;form&gt;</c> element and would leave a non-form dialog empty. The page modal fetches
     /// the organize page and copies the element matching <see cref="ControlModalRemotePage.Selector"/>
     /// into the modal body, where the client controllers (tree + object-move controller) bootstrap
@@ -22,7 +22,14 @@ namespace KleeneStar.Core.WebFragment.Object
     /// at body level rather than nested inside a content column that could clip it.
     /// </remarks>
     [Section<SectionBodySecondary>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Search.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Cache]
     public sealed class ObjectOrganizeModalFragment : ControlModalRemotePage, IFragmentControl<ControlModalRemotePage>
     {
@@ -47,11 +54,17 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragment, or null when conditions are not met.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             if (!FragmentContext.Conditions.Check(renderContext?.Request))

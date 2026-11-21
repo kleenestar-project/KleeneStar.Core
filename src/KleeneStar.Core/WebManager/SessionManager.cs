@@ -1,10 +1,13 @@
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebComponent;
@@ -20,17 +23,63 @@ namespace KleeneStar.Core.WebManager
     /// first concrete use case is REST API table layouts, for which a few
     /// typed convenience methods are provided.
     /// </summary>
+    /// <remarks>
+    /// <em>Whose</em> preference an entry is comes from one place -
+    /// <see cref="GetCurrentIdentityId"/>, the identity the request's session names - and the
+    /// overloads that take a request resolve it there rather than being handed an owner. A
+    /// caller who is not signed in owns nothing: the entry is not written and reads answer
+    /// null, which is the honest state and cheaper than a row nobody can ever claim. Until the
+    /// session was read, every preference in the installation was filed under the seeded
+    /// administrator, so one person's column widths were everybody's.
+    /// </remarks>
     public sealed class SessionManager : ISessionManager
     {
         private readonly IComponentHub _componentHub;
         private readonly IHttpServerContext _httpServerContext;
 
         /// <summary>
-        /// Identity used to own session entries when the request does not yet
-        /// carry an authenticated user (mirrors the comment endpoint's fallback
-        /// to the seeded admin identity).
+        /// The identity a <see cref="BeginIdentity"/> scope is acting as, or <see langword="null"/>
+        /// outside every such scope.
         /// </summary>
-        private static readonly Guid FallbackOwnerId = Guid.Parse("77087646-B13A-44B1-9BAC-6E66443CEDFD");
+        /// <remarks>
+        /// It is nullable because <em>acting as nobody</em> is a statement of its own: a scope
+        /// opened on <see cref="Guid.Empty"/> disowns whatever it inherited, and must not fall
+        /// through to the request that happens to be in flight.
+        /// </remarks>
+        private static readonly AsyncLocal<Guid?> _actingIdentityId = new();
+
+        /// <summary>
+        /// The requests whose credential <see cref="Accepts"/> accepted, so <see cref="Resolve"/>
+        /// does not ask a second time.
+        /// </summary>
+        private readonly ConditionalWeakTable<IRequest, WebIdentity.SessionCredential> _accepted = new();
+
+        /// <summary>
+        /// The identity of a request, resolved once and kept beside it.
+        /// </summary>
+        /// <remarks>
+        /// A page asks this several times - every fragment that greets the user, checks a
+        /// favourite or reads a preference - and the answer depends on nothing but the request,
+        /// while finding it costs a token check, a row read and a look into the token store. The
+        /// table holds no request alive, so an entry dies when the request does; "resolved to
+        /// nobody" is stored as <see cref="ResolvedCaller.Nobody"/>, distinguishable from "not
+        /// resolved yet".
+        /// </remarks>
+        private static readonly ConditionalWeakTable<IRequest, ResolvedCaller> _resolved = new();
+
+        /// <summary>
+        /// The caller of a request as it was resolved: the identity, and the credential it was
+        /// resolved from.
+        /// </summary>
+        /// <param name="IdentityId">The identity, or <see cref="Guid.Empty"/> for nobody.</param>
+        /// <param name="Credential">The credential, or <see langword="null"/> for nobody.</param>
+        private sealed record ResolvedCaller(Guid IdentityId, WebIdentity.SessionCredential Credential)
+        {
+            /// <summary>
+            /// The answer for a request nobody is signed in to.
+            /// </summary>
+            public static readonly ResolvedCaller Nobody = new(Guid.Empty, null);
+        }
 
         /// <summary>
         /// Shared JSON serializer options for round-tripping the opaque payloads
@@ -56,19 +105,184 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
-        /// Resolves the identity that owns the current request. WebExpress
-        /// does not yet expose the authenticated identity on <see cref="IRequest"/>;
-        /// until it does, every request is attributed to the seeded admin
-        /// identity so that user preferences still round-trip to a valid row.
+        /// Resolves the identity that owns the current request: the authenticated user the
+        /// request's session names, or <see cref="Guid.Empty"/> when the request carries no
+        /// signed-in user.
         /// </summary>
-        /// <param name="request">The current HTTP request.</param>
-        /// <returns>The current identity id.</returns>
+        /// <remarks>
+        /// The framework carries who signed in in a signed token - an access cookie, or a
+        /// personal access token as a bearer - and <see cref="WebIdentity.SessionCredential"/>
+        /// reads it; this is one question asked of one place, and everything per-user in the
+        /// application follows from it: who a comment is by, whose like it is, whose
+        /// preferences a table layout belongs to, whom a notification is addressed to, which
+        /// identity an audit event names.
+        /// <para>
+        /// A request with no signed-in user answers <see cref="Guid.Empty"/>, and every caller
+        /// already treats that as "nobody": a preference is not stored, a notification is not
+        /// recorded, a comment is refused. It used to answer with the seeded administrator,
+        /// which was serviceable while nothing could be attributed at all and dishonest as soon
+        /// as something could - it signed anonymous writing with a real person's name.
+        /// </para>
+        /// </remarks>
+        /// <param name="request">The current HTTP request. May be null - a caller that has no
+        /// request in hand is answered from the acting scope, else from the request being served
+        /// on its call chain (<c>WebEx.CurrentRequest</c>).</param>
+        /// <returns>The current identity id, or <see cref="Guid.Empty"/>.</returns>
         public Guid GetCurrentIdentityId(IRequest request)
         {
-            // TODO: read the authenticated identity from request.Session once the
-            // WebExpress identity flow exposes it on the request. Until then,
-            // anonymous requests are attributed to the seeded admin identity.
-            return FallbackOwnerId;
+            // an explicit "act as" wins over whatever request is in flight: it is the caller
+            // saying on whose behalf this runs, which is a stronger statement than the ambient
+            if (request is null && _actingIdentityId.Value.HasValue)
+            {
+                return _actingIdentityId.Value.Value;
+            }
+
+            // the managers ask without a request - they are several calls from the endpoint and
+            // shared with callers that have none - so the request being answered on this call
+            // chain stands in for the one they were not given
+            var current = request ?? WebEx.CurrentRequest;
+
+            if (current is null)
+            {
+                return Guid.Empty;
+            }
+
+            return ResolveCached(current).IdentityId;
+        }
+
+        /// <summary>
+        /// Returns the credential the request is authenticated by - the sign-in grant or the
+        /// personal access token behind <see cref="GetCurrentIdentityId"/>.
+        /// </summary>
+        /// <param name="request">The current HTTP request. May be null, which answers from the
+        /// request being served on this call chain.</param>
+        /// <returns>The credential, or <see langword="null"/> when nobody is signed in.</returns>
+        public WebIdentity.SessionCredential GetCurrentCredential(IRequest request)
+        {
+            var current = request ?? WebEx.CurrentRequest;
+
+            return current is null ? null : ResolveCached(current).Credential;
+        }
+
+        /// <summary>
+        /// Resolves the caller of a request once and keeps the answer beside the request.
+        /// </summary>
+        /// <param name="current">The request.</param>
+        /// <returns>The resolved caller.</returns>
+        private ResolvedCaller ResolveCached(IRequest current)
+        {
+            if (_resolved.TryGetValue(current, out var cached))
+            {
+                return cached;
+            }
+
+            var caller = Resolve(current);
+
+            _resolved.AddOrUpdate(current, caller);
+
+            return caller;
+        }
+
+        /// <summary>
+        /// Acts as the supplied identity until the returned scope is closed.
+        /// </summary>
+        /// <param name="identityId">The identity to act as.</param>
+        /// <returns>The scope.</returns>
+        public IDisposable BeginIdentity(Guid identityId)
+        {
+            var previous = _actingIdentityId.Value;
+
+            _actingIdentityId.Value = identityId;
+
+            return new IdentityScope(previous);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether anybody is acting on this call chain.
+        /// </summary>
+        public bool HasCaller => _actingIdentityId.Value.HasValue || WebEx.CurrentRequest is not null;
+
+        /// <summary>
+        /// Reads the request's credential and answers the stored account it stands for - when
+        /// that account may still act, and the credential is still good.
+        /// </summary>
+        /// <remarks>
+        /// The token is one of ours or it names nobody: the sign-in answers with the row it
+        /// authenticated and an external source answers with the stored account its subject is
+        /// linked to, so the token's id is the answer and nothing is matched by name.
+        /// <para>
+        /// The framework asks <see cref="WebIdentity.SessionValidatorBase"/> for every
+        /// authenticated request, which asks <see cref="Accepts"/>; a refused credential reaches
+        /// this method as no identity. A request whose credential no validator accepted (a host
+        /// without the validator registered) is asked <see cref="Accepts"/> here.
+        /// </para>
+        /// </remarks>
+        /// <param name="request">The current HTTP request.</param>
+        /// <returns>The resolved caller.</returns>
+        private ResolvedCaller Resolve(IRequest request)
+        {
+            var credential = WebIdentity.SessionCredential.Read(request, _componentHub);
+            var identityId = credential?.Identity?.Id ?? Guid.Empty;
+
+            if (identityId == Guid.Empty)
+            {
+                return ResolvedCaller.Nobody;
+            }
+
+            // the accepted credential is the one the framework verified; on a refresh the one read
+            // from the request stems from the previous access cookie, which nobody verified
+            if (_accepted.TryGetValue(request, out var accepted))
+            {
+                return new ResolvedCaller(identityId, accepted);
+            }
+
+            return Accepts(credential, request) ? new ResolvedCaller(identityId, credential) : ResolvedCaller.Nobody;
+        }
+
+        /// <summary>
+        /// Decides whether a verified credential may still act.
+        /// </summary>
+        /// <remarks>
+        /// A token is a snapshot that stays valid until it expires, so three questions are asked:
+        /// <list type="bullet">
+        /// <item>The stored account is <see cref="Model.Entities.IdentityState.Active"/>.</item>
+        /// <item>For a sign-in, its grant is not revoked in the token store
+        /// (<see cref="IIdentitySessionManager.Accepts"/>, which also records the session).</item>
+        /// <item>For a personal access token, it is an active row of its owner and its scope
+        /// allows the request (<see cref="IAccessTokenManager.Accepts"/>).</item>
+        /// </list>
+        /// The method does not read the current identity of the request, because it runs inside
+        /// the framework's identity resolution.
+        /// </remarks>
+        /// <param name="credential">The verified credential.</param>
+        /// <param name="request">The request it came with.</param>
+        /// <returns><see langword="true"/> when the credential may act.</returns>
+        public bool Accepts(WebIdentity.SessionCredential credential, IRequest request)
+        {
+            var identityId = credential?.Identity?.Id ?? Guid.Empty;
+
+            if (identityId == Guid.Empty)
+            {
+                return false;
+            }
+
+            var account = CoreHub.IdentityManager?.GetIdentity(identityId);
+
+            if (account is null || account.State != Model.Entities.IdentityState.Active)
+            {
+                return false;
+            }
+
+            var accepted = credential.Personal
+                ? CoreHub.AccessTokenManager?.Accepts(credential, request) ?? false
+                : CoreHub.IdentitySessionManager?.Accepts(credential, request) ?? false;
+
+            if (accepted && request is not null)
+            {
+                _accepted.AddOrUpdate(request, credential);
+            }
+
+            return accepted;
         }
 
         /// <summary>
@@ -150,21 +364,7 @@ namespace KleeneStar.Core.WebManager
                 return null;
             }
 
-            var json = GetValue(request, ISessionManager.TableLayoutScope, tableKey);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return null;
-            }
-
-            try
-            {
-                var stored = JsonSerializer.Deserialize<List<RestApiTableColumnUpdate>>(json, _jsonOptions);
-                return stored?.Where(c => !string.IsNullOrWhiteSpace(c?.Id)).ToList();
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
+            return TableLayout.Parse(GetValue(request, ISessionManager.TableLayoutScope, tableKey));
         }
 
         /// <summary>
@@ -194,18 +394,7 @@ namespace KleeneStar.Core.WebManager
                 return;
             }
 
-            var snapshot = columns
-                .Where(c => !string.IsNullOrWhiteSpace(c?.Id))
-                .Select(c => new RestApiTableColumnUpdate
-                {
-                    Id = c.Id,
-                    Visible = c.Visible,
-                    Width = c.Width
-                })
-                .ToList();
-
-            var json = JsonSerializer.Serialize(snapshot, _jsonOptions);
-            SetValue(request, ISessionManager.TableLayoutScope, tableKey, json);
+            SetValue(request, ISessionManager.TableLayoutScope, tableKey, TableLayout.Serialize(columns) ?? "[]");
         }
 
         /// <summary>
@@ -224,60 +413,7 @@ namespace KleeneStar.Core.WebManager
             IEnumerable<RestApiTableColumn> defaultColumns
         )
         {
-            if (defaultColumns is null)
-            {
-                yield break;
-            }
-
-            var defaults = defaultColumns.ToList();
-            var stored = GetTableLayout(request, tableKey);
-
-            if (stored is null || stored.Count == 0)
-            {
-                foreach (var column in defaults)
-                {
-                    yield return column;
-                }
-
-                yield break;
-            }
-
-            var lookup = defaults.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // emit columns in the stored order, copying visibility/width
-            foreach (var update in stored)
-            {
-                if (string.IsNullOrWhiteSpace(update.Id) ||
-                    !lookup.TryGetValue(update.Id, out var template) ||
-                    !seen.Add(template.Id))
-                {
-                    continue;
-                }
-
-                yield return new RestApiTableColumn
-                {
-                    Id = template.Id,
-                    Name = template.Name,
-                    Label = template.Label,
-                    Icon = template.Icon,
-                    Template = template.Template,
-                    Visible = update.Visible ?? template.Visible,
-                    Width = update.Width ?? template.Width
-                };
-            }
-
-            // append any column the stored layout does not know about (e.g. a
-            // column added in a newer build) at the tail with its default state
-            foreach (var column in defaults)
-            {
-                if (seen.Contains(column.Id))
-                {
-                    continue;
-                }
-
-                yield return column;
-            }
+            return TableLayout.Apply(GetTableLayout(request, tableKey), defaultColumns);
         }
 
         /// <summary>
@@ -286,6 +422,30 @@ namespace KleeneStar.Core.WebManager
         public void Dispose()
         {
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// The scope handed out by <see cref="BeginIdentity"/>. Closing it puts back the
+        /// identity of the enclosing scope, however often it is disposed.
+        /// </summary>
+        /// <param name="previous">The identity that was current when the scope was opened.</param>
+        private sealed class IdentityScope(Guid? previous) : IDisposable
+        {
+            private bool _closed;
+
+            /// <summary>
+            /// Restores the identity of the enclosing scope.
+            /// </summary>
+            public void Dispose()
+            {
+                if (_closed)
+                {
+                    return;
+                }
+
+                _closed = true;
+                _actingIdentityId.Value = previous;
+            }
         }
     }
 }

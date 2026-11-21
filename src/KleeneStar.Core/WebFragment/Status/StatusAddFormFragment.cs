@@ -1,6 +1,10 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,32 +20,43 @@ namespace KleeneStar.Core.WebFragment.Status
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Add>]
     [Cache]
-    public sealed class StatusAddFormFragment : FragmentControlRestFormAdd
+    public sealed class StatusAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the class the status is created in.
+        /// </summary>
+        /// <remarks>
+        /// The form posts to the collection endpoint, whose route names no class, so the
+        /// class of the page the form was opened from has to travel in the payload — a
+        /// status cannot be inserted without it.
+        /// </remarks>
+        public ControlFormItemInputHidden ClassId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Status.ClassId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the state.
         /// </summary>
-        public ControlRestFormItemInputUnique StateName { get; } = new()
+        public ControlDataFormItemInputUnique StateName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.Name),
             Label = _ => "kleenestar.core:status.name.label",
             Placeholder = _ => "kleenestar.core:status.name.placeholder",
             Help = _ => "kleenestar.core:status.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input selection control for the category status resource.
         /// </summary>
-        public ControlRestFormItemInputSelection Category { get; } = new()
+        public ControlDataFormItemInputSelection Category { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.Category),
             Label = _ => "kleenestar.core:status.category.label",
             Placeholder = _ => "kleenestar.core:status.category.placeholder",
             Help = _ => "kleenestar.core:status.category.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Category>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Category>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the state.
@@ -52,21 +67,21 @@ namespace KleeneStar.Core.WebFragment.Status
             Label = _ => "kleenestar.core:status.description.label",
             Placeholder = _ => "kleenestar.core:status.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection StatusState { get; } = new()
+        public StateInputSelection StatusState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Status.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.StatusStateExtensions.Id(global::KleeneStar.Model.Entities.StatusState.Active).ToString(),
             Label = _ => "kleenestar.core:status.state.label",
             Placeholder = _ => "kleenestar.core:status.state.placeholder",
             Help = _ => "kleenestar.core:status.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.State>().ToString())};
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -75,12 +90,13 @@ namespace KleeneStar.Core.WebFragment.Status
         public StatusAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(ClassId);
             Add(StateName);
             Add(Category);
             Add(Description);
             Add(StatusState);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Statuses.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Statuses.Index>();
         }
 
         /// <summary>
@@ -97,6 +113,15 @@ namespace KleeneStar.Core.WebFragment.Status
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is class scoped, so the class it creates the
+            // item in is taken from the request and carried in the hidden input
+            var classId = renderContext?.Request?.GetParameter<ClassIdParameter>()?.Value;
+
+            if (!string.IsNullOrWhiteSpace(classId))
+            {
+                renderContext.SetValue(ClassId, new ControlFormInputValueString(classId));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

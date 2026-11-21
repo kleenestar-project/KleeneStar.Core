@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using WebExpress.WebApp.WebMessageQueue;
 using WebExpress.WebCore;
 using WebExpress.WebCore.WebComponent;
 using WebExpress.WebIndex.Queries;
@@ -24,6 +25,12 @@ namespace KleeneStar.Core.WebManager
         /// Raised after an attachment has been added via <see cref="Add"/>.
         /// </summary>
         public event EventHandler<Attachment> AttachmentAdded;
+
+        /// <summary>
+        /// Raised after the metadata of an attachment has been changed via
+        /// <see cref="SetDescription"/>.
+        /// </summary>
+        public event EventHandler<Attachment> AttachmentUpdated;
 
         /// <summary>
         /// Raised after an attachment has been removed via <see cref="Remove"/>.
@@ -52,8 +59,9 @@ namespace KleeneStar.Core.WebManager
         {
             ArgumentNullException.ThrowIfNull(objectKey);
 
-            using var db = ModelHub.CreateDbContext();
-            var obj = db.Objects.AsNoTracking().FirstOrDefault(o => o.Key == objectKey.Value);
+            // through the object manager, so a key the caller may not read - by its grants
+            // or its security level - has nothing to show
+            var obj = CoreHub.ObjectManager.GetObjectByKey(objectKey.Value);
             if (obj is null)
             {
                 return [];
@@ -110,9 +118,38 @@ namespace KleeneStar.Core.WebManager
         }
 
         /// <summary>
+        /// Returns every version of the supplied file name attached to the object, oldest
+        /// version first.
+        /// </summary>
+        /// <param name="objectId">The object id.</param>
+        /// <param name="fileName">The file name whose chain is read.</param>
+        /// <returns>The versions of the file. The collection may be empty.</returns>
+        public IEnumerable<Attachment> GetVersions(Guid objectId, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return [];
+            }
+
+            return GetAttachments(objectId)
+                .Where(a => string.Equals(a.FileName, fileName, StringComparison.Ordinal))
+                .OrderBy(a => a.Version)
+                .ThenBy(a => a.Created)
+                .ToList();
+        }
+
+        /// <summary>
         /// Attaches a file to the object. Returns <see langword="null"/> when the object
         /// does not exist or the file name is empty.
         /// </summary>
+        /// <remarks>
+        /// The name is the identity of a file across its versions, so attaching a name the object
+        /// already carries stores the next version of that file rather than a second file; the
+        /// number itself is assigned by <see cref="ModelHub.Add"/>, which reads the chain and
+        /// writes the row against one context. A new version inherits the description of the one
+        /// it supersedes unless the caller supplies its own, because the description says what the
+        /// <i>file</i> is - re-uploading it does not make that unknown again.
+        /// </remarks>
         /// <param name="objectId">The id of the object the file is attached to.</param>
         /// <param name="fileName">The original file name including its extension.</param>
         /// <param name="contentType">The MIME content type of the file.</param>
@@ -142,7 +179,7 @@ namespace KleeneStar.Core.WebManager
                 ContentType = contentType,
                 Size = content?.LongLength ?? 0,
                 Content = content,
-                Description = description,
+                Description = description ?? GetVersions(objectId, fileName).LastOrDefault()?.Description,
                 State = AttachmentState.Active,
                 Created = DateTime.UtcNow,
                 Updated = DateTime.UtcNow
@@ -150,9 +187,41 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Add(attachment);
             AttachmentAdded?.Invoke(this, attachment);
-            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.attachment.created");
+            Announce();
+            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.attachment.created", CoreHub.ObjectManager.GetObject(objectId));
 
             return attachment;
+        }
+
+        /// <summary>
+        /// Changes the human-readable description of an attachment. Raises
+        /// <see cref="AttachmentUpdated"/> when a row existed.
+        /// </summary>
+        /// <remarks>
+        /// This is the write path behind the in-place editor of the file surfaces. An earlier
+        /// version keeps the description it was given - it is a record of what was - so the edit a
+        /// user makes lands on the row they named rather than on the chain.
+        /// </remarks>
+        /// <param name="attachmentId">The id of the attachment whose description changes.</param>
+        /// <param name="description">The new description. An empty or blank value clears it.</param>
+        /// <returns>The changed attachment, or <see langword="null"/> when no row matches.</returns>
+        public Attachment SetDescription(Guid attachmentId, string description)
+        {
+            var next = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+            // the write goes straight to the column instead of through a loaded entity, so
+            // editing a caption never reads the file's payload back out of the database
+            var changed = ModelHub.SetAttachmentDescription(attachmentId, next);
+
+            if (changed is null)
+            {
+                return null;
+            }
+
+            AttachmentUpdated?.Invoke(this, changed);
+            Announce();
+
+            return changed;
         }
 
         /// <summary>
@@ -173,9 +242,33 @@ namespace KleeneStar.Core.WebManager
 
             ModelHub.Remove(existing);
             AttachmentRemoved?.Invoke(this, existing);
-            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.attachment.deleted");
+            Announce();
+            TryAddNotification("kleenestar.core:notification.title.deleted", "kleenestar.core:notification.attachment.deleted", CoreHub.ObjectManager.GetObject(existing.ObjectId));
 
             return true;
+        }
+
+        /// <summary>
+        /// Announces that the attachments changed, so every file surface currently on screen
+        /// re-queries its endpoint.
+        /// </summary>
+        /// <remarks>
+        /// The REST endpoint the file view reads is not the one that wrote the change - an upload
+        /// posts to the page route and an edit to the attachment endpoint - so nothing else
+        /// announces it. Without this a file another user attached, or a caption they corrected,
+        /// stays invisible until the page is loaded again.
+        /// </remarks>
+        private static void Announce()
+        {
+            try
+            {
+                _ = DataChangedNotifier.NotifyAsync<Attachment>(DataChangeOperation.Updated);
+            }
+            catch
+            {
+                // the announcement is best-effort; a host without a message queue must not turn a
+                // successful write into a failed request
+            }
         }
 
         /// <summary>
@@ -192,11 +285,11 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="titleKey">The i18n key of the notification title.</param>
         /// <param name="messageKey">The i18n key of the notification message.</param>
-        private static void TryAddNotification(string titleKey, string messageKey)
+        private static void TryAddNotification(string titleKey, string messageKey, object subject)
         {
             try
             {
-                CoreHub.AddNotification(titleKey, messageKey, 5000);
+                CoreHub.AddNotification(titleKey, messageKey, subject);
             }
             catch
             {

@@ -156,7 +156,7 @@ namespace KleeneStar.Core.WebManager
 
             SlaAdded?.Invoke(this, policy);
 
-            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.sla.created");
+            TryAddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.sla.created", policy);
 
             return this;
         }
@@ -176,7 +176,7 @@ namespace KleeneStar.Core.WebManager
 
             SlaUpdated?.Invoke(this, policy);
 
-            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.sla.updated");
+            TryAddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.sla.updated", policy);
 
             return this;
         }
@@ -184,11 +184,11 @@ namespace KleeneStar.Core.WebManager
         // Wraps CoreHub.AddNotification so that callers running outside a fully wired
         // WebExpress host (in particular unit tests using the in-memory fixture) do not
         // crash on the unavailable global ComponentHub.
-        private static void TryAddNotification(string titleKey, string messageKey)
+        private static void TryAddNotification(string titleKey, string messageKey, object subject)
         {
             try
             {
-                CoreHub.AddNotification(titleKey, messageKey, 5000);
+                CoreHub.AddNotification(titleKey, messageKey, subject);
             }
             catch
             {

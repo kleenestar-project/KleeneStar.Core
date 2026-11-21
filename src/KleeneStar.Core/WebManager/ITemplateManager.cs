@@ -64,6 +64,61 @@ namespace KleeneStar.Core.WebManager
         IEnumerable<Template> GetTemplates(IQuery<Template> query, IQueryContext context);
 
         /// <summary>
+        /// Returns the field presets a template applies.
+        /// </summary>
+        /// <remarks>
+        /// The keys are field names as the object create endpoint expects them. The description
+        /// of the template is the text an object created from it starts with and is answered as
+        /// the <c>Description</c> preset unless the template carries one of its own.
+        /// </remarks>
+        /// <param name="templateId">The id of the template whose presets are read.</param>
+        /// <returns>The presets, keyed by field name. The map may be empty.</returns>
+        IReadOnlyDictionary<string, string> GetPresets(Guid templateId);
+
+        /// <summary>
+        /// Returns the presets a template stores, without the description the template
+        /// contributes on its own (<see cref="GetPresets"/>).
+        /// </summary>
+        /// <param name="templateId">The id of the template whose presets are read.</param>
+        /// <returns>The stored presets, keyed by field name. The map may be empty.</returns>
+        IReadOnlyDictionary<string, string> GetStoredPresets(Guid templateId);
+
+        /// <summary>
+        /// Returns the classes a template serves: the class it is bound to first, then the
+        /// further classes in the order they were assigned.
+        /// </summary>
+        /// <param name="templateId">The template.</param>
+        /// <returns>The class ids; empty for an unknown template.</returns>
+        IReadOnlyList<Guid> GetClassIds(Guid templateId);
+
+        /// <summary>
+        /// Returns the classes the given templates serve, read in one query.
+        /// </summary>
+        /// <param name="templates">The templates.</param>
+        /// <returns>
+        /// The class ids per template id: the class it is bound to first, then the further
+        /// classes.
+        /// </returns>
+        IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> GetClassIds(IEnumerable<Template> templates);
+
+        /// <summary>
+        /// Returns the templates that serve a class as a further class, beside the class they
+        /// are bound to.
+        /// </summary>
+        /// <param name="classId">The class.</param>
+        /// <returns>The template ids.</returns>
+        IReadOnlyList<Guid> GetFurtherTemplateIds(Guid classId);
+
+        /// <summary>
+        /// Replaces the further classes of a template. The class the template is bound to is
+        /// never stored as a further class.
+        /// </summary>
+        /// <param name="templateId">The template.</param>
+        /// <param name="classIds">The further classes.</param>
+        /// <returns>The current instance for method chaining.</returns>
+        ITemplateManager SetFurtherClasses(Guid templateId, IEnumerable<Guid> classIds);
+
+        /// <summary>
         /// Adds a new template to the collection.
         /// </summary>
         /// <param name="templateEntry">

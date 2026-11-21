@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebIcon;
 using WebExpress.WebCore.WebMessage;
@@ -28,6 +29,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendars._classid_
         private readonly IUri _editFormUri;
         private readonly IUri _cloneFormUri;
         private readonly IUri _deleteFormUri;
+        private readonly IUri _permissionFormUri;
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -37,6 +39,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendars._classid_
             _editFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Calendar._calendarid_.Edit>();
             _cloneFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Calendar._calendarid_.Clone>();
             _deleteFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Calendar._calendarid_.Delete>();
+            _permissionFormUri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Calendar._calendarid_.Permission>();
         }
 
         /// <summary>
@@ -210,8 +213,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendars._classid_
             var deleteUri = _deleteFormUri?
                 .BindParameters(request)
                 .BindParameters(new CalendarIdParameter(row.Id));
+            var permissionUri = _permissionFormUri?
+                .BindParameters(request)
+                .BindParameters(new CalendarIdParameter(row.Id));
 
-            var iconTheme = request?.ApplicationContext?.DefaultTheme?.IconTheme ?? TypeIconTheme.Light;
 
             yield return new RestApiOptionHeader(request)
             {
@@ -220,21 +225,30 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendars._classid_
 
             yield return new RestApiOptionEdit(request)
             {
-                Icon = new IconPen(iconTheme),
+                Icon = new IconPen(),
                 PrimaryAction = new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
             };
 
             yield return new RestApiOptionClone(request)
             {
-                Icon = new IconClone(iconTheme),
+                Icon = new IconClone(),
                 PrimaryAction = new ActionModal("modal-form", cloneUri, TypeModalSize.ExtraLarge)
+            };
+
+            yield return new RestApiOptionCustom(request)
+            {
+                // a payload string is not a control: nothing on the client resolves a key in
+                // it, so the label is translated here like the built-in options translate theirs
+                Text = I18N.Translate(request, "kleenestar.core:calendar.permission.label"),
+                Icon = new IconUserShield(),
+                PrimaryAction = new ActionModal("modal-form", permissionUri, TypeModalSize.ExtraLarge)
             };
 
             yield return new RestApiOptionSeparator(request);
 
             yield return new RestApiOptionDelete(request)
             {
-                Icon = new IconTrash(iconTheme),
+                Icon = new IconTrash(),
                 PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
             };
         }

@@ -1,4 +1,5 @@
-﻿using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebControl;
+using WebExpress.WebApp.WebData;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -25,9 +26,9 @@ namespace KleeneStar.Core.WebFragment.Workspace
         /// Gets the configuration tile that provides REST access to 
         /// workspace data.
         /// </summary>
-        public ControlRestTile Tile { get; } = new ControlRestTile()
+        public ControlDataTile Tile { get; } = new ControlDataTile()
         {
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Tile>()
+            ServiceFactory = _ => DataServiceDescriptor.Data(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Tile>().ToString())
         };
 
         /// <summary>
@@ -37,6 +38,11 @@ namespace KleeneStar.Core.WebFragment.Workspace
         public WorkspaceViewTileFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            // the tiles are the view here rather than a block among others, so they take the
+            // height they are handed instead of growing with their number: the tiles then
+            // scroll above chrome that stays instead of pushing the pager out of reach
+            Tile.Fill = _ => true;
+
             Icon = _ => new IconTile();
             Title = _ => "kleenestar.core:view.tile.title";
             Tile.Bind = _ => new Binding()
@@ -48,11 +54,17 @@ namespace KleeneStar.Core.WebFragment.Workspace
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);

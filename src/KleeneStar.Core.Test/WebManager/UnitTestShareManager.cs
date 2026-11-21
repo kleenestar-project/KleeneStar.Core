@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
@@ -179,7 +178,7 @@ namespace KleeneStar.Core.Test.WebManager
 
             CoreHub.ShareManager.Add(ObjectId, IdentityId);
 
-            ObjectShare? raised = null;
+            ObjectShare raised = null;
             CoreHub.ShareManager.ShareRemoved += (_, s) => raised = s;
 
             var first = CoreHub.ShareManager.Remove(ObjectId, IdentityId);

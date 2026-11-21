@@ -1,5 +1,7 @@
 ﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebControl;
 using KleeneStar.Model;
+using KleeneStar.Core.WebRestApi;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +9,9 @@ using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebUri;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
 {
@@ -45,6 +49,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
         }
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Retrieves a collection of tile items representing classes that match the 
         /// specified query and workspace context.
         /// </summary>
@@ -78,7 +88,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
                 {
                     Id = x.Id.ToString(),
                     Title = x.Name,
-                    Text = x.Description,
+                    Text = ProseText.ToPlainText(x.Description),
                     Image = x.Icon?.Uri?.ToString()
                     //Options = GetOptions(x, request)
                 });
@@ -122,6 +132,34 @@ namespace KleeneStar.Core.WWW.Api._1_.Classes._workspacekey_
             //        category.Value
             //    );
             //}
+
+            return query;
+        }
+
+        /// <summary>
+        /// Applies the quickfilter identifiers the view's filter binding carries - the object
+        /// type the sidebar picked and the state quick filters.
+        /// </summary>
+        /// <param name="filters">
+        /// A collection of filter identifiers.
+        /// </param>
+        /// <param name="query">
+        /// The query object to which the filters will be applied.
+        /// </param>
+        /// <param name="request">
+        /// The request that provides the operational context.
+        /// </param>
+        /// <returns>
+        /// A query representing the filtered set of classes.
+        /// </returns>
+        protected override IQuery<Model.Entities.Class> Filter(IEnumerable<string> filters, IQuery<Model.Entities.Class> query, IRequest request)
+        {
+            query = ClassKindFilter.Apply(filters, query);
+
+            if (filters?.Any(f => string.Equals(f, "qf_active", StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                query = query.Where(x => x.State == Model.Entities.ClassState.Active);
+            }
 
             return query;
         }

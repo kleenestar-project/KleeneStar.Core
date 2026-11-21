@@ -10,7 +10,7 @@ namespace KleeneStar.Core.WWW.Settings.Identity._identityid_
     /// <summary>
     /// Represents a page for deleting an identity.
     /// </summary>
-    [WebIcon<IconTrashAlt>]
+    [WebIcon<IconTrash>]
     [Title("kleenestar.core:setting.identity.delete.title")]
     [Scope<IScopeGeneral>]
     public sealed class Delete : IPage<VisualTreeWebApp>, IScope

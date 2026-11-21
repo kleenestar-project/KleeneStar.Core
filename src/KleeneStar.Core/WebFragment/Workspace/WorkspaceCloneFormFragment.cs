@@ -1,136 +1,26 @@
-﻿using KleeneStar.Core.WebParameter;
-using KleeneStar.Core.WebPolicies;
-using WebExpress.WebApp.WebApiControl;
-using WebExpress.WebApp.WebFragment;
+﻿using KleeneStar.Core.WebPolicies;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
-using WebExpress.WebCore.WebHtml;
-using WebExpress.WebUI.WebControl;
-using WebExpress.WebUI.WebPage;
+using WebExpress.WebUI.WebIcon;
 
 namespace KleeneStar.Core.WebFragment.Workspace
 {
     /// <summary>
-    /// Represents a clone form fragment for a workspace.
+    /// The wizard that clones a workspace (<see cref="WorkspaceWizardFragmentBase"/>).
     /// </summary>
+    /// <remarks>
+    /// The steps start on the values <c>/api/1/workspaces</c> answers in clone mode: key and name
+    /// of the original with a copy suffix, its categories, description, inheritance, access
+    /// modifier, seal and tenants, and the state active.
+    /// </remarks>
     [Section<SectionContentPreferences>]
-    [Policy<WorkspaceAdminPolicy>]
     [Scope<global::KleeneStar.Core.WWW.Workspaces._workspacekey_.Clone>]
+    [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceAdminPolicy>>]
     [Cache]
-    public sealed class WorkspaceCloneFormFragment : FragmentControlRestFormClone
+    public sealed class WorkspaceCloneFormFragment : WorkspaceWizardFragmentBase
     {
-        /// <summary>
-        /// Gets the input text control for specifying the name of the workspace.
-        /// </summary>
-        public ControlRestFormItemInputUnique WorkspaceName { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Workspace.Name),
-            Label = _ => "kleenestar.core:workspace.name.label",
-            Placeholder = _ => "kleenestar.core:workspace.name.placeholder",
-            Help = _ => "kleenestar.core:workspace.name.help",
-            Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.UniqueName>()
-        };
-
-        /// <summary>
-        /// Gets the input text control for specifying the key of the workspace.
-        /// </summary>
-        public ControlRestFormItemInputUnique Key { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Workspace.Key),
-            Label = _ => "kleenestar.core:workspace.key.label",
-            Placeholder = _ => "kleenestar.core:workspace.key.placeholder",
-            Help = _ => "kleenestar.core:workspace.key.help",
-            Required = _ => true,
-            MaxLength = _ => 10,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.UniqueKey>()
-        };
-
-        /// <summary>
-        /// Gets the input tag definition for the workspace category field.
-        /// </summary>
-        public ControlFormItemInputTag Category { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Workspace.Categories),
-            Label = _ => "kleenestar.core:workspace.category.label",
-            Placeholder = _ => "kleenestar.core:workspace.category.placeholder",
-            Help = _ => "kleenestar.core:workspace.category.help"
-        };
-
-        /// <summary>
-        /// Gets the input text control for specifying the description of the workspace.
-        /// </summary>
-        public ControlFormItemInputText Description { get; } = new ControlFormItemInputText()
-        {
-            Name = _ => nameof(Model.Entities.Workspace.Description),
-            Label = _ => "kleenestar.core:workspace.description.label",
-            Placeholder = _ => "kleenestar.core:workspace.description.placeholder",
-            Format = _ => TypeEditTextFormat.Wysiwyg,
-            Required = _ => false
-        };
-
-        /// <summary>
-        /// Gets the input selection control for the state.
-        /// </summary>
-        public ControlRestFormItemInputSelection WorkspaceState { get; } = new()
-        {
-            Name = _ => nameof(Model.Entities.Workspace.State),
-            Label = _ => "kleenestar.core:workspace.state.label",
-            Placeholder = _ => "kleenestar.core:workspace.state.placeholder",
-            Help = _ => "kleenestar.core:workspace.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.State>()
-        };
-
-        /// <summary>
-        /// Gets the input selection control for the inherited workspace.
-        /// </summary>
-        public ControlRestFormItemInputSelection InheritedSelection { get; } = new()
-        {
-            Name = _ => "InheritedId",
-            Label = _ => "kleenestar.core:workspace.inherited.label",
-            Placeholder = _ => "kleenestar.core:workspace.inherited.placeholder",
-            Help = _ => "kleenestar.core:workspace.inherited.help",
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_.Inherited>()
-        };
-
-        /// <summary>
-        /// Gets the input selection control for the access modifier.
-        /// </summary>
-        public ControlRestFormItemInputSelection AccessModifierSelection { get; } = new()
-        {
-            Name = _ => "AccessModifier",
-            Label = _ => "kleenestar.core:workspace.accessmodifier.label",
-            Placeholder = _ => "kleenestar.core:workspace.accessmodifier.placeholder",
-            Help = _ => "kleenestar.core:workspace.accessmodifier.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.AccessModifier>()
-        };
-
-        /// <summary>
-        /// Gets the checkbox control for the sealed flag.
-        /// </summary>
-        public ControlFormItemInputCheck WorkspaceSealed { get; } = new()
-        {
-            Name = _ => "Sealed",
-            Label = _ => "kleenestar.core:workspace.sealed.label",
-            Help = _ => "kleenestar.core:workspace.sealed.help",
-            Layout = _ => TypeLayoutCheck.Switch
-        };
-
-        /// <summary>
-        /// Gets the tenant management input.
-        /// </summary>
-        public ControlFormItemInputTag Tenant { get; } = new()
-        {
-            Name = _ => "Tenant",
-            Label = _ => "kleenestar.core:workspace.tenant.label",
-            Placeholder = _ => "kleenestar.core:workspace.tenant.placeholder",
-            Help = _ => "kleenestar.core:workspace.tenant.help"
-        };
-
-
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
@@ -138,40 +28,9 @@ namespace KleeneStar.Core.WebFragment.Workspace
         public WorkspaceCloneFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Add(Key);
-            Add(WorkspaceName);
-            Add(Category);
-            Add(Description);
-            Add(InheritedSelection);
-            Add(AccessModifierSelection);
-            Add(WorkspaceSealed);
-            Add(Tenant);
-            Add(WorkspaceState);
-
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workspaces.Index>();
-            ItemId = renderContext =>
-            {
-                var key = renderContext.Request.GetParameter<WorkspaceKeyParameter>();
-                var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(key?.Value);
-                return workspace?.Id.ToString();
-            };
-        }
-
-        /// <summary>
-        /// Renders the control as an HTML node.
-        /// </summary>
-        /// <param name="renderContext">
-        /// The context in which the control is rendered.
-        /// </param>
-        /// <param name="visualTree">
-        /// The visual tree representing the control's structure.
-        /// </param>
-        /// <returns>
-        /// An HTML node representing the rendered control.
-        /// </returns>
-        public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
-        {
-            return base.Render(renderContext, visualTree);
+            Mode = _ => TypeRestFormMode.Clone;
+            FinishLabel = _ => "webexpress.webapp:clone.label";
+            FinishIcon = _ => new IconClone();
         }
     }
 }

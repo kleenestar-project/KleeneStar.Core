@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System.Globalization;
@@ -7,6 +7,7 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
+using WebExpress.WebCore.WebIcon;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -15,12 +16,18 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
-    /// Object-scoped property card that groups the lifecycle attributes of the object
-    /// (creation timestamp, last update timestamp, and lifecycle state) inside a single
-    /// <see cref="ControlPanelCard"/>.
+    /// The lifecycle section of the reference zone, grouping the creation timestamp, the last
+    /// update timestamp and the lifecycle state of the object.
     /// </summary>
+    /// <remarks>
+    /// An archived object is reported in the section header as well, where a folded section
+    /// still shows it: the archived state changes how everything else on the page should be
+    /// read. An active object is the normal case and gets no badge - a badge that is always
+    /// there stops being a signal.
+    /// </remarks>
     [Section<SectionPropertyPrimary>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
     [Order(9)]
     [Cache]
     public sealed class ObjectPropertyLifecycleCardFragment : FragmentControlPanel
@@ -55,27 +62,39 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            var card = new ControlPanelCard("object-property-lifecycle-card")
+            // an archived object is the one lifecycle state that changes how everything else on
+            // the page should be read, so it is reported in the header where a folded section
+            // still shows it. an active object is the normal case and gets no badge - a badge
+            // that is always there stops being a signal.
+            var archived = @object.State == WorkspaceState.Archived;
+
+            var section = new ControlSection("object-property-lifecycle-section")
             {
                 Header = _ => "kleenestar.core:object.property.lifecycle.header",
-                Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.None, PropertySpacing.Space.Two)
+                HeaderIcon = _ => new IconClockRotateLeft(),
+                Layout = _ => TypeLayoutSection.Rule,
+                Badge = archived ? ctx => I18N.Translate(ctx, @object.State.Text()) : null,
+                BadgeColor = archived ? _ => new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Secondary) : null
             };
 
-            card.Add(new ControlAttribute("object-property-created")
+            section.Add(new ControlAttribute("object-property-created")
             {
                 Icon = _ => new IconCalendarPlus(),
                 Key = _ => "kleenestar.core:object.created.label",
-                Value = _ => @object.Created.ToString("g", CultureInfo.InvariantCulture)
+                // the card is read in the visitor's language, so the timestamp is written in
+                // the visitor's culture as well - an invariant 07/25/2026 on a German page
+                // reads as a different date than the one that is meant
+                Value = ctx => @object.Created.ToString("g", Culture(ctx))
             });
 
-            card.Add(new ControlAttribute("object-property-updated")
+            section.Add(new ControlAttribute("object-property-updated")
             {
                 Icon = _ => new IconClockRotateLeft(),
                 Key = _ => "kleenestar.core:object.updated.label",
-                Value = _ => @object.Updated.ToString("g", CultureInfo.InvariantCulture)
+                Value = ctx => @object.Updated.ToString("g", Culture(ctx))
             });
 
-            card.Add(new ControlPanelFlex
+            section.Add(new ControlFlex
             (
                 "object-property-state",
                 new ControlIcon
@@ -101,7 +120,18 @@ namespace KleeneStar.Core.WebFragment.Object
                 Justify = _ => TypeJustifiedFlex.Start
             });
 
-            return card.Render(renderContext, visualTree);
+            return section.Render(renderContext, visualTree);
+        }
+
+        /// <summary>
+        /// Returns the culture the request is rendered in, falling back to the invariant
+        /// culture when the request carries none.
+        /// </summary>
+        /// <param name="renderContext">The render context.</param>
+        /// <returns>The culture.</returns>
+        private static CultureInfo Culture(IRenderControlContext renderContext)
+        {
+            return renderContext?.Request?.Culture ?? CultureInfo.InvariantCulture;
         }
 
         /// <summary>

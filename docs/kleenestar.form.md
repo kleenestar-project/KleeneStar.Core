@@ -56,19 +56,19 @@ The **KleeneStar** data model forms the structural foundation for form managemen
 ║                                          │ 1                    │ *       │          ║
 ║          ┌───────────┐ *           * ┌───▼───┐ 1          * ┌───▼───┐ 0,1 │          ║
 ║          │ Workspace ├───────────────► Class ◄──────────────┤ Field ├─────┘          ║
-║          └─────┬─────┘               └───▲───┘              └───▲───┘                ║
-║                │ 1                       │ 1                    │ 1                  ║
-║                └────────────────────┐    │                      │                    ║
-║                                     │ *  │ *                    │ *                  ║
-║    ┌───────────┐  ┌──────┐ *    2 ┌─▼────┴─┐ 1            * ┌───┴───┐                ║
-║    │ Dashboard │  │ Link ├────────► Object ├────────────────► Value │                ║
-║    └─────┬─────┘  └──────┘        └─▲────▲─┘                └───▲───┘                ║
-║          │ 1                        │ 1  │ 1                    │ 1                  ║
-║          │              ┌───────────┘    │                      │                    ║
-║          │ *            │ *              │ *                    │ *                  ║
-║     ┌────▼───┐     ┌────┴────┐      ┌────┴────┐         ┌───────┴───────┐            ║
-║     │ Widget │     │ Comment │      │ Version │         │ FileReference │            ║
-║     └────────┘     └─────────┘      └─────────┘         └───────────────┘            ║
+║          └─────┬─────┘               └───▲───┘              └─▲───▲─┘                ║
+║                │ 1                       │ 1                  │ 1 │ 1                ║
+║                └────────────────────┐    │              ┌─────┘   └──────┐           ║
+║                                     │ *  │ *            │ *              │ *         ║
+║    ┌─────────┐    ┌──────┐ *    2 ┌─▼────┴─┐ 1    * ┌───┴───┐        ┌───┴────┐      ║
+║    │ Insight │    │ Link ├────────► Object ◄────────┤ Value │        │ Change │      ║
+║    └────┬────┘    └──────┘        └─▲──▲──▲┘        └───────┘        └───┬────┘      ║
+║         │ 1                       1 │  │ 1│ 1                            │ *         ║
+║         │              ┌────────────┘  │  └──────────────┐    ┌──────────┘           ║
+║         │ *            │ *             │ *               │ *  │ 1                    ║
+║  ┌──────▼──────┐  ┌────┴────┐    ┌─────┴─────────┐     ┌─┴────▼─┐                    ║
+║  │ InsightView │  │ Comment │    │ FileReference │     │ Commit │                    ║
+║  └─────────────┘  └─────────┘    └───────────────┘     └────────┘                    ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
@@ -210,7 +210,7 @@ The tabular overview shows key attributes per class such as name, description, a
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Classes                                                           │║
@@ -255,7 +255,7 @@ Access to the form management page is via Manage Forms in class administration o
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / Forms                                                  │║
@@ -297,7 +297,7 @@ The Form Designer is the central tool for designing and maintaining forms within
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk / Incident / IncidentForm                                           │║
@@ -343,7 +343,7 @@ When editing an existing form, all properties are prefilled and can be adjusted.
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔FormAddEditModal════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Form / Edit Form                                                 │║     │║
@@ -387,7 +387,7 @@ Cloning creates a new form with key properties inherited from the original, incl
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔FormCloneModal══════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Clone Form                                                           │║     │║
@@ -429,7 +429,7 @@ Deleting a form is a critical operation handled via a dedicated modal to avoid a
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔FormDeleteModal═════════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Delete Form                                                          │║     │║

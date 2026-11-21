@@ -17,13 +17,23 @@ namespace KleeneStar.Core.WWW.Api._1_.Calendars
     /// Provides CRUD operations for calendar items via a REST API.
     /// </summary>
     [Cache]
-    public sealed class Index : RestApiCrud<Calendar>
+    public sealed class Index : global::KleeneStar.Core.WebRestApi.RestApiCrudClassStructure<Calendar>
     {
         /// <summary>
         /// Initializes a new instance of the class.
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Returns the class a record belongs to, which decides who may change it.
+        /// </summary>
+        /// <param name="item">The record.</param>
+        /// <returns>The class id.</returns>
+        protected override System.Guid? ClassOf(Calendar item)
+        {
+            return item?.ClassId;
         }
 
         /// <summary>

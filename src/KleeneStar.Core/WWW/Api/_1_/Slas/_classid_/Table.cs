@@ -211,7 +211,6 @@ namespace KleeneStar.Core.WWW.Api._1_.Slas._classid_
                 .BindParameters(request)
                 .BindParameters(new SlaIdParameter(row.Id));
 
-            var iconTheme = request?.ApplicationContext?.DefaultTheme?.IconTheme ?? TypeIconTheme.Light;
 
             yield return new RestApiOptionHeader(request)
             {
@@ -220,13 +219,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Slas._classid_
 
             yield return new RestApiOptionEdit(request)
             {
-                Icon = new IconPen(iconTheme),
+                Icon = new IconPen(),
                 PrimaryAction = new ActionModal("modal-form", editUri, TypeModalSize.ExtraLarge)
             };
 
             yield return new RestApiOptionClone(request)
             {
-                Icon = new IconClone(iconTheme),
+                Icon = new IconClone(),
                 PrimaryAction = new ActionModal("modal-form", cloneUri, TypeModalSize.ExtraLarge)
             };
 
@@ -234,7 +233,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Slas._classid_
 
             yield return new RestApiOptionDelete(request)
             {
-                Icon = new IconTrash(iconTheme),
+                Icon = new IconTrash(),
                 PrimaryAction = new ActionModal("modal-form", deleteUri, TypeModalSize.Small)
             };
         }

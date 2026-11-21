@@ -18,6 +18,11 @@ namespace KleeneStar.Core.WebPolicies
     [Permission<ClassImportPermission>()]
     [Permission<ClassExportPermission>()]
     [Permission<ClassManagePermissionsPermission>()]
+    [Permission<SecurityLevelReadPermission>()]
+    [Permission<SecurityLevelCreatePermission>()]
+    [Permission<SecurityLevelUpdatePermission>()]
+    [Permission<SecurityLevelDeletePermission>()]
+    [Permission<SecurityLevelClonePermission>()]
     public sealed class ClassAdminPolicy : IIdentityPolicy
     {
     }

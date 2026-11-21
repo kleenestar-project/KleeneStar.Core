@@ -40,7 +40,7 @@ namespace KleeneStar.Core.WWW.Priority._priorityid_
                 .Concat(new WorkspaceKeyUriPathSegmentVariable<WorkspaceKeyParameter>()
                 {
                     Value = workspace?.Key,
-                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Objects._workspacekey_.Index>()
+                    Uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>()
                     .BindParameters(renderContext.Request)
                 })
                 .Concat(new PriorityIdUriPathSegmentVariable<PriorityIdParameter>()

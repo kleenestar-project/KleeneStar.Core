@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using ObjectEntity = KleeneStar.Model.Entities.Object;
@@ -149,7 +148,7 @@ namespace KleeneStar.Core.Test.WebManager
             var tag = CoreHub.ObjectTagManager.Add(ObjectId, "network", null);
             Assert.NotNull(tag);
 
-            ObjectTag? raised = null;
+            ObjectTag raised = null;
             CoreHub.ObjectTagManager.TagRemoved += (_, t) => raised = t;
 
             var first = CoreHub.ObjectTagManager.Remove(tag.Id);

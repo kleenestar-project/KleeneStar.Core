@@ -51,8 +51,7 @@ namespace KleeneStar.Core.WWW.Profile
             }
                 .AddColumn(I18N.Translate(renderContext, "kleenestar.core:profile.notifications.column.event"))
                 .AddColumn(I18N.Translate(renderContext, "kleenestar.core:profile.notifications.column.email"))
-                .AddColumn(I18N.Translate(renderContext, "kleenestar.core:profile.notifications.column.inapp"))
-                .AddColumn(I18N.Translate(renderContext, "kleenestar.core:profile.notifications.column.slack"));
+                .AddColumn(I18N.Translate(renderContext, "kleenestar.core:profile.notifications.column.inapp"));
 
             AddRow(table, renderContext, "kleenestar.core:profile.notifications.event.mention");
             AddRow(table, renderContext, "kleenestar.core:profile.notifications.event.assign");
@@ -79,14 +78,12 @@ namespace KleeneStar.Core.WWW.Profile
         private static void AddRow(IControlTable table, IRenderContext renderContext, string labelKey)
         {
             var on = I18N.Translate(renderContext, "kleenestar.core:profile.notifications.on");
-            var off = I18N.Translate(renderContext, "kleenestar.core:profile.notifications.off");
 
             table.AddRow
             (
                 new ControlTableCell() { Text = _ => I18N.Translate(renderContext, labelKey) },
                 new ControlTableCellPanel().Add(new ControlText() { Text = _ => on }),
-                new ControlTableCellPanel().Add(new ControlText() { Text = _ => on }),
-                new ControlTableCellPanel().Add(new ControlText() { Text = _ => off })
+                new ControlTableCellPanel().Add(new ControlText() { Text = _ => on })
             );
         }
     }

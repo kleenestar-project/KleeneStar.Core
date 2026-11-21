@@ -1,4 +1,3 @@
-using KleeneStar.Core.Test;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 
@@ -95,7 +94,7 @@ namespace KleeneStar.Core.Test.WebManager
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void Add_EmptyFileName_ReturnsNull(string? fileName)
+        public void Add_EmptyFileName_ReturnsNull(string fileName)
         {
             Seed(nameof(Add_EmptyFileName_ReturnsNull));
 
@@ -126,7 +125,7 @@ namespace KleeneStar.Core.Test.WebManager
         {
             Seed(nameof(Add_RaisesAttachmentAddedEvent));
 
-            Attachment? raised = null;
+            Attachment raised = null;
             CoreHub.AttachmentManager.AttachmentAdded += (_, a) => raised = a;
 
             var added = CoreHub.AttachmentManager.Add(ObjectId, "evented.txt", "text/plain", SampleContent(), null, null);
@@ -225,7 +224,7 @@ namespace KleeneStar.Core.Test.WebManager
 
             var added = CoreHub.AttachmentManager.Add(ObjectId, "to-remove.txt", "text/plain", SampleContent(), null, null);
 
-            Attachment? raised = null;
+            Attachment raised = null;
             CoreHub.AttachmentManager.AttachmentRemoved += (_, a) => raised = a;
 
             var removed = CoreHub.AttachmentManager.Remove(added.Id);
@@ -247,6 +246,125 @@ namespace KleeneStar.Core.Test.WebManager
             var removed = CoreHub.AttachmentManager.Remove(Guid.NewGuid());
 
             Assert.False(removed);
+        }
+
+        /// <summary>
+        /// The first upload of a name is version 1, and every further upload of the same name
+        /// continues that chain instead of starting a second file.
+        /// </summary>
+        [Fact]
+        public void Add_SameFileName_ContinuesTheVersionChain()
+        {
+            Seed(nameof(Add_SameFileName_ContinuesTheVersionChain));
+
+            var first = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), "first cut", null);
+            var second = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), null, null);
+            var third = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), null, null);
+
+            Assert.Equal(1, first.Version);
+            Assert.Equal(2, second.Version);
+            Assert.Equal(3, third.Version);
+
+            var versions = CoreHub.AttachmentManager.GetVersions(ObjectId, "plan.pdf").ToList();
+
+            Assert.Equal(3, versions.Count);
+            Assert.Equal([1, 2, 3], versions.Select(x => x.Version));
+        }
+
+        /// <summary>
+        /// A different name is a different file, so it starts its own chain at version 1.
+        /// </summary>
+        [Fact]
+        public void Add_DifferentFileName_StartsItsOwnChain()
+        {
+            Seed(nameof(Add_DifferentFileName_StartsItsOwnChain));
+
+            CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), null, null);
+            var other = CoreHub.AttachmentManager.Add(ObjectId, "budget.xlsx", "text/csv", SampleContent(), null, null);
+
+            Assert.Equal(1, other.Version);
+            Assert.Single(CoreHub.AttachmentManager.GetVersions(ObjectId, "budget.xlsx"));
+        }
+
+        /// <summary>
+        /// A new version inherits the description of the version it supersedes, because the
+        /// description says what the file is - re-uploading it does not make that unknown again.
+        /// An explicit description still wins.
+        /// </summary>
+        [Fact]
+        public void Add_NewVersion_InheritsTheDescription()
+        {
+            Seed(nameof(Add_NewVersion_InheritsTheDescription));
+
+            CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), "rollback plan", null);
+
+            var inherited = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), null, null);
+            var explicitly = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), "revised plan", null);
+
+            Assert.Equal("rollback plan", inherited.Description);
+            Assert.Equal("revised plan", explicitly.Description);
+        }
+
+        /// <summary>
+        /// SetDescription persists the new text, raises <c>AttachmentUpdated</c> and leaves the
+        /// other versions of the file alone.
+        /// </summary>
+        [Fact]
+        public void SetDescription_WritesOnlyTheNamedVersion()
+        {
+            Seed(nameof(SetDescription_WritesOnlyTheNamedVersion));
+
+            var first = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), "first cut", null);
+            var second = CoreHub.AttachmentManager.Add(ObjectId, "plan.pdf", "application/pdf", SampleContent(), null, null);
+
+            Attachment raised = null;
+            CoreHub.AttachmentManager.AttachmentUpdated += (_, a) => raised = a;
+
+            var changed = CoreHub.AttachmentManager.SetDescription(second.Id, "  approved by the board  ");
+
+            Assert.NotNull(changed);
+            Assert.Equal("approved by the board", changed.Description);
+
+            var reloaded = CoreHub.AttachmentManager.GetAttachment(second.Id);
+
+            Assert.Equal("approved by the board", reloaded.Description);
+            Assert.Equal("first cut", CoreHub.AttachmentManager.GetAttachment(first.Id).Description);
+
+            // the caption is written without the payload passing through, so the file itself has
+            // to be exactly what it was
+            Assert.Equal(SampleContent(), reloaded.Content);
+            Assert.Equal(2, reloaded.Version);
+            Assert.NotNull(raised);
+            Assert.Equal(second.Id, raised.Id);
+        }
+
+        /// <summary>
+        /// A blank description clears the text rather than storing whitespace, so the file
+        /// surfaces fall back to the placeholder of their editor.
+        /// </summary>
+        [Fact]
+        public void SetDescription_Blank_ClearsTheDescription()
+        {
+            Seed(nameof(SetDescription_Blank_ClearsTheDescription));
+
+            var added = CoreHub.AttachmentManager.Add(ObjectId, "notes.txt", "text/plain", SampleContent(), "draft", null);
+
+            var changed = CoreHub.AttachmentManager.SetDescription(added.Id, "   ");
+
+            Assert.NotNull(changed);
+            Assert.Null(changed.Description);
+            Assert.Null(CoreHub.AttachmentManager.GetAttachment(added.Id).Description);
+        }
+
+        /// <summary>
+        /// SetDescription of an unknown id returns null and is a no-op.
+        /// </summary>
+        [Fact]
+        public void SetDescription_UnknownAttachment_ReturnsNull()
+        {
+            Seed(nameof(SetDescription_UnknownAttachment_ReturnsNull));
+
+            Assert.Null(CoreHub.AttachmentManager.SetDescription(Guid.NewGuid(), "anything"));
         }
 
         /// <summary>

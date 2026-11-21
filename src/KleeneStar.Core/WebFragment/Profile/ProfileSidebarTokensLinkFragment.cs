@@ -1,4 +1,4 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -15,20 +15,22 @@ namespace KleeneStar.Core.WebFragment.Profile
     /// Sidebar link to the personal access tokens page.
     /// </summary>
     [Section<SectionSidebarPrimary>]
+    [Order(2)]
     [Scope<global::KleeneStar.Core.WWW.Profile.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Account>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tenant>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Appearance>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Notifications>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Security>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Integrations>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Data>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Delete>]
     [Cache]
     public sealed class ProfileSidebarTokensLinkFragment : FragmentControlSidebarItemLink
     {
-        private static readonly IUri _uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Profile.Tokens>();
+        private static readonly IUri _uri = CoreHub.GetUri<global::KleeneStar.Core.WWW.Profile.Tokens.Index>();
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -40,7 +42,7 @@ namespace KleeneStar.Core.WebFragment.Profile
         public ProfileSidebarTokensLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconKey(TypeIconTheme.Light);
+            Icon = _ => new IconKey();
             Text = _ => "kleenestar.core:profile.tokens.title";
             Uri = _ => _uri;
             Active = renderContext => ProfileSidebarUriHelper.IsActive(renderContext, _uri)

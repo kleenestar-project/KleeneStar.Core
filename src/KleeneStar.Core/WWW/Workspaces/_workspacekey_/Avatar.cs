@@ -1,4 +1,6 @@
-﻿using KleeneStar.Core.WebPolicies;
+﻿using KleeneStar.Core.WebParameter;
+using KleeneStar.Core.WebPermission;
+using KleeneStar.Core.WebPermissions;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebCore.WebAttribute;
@@ -14,7 +16,7 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
     /// </summary>
     [WebIcon<IconPencil>]
     [Title("kleenestar.core:workspace.avatar.title")]
-    [Policy<WorkspaceAdminPolicy>]
+    //[Policy<WorkspaceAdminPolicy>] - a page-level policy refuses everybody; see PageAuthorization
     [Scope<IScopeGeneral>]
     public sealed class Avatar : IPage<VisualTreeWebApp>, IScope
     {
@@ -32,6 +34,15 @@ namespace KleeneStar.Core.WWW.Workspaces._workspacekey_
         /// <param name="visualTree">The visual tree of the web application.</param>
         public void Process(IRenderContext renderContext, VisualTreeWebApp visualTree)
         {
+            // the picture is part of the workspace, so changing it asks what editing it asks
+            var workspace = CoreHub.WorkspaceManager.GetWorkspaceByKey(renderContext.Request.GetParameter<WorkspaceKeyParameter>()?.Value);
+
+            PageAuthorization.Demand
+            (
+                renderContext.Request,
+                typeof(WorkspaceUpdatePermission),
+                PageAuthorization.ChainOf(workspace)
+            );
         }
     }
 }

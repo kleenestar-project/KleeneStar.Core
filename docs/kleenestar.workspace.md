@@ -63,19 +63,19 @@ The **KleeneStar** Core Data Model forms the structural foundation for managing 
 ║                                          │ 1                    │ *       │          ║
 ║          ┌───────────┐ *           * ┌───▼───┐ 1          * ┌───▼───┐ 0,1 │          ║
 ║          │ Workspace ├───────────────► Class ◄──────────────┤ Field ├─────┘          ║
-║          └─────┬─────┘               └───▲───┘              └───▲───┘                ║
-║                │ 1                       │ 1                    │ 1                  ║
-║                └────────────────────┐    │                      │                    ║
-║                                     │ *  │ *                    │ *                  ║
-║    ┌───────────┐  ┌──────┐ *    2 ┌─▼────┴─┐ 1            * ┌───┴───┐                ║
-║    │ Dashboard │  │ Link ├────────► Object ├────────────────► Value │                ║
-║    └─────┬─────┘  └──────┘        └─▲────▲─┘                └───▲───┘                ║
-║          │ 1                        │ 1  │ 1                    │ 1                  ║
-║          │              ┌───────────┘    │                      │                    ║
-║          │ *            │ *              │ *                    │ *                  ║
-║     ┌────▼───┐     ┌────┴────┐      ┌────┴────┐         ┌───────┴───────┐            ║
-║     │ Widget │     │ Comment │      │ Version │         │ FileReference │            ║
-║     └────────┘     └─────────┘      └─────────┘         └───────────────┘            ║
+║          └─────┬─────┘               └───▲───┘              └─▲───▲─┘                ║
+║                │ 1                       │ 1                  │ 1 │ 1                ║
+║                └────────────────────┐    │              ┌─────┘   └──────┐           ║
+║                                     │ *  │ *            │ *              │ *         ║
+║    ┌─────────┐    ┌──────┐ *    2 ┌─▼────┴─┐ 1    * ┌───┴───┐        ┌───┴────┐      ║
+║    │ Insight │    │ Link ├────────► Object ◄────────┤ Value │        │ Change │      ║
+║    └────┬────┘    └──────┘        └─▲──▲──▲┘        └───────┘        └───┬────┘      ║
+║         │ 1                       1 │  │ 1│ 1                            │ *         ║
+║         │              ┌────────────┘  │  └──────────────┐    ┌──────────┘           ║
+║         │ *            │ *             │ *               │ *  │ 1                    ║
+║  ┌──────▼──────┐  ┌────┴────┐    ┌─────┴─────────┐     ┌─┴────▼─┐                    ║
+║  │ InsightView │  │ Comment │    │ FileReference │     │ Commit │                    ║
+║  └─────────────┘  └─────────┘    └───────────────┘     └────────┘                    ║
 ║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
@@ -206,12 +206,15 @@ These mockups serve as a blueprint for the final design and specify navigation, 
 
 The global workspace dropdown is a central and permanently available component in the application header. It allows for quick and context-aware switching between different workspaces without leaving the current view. The control displays the name of the active workspace and, upon interaction, opens a dropdown menu that provides a searchable list of all available workspaces. To increase efficiency, recently used workspaces are prominently placed.
 
-The dropdown is personal to the calling identity. With no search term it surfaces the most recently opened workspaces first, newest first; favorites are marked with a leading star, and any favorites that have not been opened recently are appended so they are never hidden. A visit is counted whenever the identity opens a workspace **or any of its subpages** — its content view, an object detail page, or its class management — so the workspace the user is actually working in stays at the top. As soon as a search term is entered the dropdown switches to a full-text search across every workspace; when the identity has no bookmarks yet it falls back to the full list so the control is never empty. Both signals are backed by a per-identity `WorkspaceBookmark` (a `(Owner, Workspace)` pair carrying a `Favorite` flag and a `LastVisited` timestamp): opening a workspace or one of its subpages advances its `LastVisited`, and the favorite flag is toggled from the workspace management table's overflow menu. The bookmark is the workspace analogue of the saved-search `Starred` + `LastUsed` model.
+The dropdown is personalized for each user. Without a search term, it displays recently opened workspaces first, ordered by the latest visit. Favorites feature a leading star icon. Older favorites appear at the bottom of the list so they are never hidden.
+The system registers a visit whenever a user opens a workspace or its subpages. These subpages include the content view, object detail pages, and class management. This mechanism ensures active workspaces remain at the very top.
+Entering a search term instantly switches the dropdown to a full-text search across all workspaces. If a user has no bookmarks yet, the dropdown displays the full workspace list so the control is never empty.
+Both features rely on a per-identity `WorkspaceBookmark`. This is an (`Owner`, `Workspace`) pair containing a Favorite flag and a LastVisited timestamp. Accessing a workspace or its subpages updates the `LastVisited` time. Users can toggle the favorite flag via the overflow menu in the workspace management table. This bookmark model mirrors the `Starred` and `LastUsed` logic used for saved searches.
 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└───────────────────¦────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb───────┌─┴────────────────┐───────────────────────────────────────────────┐║
 ║│ / Service Desk  │┌────────────────┐│                                               │║
@@ -254,7 +257,7 @@ The main component of this page is a tabular list of all workspaces. Each row re
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Workspaces                                                                       │║
@@ -297,7 +300,7 @@ The sidebar visualizes essential metadata at a glance, such as the name, an icon
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└────────────────────────────────────────────────────────────────────────────────────┘║
 ║┌Breadcrumb──────────────────────────────────────────────────────────────────────────┐║
 ║│ / Service Desk                                                                     │║
@@ -340,7 +343,7 @@ The content of the modal dynamically adapts to the respective use case. In edit 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspaceAddEditModal═══════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Add Workspace / Edit Workspace                                       │║     │║
@@ -381,7 +384,7 @@ In addition to editing textual and structural properties of a workspace, there i
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspaceIconModal══════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Edit Workspace Icon                                                  │║     │║
@@ -427,7 +430,7 @@ After confirmation, the new workspace is created and automatically integrated in
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspaceCloneModal═════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Clone Workspace                                                      │║     │║
@@ -470,7 +473,7 @@ The dialog window clearly indicates which workspace is intended for deletion by 
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspaceDeleteModal════════════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│ Delete Workspace                                                     │║     │║
@@ -515,7 +518,7 @@ Assignments are displayed in a tabular overview and can be adjusted or removed a
 ```
 ╔WebAppPage════════════════════════════════════════════════════════════════════════════╗
 ║┌Header──────────────────────────────────────────────────────────────────────────────┐║
-║│ * KleeneStar     Workspace ▼   Dashboard ▼       [+ AddObject]         [Search]    │║
+║│ * KleeneStar     Workspace ▼   Insight ▼         [+ AddObject]         [Search]    │║
 ║└─────╔WorkspacePermissionsModal═══════════════════════════════════════════════╗─────┘║
 ║┌Bread║┌Form──────────────────────────────────────────────────────────────────┐║─────┐║
 ║│ / Se║│  Manage Permissions for 'Sales Operations'                           │║     │║
@@ -647,6 +650,14 @@ These permissions are bundled into logical policies to represent typical use cas
 |`workspace_view_policy`    |Grants read-only access to a workspace and its contents.    |`workspace_read`, `workspace_read_content`
 |`workspace_creator_policy` |A global policy that allows the creation of new workspaces. |`workspace_create`
 
+### What the reference implementation enforces
+
+- **Built-in groups.** Besides the groups an administrator creates, two exist in every installation and nobody is a stored member of them: *Signed-in users* (`Group.AuthenticatedId`), which every caller that resolves to an account belongs to, and *Anonymous* (`Group.AnonymousId`), which every caller belongs to, signed in or not. A profile naming *Anonymous* is how a workspace is made public; a profile naming *Signed-in users* is how it is opened to every account. Neither can be deleted.
+- **Default profiles.** A workspace created from a template - and every demo workspace of a fresh installation - starts with two profiles: *Admin* → `workspace_admin_policy`, *Signed-in users* → `workspace_edit_policy`. Nothing is granted to *Anonymous*, so an anonymous visitor is excluded.
+- **A workspace profile reaches its contents.** `workspace_read_content` reads the objects and the structure they are drawn with, `workspace_write_content` changes the objects (edit, comment, attach, relate, transition, restore), and `workspace_update` - held by `workspace_admin_policy` alone - administers the structure of the classes: the class pages, fields, forms, workflows, priorities, statuses, agreements, calendars, security levels and templates. A profile on the class itself (`class_…`, `object_…`) still counts.
+- **Unadministered is open for use, closed for administration.** A workspace without any profile refuses nobody its content, but its administration belongs to the members of the *Admin* group until a profile says otherwise.
+- **Enforced everywhere.** Every page guards the route it names (`RouteAuthorization`, applied by `PageGuardFragment`), every object read and every workspace list is narrowed to what the caller may read (`ContentVisibility`, in the object manager), and every endpoint that writes asks before it writes (`ContentAuthorization`, `RestApiCrudClassStructure`) and answers `403`. Creating a workspace needs a signed-in caller.
+
 ## Conclusion
 
-The document "KleeneStar Workspace Management" provides the conceptual foundation for a reference implementation. It outlines core functional requirements across data modeling, architecture, and user interfaces, and defines the lifecycle of a workspace including a flexible permissions model based on context-specific profiles. As a high-level blueprint, it intentionally omits technical detail in key areas. Topics such as persistent storage, concurrent access handling, and validation logic are left open and must be defined during implementation. The focus lies on core functional flows. Long-running operations like cloning or archiving large workspaces, asynchronous processing, and user notifications are not covered. Similarly, retention logic from the state diagram and the audit system design remain unspecified. The document thus offers a solid conceptual base while leaving critical implementation aspects open. The reference implementation is expected to close these gaps with concrete solutions and validate the practical feasibility of the proposed models.
+The document "KleeneStar Workspace Management" provides the conceptual foundation for a reference implementation. It outlines core functional requirements across data modeling, architecture, and user interfaces, and defines the lifecycle of a workspace including a flexible permissions model based on context-specific profiles. As a high-level blueprint, it intentionally omits technical detail in key areas. Concurrent access handling is left open and must be defined during implementation, and so are long-running operations like cloning or archiving large workspaces, asynchronous processing, and the retention logic from the state diagram. The focus lies on core functional flows. The other gaps have since been closed by the reference implementation and are no longer open: **persistent storage** is EF Core through `KleeneStarDbContext`; **validation** is the gate of `/api/1/workspaces`, which demands key and name on a create, refuses the reserved keys and refuses duplicates of either (see *The required fields are actually required* in [kleenestar.workspacetemplate.md](kleenestar.workspacetemplate.md)); **user notifications** are raised by the `WorkspaceManager` on every change through `CoreHub.AddNotification`; and the **audit system** is the installation-wide, hash-chained log of [kleenestar.audit.md](kleenestar.audit.md), which subscribes to the workspace manager's events centrally.

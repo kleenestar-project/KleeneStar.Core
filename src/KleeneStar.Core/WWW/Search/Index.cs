@@ -1,4 +1,5 @@
-using System;
+using KleeneStar.Core.WebFragment.Search;
+using KleeneStar.Core.WebRestApi;
 using WebExpress.WebApp.WebPage;
 using WebExpress.WebApp.WebScope;
 using WebExpress.WebCore.WebAttribute;
@@ -14,8 +15,9 @@ namespace KleeneStar.Core.WWW.Search
     /// </summary>
     /// <remarks>
     /// When invoked with a <c>use</c> query parameter (the id of a saved search that was
-    /// run), the page stamps that saved search as just used so the navigation dropdown's
-    /// "recently used" ordering stays current.
+    /// run, see <see cref="SavedSearchRun"/>), the page is titled by that saved search and, for
+    /// its owner, stamps it as just used so the navigation dropdown's "recently used" ordering
+    /// stays current.
     /// </remarks>
     [WebIcon<IconMagnifyingGlass>]
     [Title("kleenestar.core:search.title")]
@@ -39,12 +41,24 @@ namespace KleeneStar.Core.WWW.Search
             visualTree.Title = "kleenestar.core:search.title";
             visualTree.Content.MainPanel.Headline.Title = "kleenestar.core:search.headline";
 
-            // when a saved search was run, stamp it as just used so the dropdown's
-            // recently-used ordering reflects it.
-            var use = renderContext?.Request?.GetParameter("use")?.Value;
-            if (Guid.TryParse(use, out var savedSearchId))
+            // a saved search the caller may see names the page; one they may not see is not
+            // run at all, so the page stays the plain search
+            var request = renderContext?.Request;
+            var savedSearch = SavedSearchRun.Resolve(request);
+
+            if (savedSearch is null)
             {
-                CoreHub.SavedSearchManager.RecordUse(savedSearchId);
+                return;
+            }
+
+            visualTree.Title = savedSearch.Name;
+            visualTree.Content.MainPanel.Headline.Title = savedSearch.Name;
+
+            // the recently-used list is the owner's; running a search somebody shared does not
+            // reorder theirs
+            if (SavedSearchAuthorization.IsOwner(savedSearch, request))
+            {
+                CoreHub.SavedSearchManager.RecordUse(savedSearch.Id);
             }
         }
     }

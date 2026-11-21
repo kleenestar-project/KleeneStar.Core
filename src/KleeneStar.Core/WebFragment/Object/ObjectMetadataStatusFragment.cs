@@ -1,4 +1,4 @@
-using KleeneStar.Core.WebManager;
+﻿using KleeneStar.Core.WebManager;
 using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System.Linq;
@@ -12,28 +12,35 @@ using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
-    // The entity type names collide with the KleeneStar.Core.WWW.* namespace segments of
-    // the same name; alias them inside the namespace block so Field/Status/Workflow resolve
-    // to the model entities here (see also the Calendar namespace-collision note).
+    // The entity type name collides with the KleeneStar.Core.WWW.Field namespace segment of
+    // the same name; alias it inside the namespace block so Field resolves to the model
+    // entity here (see also the Calendar namespace-collision note).
     using Field = KleeneStar.Model.Entities.Field;
-    using Status = KleeneStar.Model.Entities.Status;
-    using Workflow = KleeneStar.Model.Entities.Workflow;
 
     /// <summary>
-    /// Headline-metadata fragment that surfaces the current workflow status of the object on
-    /// <see cref="WWW.Object._objectkey_.Index"/> as a read-only pill badge.
+    /// Headline-metadata fragment that surfaces the current workflow status of the object as
+    /// a read-only pill badge, on the reading views and on the reduced view
+    /// <see cref="WWW.Issue._objectkey_.Preview"/> a master-detail pane shows.
     /// </summary>
     /// <remarks>
     /// The status is resolved exactly like the interactive
     /// <see cref="ObjectPropertyWorkflowCardFragment"/> (the persisted
     /// <see cref="Model.Entities.Value"/> of every workflow-backed field matched against the
-    /// attached workflow's statuses), but rendered as a plain badge without the split button,
-    /// dropdown or workflow modal — so the status is displayed but cannot be changed from
-    /// here. Returns <c>null</c> when the class has no workflow field or none has a value yet,
-    /// keeping the metadata line clean.
+    /// attached workflow's statuses by <see cref="IWorkflowManager.ResolveStatus"/>) and
+    /// carries the color of the status category, but is rendered as a plain badge without the
+    /// split button, dropdown or workflow modal — so the status is displayed but cannot be
+    /// changed from here. Returns <c>null</c> when the class has no workflow field or none has
+    /// a value yet, keeping the metadata line clean.
+    /// <para>
+    /// A read-only badge is exactly what the reduced view needs, so it renders there unchanged:
+    /// the detail pane never receives the property column that holds the interactive control,
+    /// and this fragment is what puts the status in front of a reader without it.
+    /// </para>
     /// </remarks>
     [Section<SectionHeadlineMetadata>]
-    [Scope<global::KleeneStar.Core.WWW.Object._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Order(0)]
     [Cache]
     public sealed class ObjectMetadataStatusFragment : FragmentControlPanel
@@ -106,7 +113,7 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
-            var panel = new ControlPanelFlex("object-metadata-status")
+            var panel = new ControlFlex("object-metadata-status")
             {
                 Layout = _ => TypeLayoutFlex.Default,
                 Align = _ => TypeAlignFlex.Center,
@@ -137,7 +144,9 @@ namespace KleeneStar.Core.WebFragment.Object
         /// <returns>The badge control, or <c>null</c>.</returns>
         private IControl BuildStatusBadge(Model.Entities.Object @object, Field field)
         {
-            var workflow = _workflowManager.GetWorkflow(field.WorkflowId.Value);
+            // the states are needed to resolve the payload, so the structural load is used
+            // rather than the shallow header read
+            var workflow = _workflowManager.GetWorkflowWithStructure(field.WorkflowId.Value);
 
             if (workflow is null)
             {
@@ -145,7 +154,7 @@ namespace KleeneStar.Core.WebFragment.Object
             }
 
             var value = _valueManager.GetValue(@object.Id, field.Id);
-            var current = ResolveStatus(workflow, value?.Data);
+            var current = _workflowManager.ResolveStatus(workflow, value?.Data);
             var currentLabel = current?.Name
                 ?? (string.IsNullOrWhiteSpace(value?.Data) ? null : value.Data);
 
@@ -154,46 +163,17 @@ namespace KleeneStar.Core.WebFragment.Object
                 return null;
             }
 
+            var color = current?.Category?.Color;
+
             return new ControlBadge("object-metadata-status-" + field.Id.ToString("N"))
             {
                 Value = _ => currentLabel,
                 Pill = _ => TypePillBadge.Pill,
-                BackgroundColor = _ => new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Info),
+                BackgroundColor = _ => string.IsNullOrWhiteSpace(color)
+                    ? new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Info)
+                    : new PropertyColorBackgroundBadge(color),
                 Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.One, PropertySpacing.Space.None, PropertySpacing.Space.None)
             };
-        }
-
-        /// <summary>
-        /// Resolves the persisted field value to a <see cref="Status"/> of the supplied
-        /// workflow. The match is attempted first by normalised name (case-, space- and
-        /// punctuation-insensitive) and then by status id. Returns <c>null</c> when the value
-        /// is empty or no status matches, in which case the raw value is shown verbatim.
-        /// </summary>
-        /// <param name="workflow">The workflow whose statuses are searched.</param>
-        /// <param name="data">The persisted value payload of the workflow field.</param>
-        /// <returns>The matching status, or <c>null</c>.</returns>
-        private static Status ResolveStatus(Workflow workflow, string data)
-        {
-            if (string.IsNullOrWhiteSpace(data) || workflow.Statuses is null)
-            {
-                return null;
-            }
-
-            var normalized = Normalize(data);
-
-            return workflow.Statuses.FirstOrDefault(s => Normalize(s.Name) == normalized)
-                ?? workflow.Statuses.FirstOrDefault(s => string.Equals(s.Id.ToString(), data, System.StringComparison.OrdinalIgnoreCase));
-        }
-
-        /// <summary>
-        /// Reduces a string to its lower-cased alphanumeric characters so loosely-formatted
-        /// status slugs can be compared against status names.
-        /// </summary>
-        /// <param name="value">The value to normalise.</param>
-        /// <returns>The normalised string.</returns>
-        private static string Normalize(string value)
-        {
-            return new string((value ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
         }
     }
 }

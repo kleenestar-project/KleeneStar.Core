@@ -140,6 +140,53 @@ namespace KleeneStar.Core.WebManager
         WorkspaceBookmark RecordVisit(Guid ownerId, Guid workspaceId);
 
         /// <summary>
+        /// Returns the home page of the supplied workspace: its dedicated document.
+        /// </summary>
+        /// <remarks>
+        /// The home page is a dedicated document referenced by <see cref="Workspace.HomeId"/> and
+        /// created by <see cref="EnsureHome"/>. It is not part of the page tree, takes no comments
+        /// and is read and edited on the document overview. The read goes through the object
+        /// manager; a caller without read access gets <see langword="null"/>.
+        /// </remarks>
+        /// <param name="workspaceId">The id of the workspace.</param>
+        /// <returns>The home document, or <see langword="null"/>.</returns>
+        Model.Entities.Object GetHome(Guid workspaceId);
+
+        /// <summary>
+        /// Returns whether the supplied object is the home page of its workspace.
+        /// </summary>
+        /// <param name="workspaceId">The id of the workspace.</param>
+        /// <param name="objectId">The id of the document.</param>
+        /// <returns><see langword="true"/> when the document is the workspace's home page.</returns>
+        bool IsHome(Guid workspaceId, Guid objectId);
+
+        /// <summary>
+        /// Returns whether the supplied object is the home page of its workspace.
+        /// </summary>
+        /// <param name="object">The object, or <see langword="null"/>.</param>
+        /// <returns><see langword="true"/> when the object is the workspace's home page.</returns>
+        bool IsHome(Model.Entities.Object @object);
+
+        /// <summary>
+        /// Makes sure the supplied workspace has its dedicated home page, creating it when it has
+        /// none.
+        /// </summary>
+        /// <remarks>
+        /// The page is written into a document class of the workspace with the effective renderer
+        /// prose; without such a class the class <c>Page</c> is created. A referenced document with
+        /// a parent, children or comments is not adopted; it stays a page of the tree and a new
+        /// home page is created.
+        /// </remarks>
+        /// <param name="workspaceId">The id of the workspace.</param>
+        /// <param name="identityId">The author of a page that is created. Empty when not known.</param>
+        /// <param name="culture">The language a created page is written in; null for the
+        /// installation's own.</param>
+        /// <param name="template">The template whose home page content is written, or
+        /// <see langword="null"/> for the generic page.</param>
+        /// <returns>The home page, or <see langword="null"/> when the workspace does not exist.</returns>
+        Model.Entities.Object EnsureHome(Guid workspaceId, Guid identityId = default, System.Globalization.CultureInfo culture = null, WebWorkspaceTemplate.IWorkspaceTemplate template = null);
+
+        /// <summary>
         /// Adds a workspace to the workspace manager.
         /// </summary>
         /// <param name="workspace">The workspace to add. Cannot be null.</param>

@@ -21,6 +21,7 @@ namespace KleeneStar.Core.WWW.Settings
     [WebIcon<IconDatabase>]
     [SettingGroup<SettingGroupSystemGeneral>()]
     [SettingSection(SettingSection.Secondary)]
+    [Policy<global::WebExpress.WebCore.WebPolicies.AuthenticatedAccessPolicy>]
     [Scope<IScopeAdmin>]
     public sealed class DB : ISettingPage<VisualTreeWebAppSetting>, IScopeAdmin
     {
@@ -39,7 +40,7 @@ namespace KleeneStar.Core.WWW.Settings
         public void Process(IRenderContext renderContext, VisualTreeWebAppSetting visualTree)
         {
             // retrieve provider and connection string
-            var dbInfo = ModelHub.DatabaseConfig;
+            var dbInfo = ModelHub.DatabaseSettings;
             var providerName = dbInfo.Provider ?? string.Empty;
             var connectionString = dbInfo.ConnectionString ?? string.Empty;
 

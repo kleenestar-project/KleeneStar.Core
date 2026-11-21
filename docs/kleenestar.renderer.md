@@ -1,0 +1,166 @@
+![KleeneStar](https://raw.githubusercontent.com/kleenestar-project/.github/main/docs/assets/img/banner.png)
+
+# KleeneStar Renderer Concept
+
+An object type answers one question — *where do the objects of this class appear?* Documents form a page tree, blog posts a timeline, issues a filterable work-item list, assets an inventory. It says nothing about the second question, which is just as consequential for the person in front of the screen: *what happens when I open one of them?*
+
+For a long time the two answers were fused. A document was a page tree entry **and** a WYSIWYG surface; an issue was a work-item list entry **and** a field mask. Nothing in the model said so — it was simply which fragments happened to be scoped to which routes. The consequence was that a structured record and a written page could not stand side by side in the same tree, because being in the tree already meant being prose.
+
+A **renderer** is the second answer, made explicit and made a choice. `Class.Renderer` names the surface the objects of the class are read and written through, independently of `Class.Kind`. A class of kind *document* with the **form** renderer stands in the same page tree, in the same order, under the same parent, and opens as an input mask; a class of kind *document* with the **prose** renderer opens in the WYSIWYG editor, as it always has.
+
+Kind and renderer are orthogonal in the sense that matters — neither is derived from the other, and the kind decides nothing about how an object opens beyond supplying a default. What a kind *may* do is refuse: a kind that cannot be read coherently through a surface says which surfaces it accepts, and **the blog kind accepts prose alone**. That is one line on the kind descriptor, and it is the only such refusal the core ships.
+
+Renderers bundle:
+- A key persisted per class, chosen from an open, plugin-extensible catalog — there is no enum.
+- A default per object kind, so a class that names none behaves the way its kind always has.
+- An offer both sides agree on: the renderer names the kinds it can draw, the kind names the renderers it accepts, and empty means all on either side.
+- Two surfaces per renderer, the reading one and the writing one, contributed as ordinary fragments.
+- A condition that decides between them, so several renderers may be scoped to one route and exactly one draws.
+
+## The Model: One Nullable Column
+
+```
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║                          KleeneStar Kind / Renderer Matrix                           ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                      ║
+║                   Class.Kind  ──────────────►  where the objects appear              ║
+║                   Class.Renderer ───────────►  how one of them opens                 ║
+║                                                                                      ║
+║                  ┌────────────┬───────────────────┬───────────────────┐              ║
+║                  │            │   prose           │   form            │              ║
+║                  ├────────────┼───────────────────┼───────────────────┤              ║
+║                  │ document   │ page tree,        │ page tree,        │              ║
+║                  │            │ WYSIWYG   (def.)  │ input mask        │              ║
+║                  │ blog       │ timeline,         │ —                 │              ║
+║                  │            │ WYSIWYG   (def.)  │                   │              ║
+║                  │ issue      │ —                 │ work items,       │              ║
+║                  │            │                   │ input mask (def.) │              ║
+║                  │ asset      │ —                 │ inventory,        │              ║
+║                  │            │                   │ input mask (def.) │              ║
+║                  └────────────┴───────────────────┴───────────────────┘              ║
+║                                                                                      ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+`Class.Renderer` is a nullable string of at most 64 characters, and `ObjectRenderer` holds the two core keys (`prose`, `form`) exactly the way `ObjectKind` holds the kind keys. It is a free string and not an enum for the same reason: a plugin must be able to contribute one without a migration, and a key must survive the plugin being uninstalled.
+
+There are two deliberate asymmetries with the kind beside it.
+
+**Unset is a state, not a default.** `ObjectRenderer.Normalize` maps blank to `null`, where `ObjectKind.Normalize` maps blank to *issue*. There is no renderer that is right for every kind — prose is right for a document and wrong for an issue — so "not set" means *follow the kind*, and the kind descriptor is asked what that is (`IObjectKind.DefaultRenderer`). A class that names nothing therefore keeps behaving the way its kind always has, and keeps following along when its kind is changed later.
+
+**The renderer is not stamped onto the objects.** `Class.Kind` is copied onto every `Object.Kind` on create and update, because the overviews query by it. The renderer is read live from the class on every request, because it is presentation rather than data: switching a class from prose to form changes how its objects open on the next page load, and nothing has to be rewritten.
+
+## The Catalog
+
+`ObjectRendererManager` is the semantic lookup behind the persisted key, and the sibling of `ObjectKindManager` in every respect: a component manager on `CoreHub` that collects every **public sealed** `IObjectRenderer` with a public parameterless constructor of any plugin (WebExpress's `PluginTypeCatalog`, the core's renderers among them), takes a renderer that is no type through `Register`, and is deliberately not a gate on persistence — an unknown key survives in the data layer.
+
+An `IObjectRenderer` carries a key, a label, a description, an icon, an order, and the kinds it serves. **An empty `Kinds` collection means every kind**, including kinds registered later. That is how the form renderer is declared: a mask needs nothing of a kind beyond its classes having fields and forms, and every class has both, so it serves every kind and is what an add-on kind gets for free. Prose declares *document* and *blog*, the two kinds that have a body to write. Serving a kind is not the same as being offered on it, which is the next section.
+
+### The Offer Is Two-Sided
+
+A renderer is offered on a kind only when **both** say so. Beside `IObjectRenderer.Kinds` stands its mirror image, `IObjectKind.Renderers`, and it too reads *empty means all* — every renderer that serves the kind, including ones registered later.
+
+The two are not redundant, because they state different things. A renderer knows which kinds it is *capable* of drawing: prose declines the issue kind because an issue has no body a WYSIWYG editor could be the whole of. A kind knows which renderers it is *willing* to be read through: **the blog kind names prose and nothing else.** A post is an article on a timeline — a headline, a date, an author and a body somebody wrote — and that body is what the timeline shows, what a reader opens the post for, and what the editor exists to write. A filled-in sheet is not an article; it would put something on the timeline that cannot be read as one.
+
+Neither statement can be made from the other side. Declaring it on the renderer would mean the form renderer enumerating the kinds it may serve — which is precisely what the empty collection exists to avoid, and it would be wrong again the moment a kind is added. Declaring it on the kind makes the restriction hold against surfaces the blog kind never saw: **a kind that names renderers is a closed list**, so a renderer an add-on contributes later is not offered on it until the kind names it too. That is the point of naming any.
+
+The document kind deliberately does *not* do this, which is what makes the blog's restriction a statement rather than a habit. A document is a page in a tree, and a form-rendered handbook page standing in that tree beside the prose ones is a coherent thing. Only the timeline insists on prose.
+
+Resolution is one method, `ResolveKey`, and it has four answers in order:
+
+| The class…                                   | resolves to
+|----------------------------------------------|-----------------------------------------
+| names a renderer its kind offers             | that renderer
+| names none                                   | `IObjectKind.DefaultRenderer` of its kind
+| names one whose plugin is gone               | `IObjectKind.DefaultRenderer` of its kind
+| names one its kind does not offer            | `IObjectKind.DefaultRenderer` of its kind
+
+The third row is why the catalog does not gate persistence. A class whose renderer was contributed by an uninstalled plugin keeps the key in the database and reads as its kind meanwhile; reinstalling the plugin restores it without anybody having reconfigured anything.
+
+The fourth row is the same forbearance applied to a pairing the endpoint refuses to store: a class may have been given a renderer before its kind declined that one, or have been moved to a kind that does. Resolution cannot lean on the write gate, because the fragments that draw an object are gated on the renderer — a key none of them answers to would leave the object with no reading view at all. So the stored key is kept and read as unset, and a blog class carrying `form` opens as prose.
+
+## Fragments Decide, Not Pages
+
+No page knows about renderers. `WWW/Document/{objectkey}/Index` sets a title and a breadcrumb, and did so before renderers existed; the same is true of the edit route beside it. What changed is that **two** fragments are now scoped to each of those routes, and a condition decides between them:
+
+| Route                        | prose renderer                     | form renderer
+|------------------------------|------------------------------------|-------------------------------
+| `/document/{key}`            | `ObjectProseReadFragment`          | `ObjectFormReadFragment`
+| `/document/{key}` (headline) | `ObjectProseEditButtonFragment`    | `ObjectFormEditButtonFragment`
+| `/document/{key}/edit`       | `ObjectProseEditorPageFragment`    | `ObjectFormEditFragment`
+
+The three form fragments are scoped to the matching `/blog/{key}` routes as well, where they never draw as the core ships — the blog kind accepts no mask, so the prose fragment beside them always wins. The scope is kept rather than dropped because a `[Scope]` says where a fragment *could* stand and the kind says whether it does: a plugin that re-registers the blog kind with the mask among its renderers gets the sheet without editing a fragment.
+
+`ObjectRendererCondition` is the whole mechanism: it resolves the object the request addresses, asks the catalog which renderer its class renders through, and answers whether that is the one this fragment draws. It resolves that **once per request** — every gated fragment on a page asks the same question of the same request, and there are six of them on a document route, so reading the object and its class per fragment would multiply one page load into a dozen lookups before the winner reads the object again in its own render. The answer is kept beside the request in a `ConditionalWeakTable`, which holds nothing alive. `ProseRendererCondition` and `FormRendererCondition` name one renderer each and carry no logic — a condition is bound through `[Condition<T>]`, which takes a type rather than a value.
+
+**This is what makes the concept extensible rather than merely configurable.** A third renderer is a descriptor, a condition, and a pair of fragments. Nothing already written is edited, because nothing already written asks what else exists — each fragment only knows whether it is the one.
+
+## The Core Renderers
+
+**Prose** is what a document and a post have always been, and it is unchanged: the WYSIWYG surface writing into an [unpublished draft](kleenestar.draft.md), the reading view showing the last published text, the publish button ending both. See that document; nothing about it moved.
+
+**Form** is the new one, and it is not new code so much as the issue detail standing somewhere else:
+
+- *Reading* — `ObjectFormReadFragment` renders the class's `FormType.View` form as a **filled-in sheet**: a boxed page, a captioned band per tab, and one numbered, ruled line per field with the answer printed into it. Tags close it off, the way they close off the prose reading view, so switching a class between the renderers does not lose them.
+- *Writing* — `ObjectFormEditFragment` renders the class's `FormType.Edit` form over `/api/1/objects`. It is the same mask as the issue edit dialog, built by the same `ObjectStructuredEditFormFragmentBase` from the same form of the same class; the two subclasses differ only in where they stand and which condition, if any, gates them.
+
+**The summary titles the mask rather than leading it.** It is the *name* of what is being edited, not one of its answers, so `ObjectStructuredEditFormFragmentBase` renders it into the form's `<header>` instead of yielding it as the first item — and every dialog in the framework lifts a form header onto its own title bar. Opened as a dialog, which is how an issue and an asset are edited, the record is therefore titled by its own summary, exactly as the prose editor titles a document; served as a page, the same header stands above the mask. The mask cannot tell the two apart — both are the same request — and does not have to. The field stays inside the form, so it is loaded and submitted like any other; it carries neither label nor help line, because a caption reading *summary* over the name of the thing on screen explains nothing.
+
+It is a plain text input now. It used to be a `ControlDataFormItemInputUnique` pointed at `/api/1/workspaces/uniquename`, which checked the summary against the **workspace** names and refused the reserved workspace keys — so an issue called like a workspace was reported as taken, although two objects may carry the same summary and no endpoint ever refused one. The creation wizard had always used the plain input (`ObjectFormLayout.CreateSummaryInput`); the two paths agree now, and an availability badge has no place on a title bar in any case.
+
+Three details of the sheet are decisions rather than defaults.
+
+**It is a form, not a property list.** A column of "name: value" rows reads as a record *about* the object; the reader should recognize the document they filled in. Hence the numbered lines — a printed form refers to its own lines by number — the section bands, and the ruled box that is there whether or not anybody wrote in it. The look lives in `kleenestar.css` under *form reading view*; the fragment only names the classes.
+
+**The tabs become sections on one sheet.** A printed form is continuous, and hiding half its lines behind a second navigation reads worse than a page the eye can run down. The *editing* side keeps the tabs — there, one part at a time is what makes a long form fillable.
+
+**An empty field is kept and drawn as an empty (hatched) box**, which is the opposite of what the reduced pane view does. The reason is what the two are for: a pane summarizes an object, while this *is* the object — an unanswered line is information, and dropping it would silently shorten the record.
+
+**A class with no view form still shows its record.** `FormType.View` forms are seeded per class, but `FormManager.CreateStandardForm` — what `/api/1/classes` calls on create and on clone — files a single form and leaves its type at `FormType.Default`, so a class an *administrator* makes has no view form to resolve. That is the common case, not the edge one, and a page reporting only "not configured" would hide the summary and the text its author had just typed. `BuildSystemSheet` therefore draws the two attributes every object carries whatever its class models, which is the same fallback the writing side already makes (`ObjectStructuredEditFormFragmentBase` titles the mask with the summary whatever the class models, and emits the description when it declares no structure). The two lines are described by unsaved `Field` instances named after the properties they stand for, so the aliasing below picks them up unchanged.
+
+One trap the sheet has to know about: a field whose name aliases a system attribute of the object — `Description`, `Summary` — has **no value row at all**. The mask names its inputs after the fields, and `/api/1/objects` binds a payload key matching a property of `Object` to the object itself (`UpsertFieldValues` skips it deliberately). Reading such a line from the value rows would show an empty box beside an edit form that has the text in it, so `ResolveAnswer` takes it from the object — and treats the description as rich text whatever type the field aliasing it declares.
+
+There is no draft on the form side, and that is deliberate rather than missing. A draft is prose's answer to writing a long text over several sittings; a field is finished when it is filled in.
+
+**Spreadsheet** (added 2026-10-22) makes a document a **workbook**, and it is offered on the document kind alone (`SpreadsheetRenderer.Kinds`; the blog kind names prose anyway, an issue has a mask). It was built exactly the way the paragraph above promises - a descriptor, a condition (`SpreadsheetRendererCondition`) and fragments scoped to the document routes:
+
+- *Reading* - `ObjectSpreadsheetReadFragment` shows the published workbook as the framework's `ControlSpreadsheet`, read-only, without toolbar, formula bar and status bar; the sheet tabs stay. `ObjectSpreadsheetView` builds that view for every surface that shows such a body: the reading view, the document home (`DocumentHomeFragment`), the preview pane (`ObjectPreviewDescriptionFragment`) and the draft comparison (`ObjectDraftChangesFragment`).
+- *Writing* - `ObjectSpreadsheetEditorFragmentBase` is the framework's `ControlDataModalSpreadsheet`, the workbook sibling of the prose editor's `ControlDataModalEditor`: draft, publish, discard, preview and the shared surface are the framework's. The two subclasses stand on the reading view (opened by `ObjectSpreadsheetEditButtonFragment`) and on `…/edit` (opened with the page).
+
+**The workbook is the description.** It is stored as its JSON in `Object.Description` and travels through the **same two endpoints** as prose - `/api/1/drafts/{objectkey}` autosaves, `/api/1/prose` loads draft-or-published and publishes - so the commit history, the audit and the one draft row per object need nothing new. Both endpoints ask whether the object's class renders as a spreadsheet and then accept only a workbook of at most `WorkbookText.MaxLength` (8 Mi) characters (`400` otherwise) - far below the framework's 64 Mi transfer limit, because a body is a database row every list parses again; the framework's reader does the rest (depth 64, formulas starting with `=` and at most 8192 characters, cells inside the grid, link targets on a scheme allow-list). It is stored with the formula results the client posted, so a server reads figures without a formula engine. A blank body is stored as the explicit empty workbook, because `null` means "unchanged" to the draft manager. A body that is **no** workbook - the text of a document whose class was switched, or a template's description preset - is **converted** when the dialog opens: every block (paragraph, heading, list item, table row) becomes a row of the first column, so the first autosave and publish carry the words instead of replacing them with an empty sheet. Only the formatting is left behind; the reading view says the content is no spreadsheet until it is published, and the original stays in the history (the publish commit records it as the old value). `UnitTestSpreadsheetDocumentLifecycle` walks open, autosave, refusal, publish, reload and history.
+
+**Telling a workbook from a document is `WebControl/WorkbookText`'s job**, and it is not the framework's: `SpreadsheetWorkbook.IsWorkbook` and `EditorState.IsState` both answer "starts with a brace", and `SpreadsheetWorkbook.Parse` reads an editor document as one empty sheet. A workbook is the JSON object with a `sheets` array and no `doc`. `ProseText` asks it first, so every table, tile, teaser and tooltip shows the cell values (formula cells by their result, cut at 1000 characters) instead of the serialization, and `IsEmpty` counts filled cells.
+
+**Prose and spreadsheet have no fields.** `IObjectRenderer.Structured` (default `true`; `false` on both) is what the field and form administration asks through `CoreHub.ObjectRendererManager.IsStructured` - the class sidebar, the class overview's setup checks, the form editor's notice and the template structure (`TemplateStructure.IsProse`). They used to ask "not prose", which a third body renderer would have answered wrongly.
+
+## Administration
+
+The renderer is picked on the class dialogs, beside the object type, from the catalog — so a plugin that ships a renderer becomes selectable without those dialogs knowing it exists.
+
+That promise needs the picker to be a **projection** rather than a snapshot, which is what `ObjectRendererSelectionControl` is. The dialogs are cached fragments constructed while the core's own components register — *before* the other plugins arrive, the same two-pass problem `WorkspaceTemplateManager` exists to solve — so a list filled in a constructor would be the list as it stood before any add-on had a chance to register, and the extensibility would be silently unreachable. The control refills its options from the catalog when `CoreHub.ObjectRendererManager.Version` has moved, so an unchanged catalog costs one read per render. It is also the one copy of the picker: the add, clone and edit dialogs name it instead of carrying the same twenty lines three times, which is how the six avatar dialogs came to disagree with one another.
+
+The list leads with **Follow the object type**, the entry that clears the field. It exists because the way back to the default has to be *offered*, not merely reachable by never having chosen: a single-select has no deselect, so without it a class could be given a renderer and never given one back. Its honest value would be the empty string, but an option carries its value in its element id and the selection control drops an empty id on the client — so the entry travels as the reserved token `ObjectRendererManager.Automatic` (`auto`) and `Unwrap` turns it back into the unset state at the endpoint, on all three write paths, before anything persists it. `Register` refuses `auto` as a renderer key, so no plugin can shadow the entry that clears the field.
+
+The picker **narrows itself to the object type chosen beside it**, through the framework's dependent selection: `ObjectRendererSelectionControl` names the type field (`DependsOn`) and each entry names the types it belongs to (`Requires`, filled from `CoreHub.ObjectRendererManager.GetKinds`), so picking *blog entry* takes the mask out of the list as it is picked, and a renderer that is no longer offered is dropped from the field rather than carried into the submission. It happens in the browser because there is no request between the two answers — the type is being chosen in the same dialog.
+
+Two details of the projection are deliberate. An entry whose renderer is offered on **every** registered type carries no condition at all, so a renderer that serves everything is not silently pinned to the types that happened to exist when the list was projected; and *Follow the object type* carries none either, because it is the absence of a renderer and fits every type. The projection therefore watches **both** catalog versions, the renderers' and the kinds', since what an entry says about itself is the answer of the two together.
+
+The server gate stays where it was and remains the authority: `/api/1/classes` overrides `Validate` and refuses a renderer the resulting kind does not offer, naming the ones it does — a class of kind *blog* given the form renderer is answered with *"The chosen object type does not offer this renderer. Available: Prose."* An unset renderer — and therefore the automatic entry — is always accepted. A narrowed list is a courtesy to whoever fills in the dialog; a pairing no fragment is gated on would leave the objects of the class with no reading view at all, and that has to be refused whatever the browser did or did not do.
+
+The validation runs against the kind the class **will** carry, not the one it has: a payload that changes both fields is judged by the submitted kind, and one that changes only the renderer by the stored kind. Either half may be the one moving, so both are checked — moving a class to the blog kind while it names the mask is refused in the same breath as naming the mask on a class already there. The dialogs never produce either, since the picker drops the renderer as the type is changed; an API client that sends one field alone does.
+
+`ClassManager.Add` and `Update` normalize the key on the way in, exactly as they normalize the kind — to `null` rather than to a default, per the asymmetry above.
+
+The class administration follows the renderer too. A prose class has no mask a field could stand in or a form could arrange, so its sidebar offers neither the *Fields* nor the *Forms* link: `ClassStructuredRendererCondition` gates both on the **effective** renderer (`IsRenderedAs`), resolving the class from whichever segment the route carries - the class, or a form, workflow, SLA or calendar of it. A blog class therefore never shows them, a document class only once it is switched to the form renderer. The condition asks `IsStructured`, so a spreadsheet class is treated like a prose one. A form opened by its own address still answers with `FormProseNoticeFragment`.
+
+## Seeded Example
+
+The seed carries one document class of each renderer, so both surfaces are reachable on a fresh installation without anybody having configured anything: **Documentation** and **Knowledge** are prose, **Specification** (Software Development workspace) names the form renderer. All three stand in the page tree of their workspace; opening a Specification shows the mask, opening a Documentation shows the article.
+
+## Related
+
+- [Classes](kleenestar.class.md) — the class carries both the kind and the renderer.
+- [Forms](kleenestar.form.md) — what the form renderer reads and writes through.
+- [Drafts and publication](kleenestar.draft.md) — what the prose and the spreadsheet renderer read and write through.
+- [Objects](kleenestar.object.md) — the kind, which the renderer is orthogonal to.

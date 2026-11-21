@@ -1,6 +1,10 @@
-﻿using WebExpress.WebApp.WebApiControl;
+﻿using KleeneStar.Core.WebControl;
+using WebExpress.WebApp.WebApiControl;
+using WebExpress.WebApp.WebControl;
 using WebExpress.WebApp.WebFragment;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebApp.WebData;
+using KleeneStar.Core.WebParameter;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -16,33 +20,44 @@ namespace KleeneStar.Core.WebFragment.Workflow
     [Section<SectionContentPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Add>]
     [Cache]
-    public sealed class WorkflowAddFormFragment : FragmentControlRestFormAdd
+    public sealed class WorkflowAddFormFragment : FragmentControlDataFormAdd
     {
+        /// <summary>
+        /// Gets the hidden input carrying the class the workflow is created in.
+        /// </summary>
+        /// <remarks>
+        /// The form posts to the collection endpoint, whose route names no class, so the
+        /// class of the page the form was opened from has to travel in the payload — a
+        /// workflow cannot be inserted without it.
+        /// </remarks>
+        public ControlFormItemInputHidden ClassId { get; } = new()
+        {
+            Name = _ => nameof(Model.Entities.Workflow.ClassId)
+        };
+
         /// <summary>
         /// Gets the input text control for specifying the name of the form.
         /// </summary>
-        public ControlRestFormItemInputUnique WorkflowName { get; } = new()
+        public ControlDataFormItemInputUnique WorkflowName { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Workflow.Name),
             Label = _ => "kleenestar.core:workflow.name.label",
             Placeholder = _ => "kleenestar.core:workflow.name.placeholder",
             Help = _ => "kleenestar.core:workflow.name.help",
             Required = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.UniqueName>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.UniqueName>().ToString())};
 
         /// <summary>
         /// Gets the input selection control for the state.
         /// </summary>
-        public ControlRestFormItemInputSelection WorkflowState { get; } = new()
+        public StateInputSelection WorkflowState { get; } = new()
         {
             Name = _ => nameof(Model.Entities.Workflow.State),
+            DefaultValue = _ => global::KleeneStar.Model.Entities.WorkflowStateExtensions.Id(global::KleeneStar.Model.Entities.WorkflowState.Active).ToString(),
             Label = _ => "kleenestar.core:workflow.state.label",
             Placeholder = _ => "kleenestar.core:workflow.state.placeholder",
             Help = _ => "kleenestar.core:workflow.state.help",
-            StickySelection = _ => true,
-            RestUri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.State>()
-        };
+            ServiceFactory = _ => DataServiceDescriptor.QueryData(CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.State>().ToString())};
 
         /// <summary>
         /// Gets the input text control for specifying the description of the form.
@@ -53,6 +68,7 @@ namespace KleeneStar.Core.WebFragment.Workflow
             Label = _ => "kleenestar.core:workflow.description.label",
             Placeholder = _ => "kleenestar.core:workflow.description.placeholder",
             Format = _ => TypeEditTextFormat.Wysiwyg,
+            LinkLibraryUri = CoreHub.EditorLinkLibrary,
             Required = _ => false
         };
 
@@ -63,10 +79,11 @@ namespace KleeneStar.Core.WebFragment.Workflow
         public WorkflowAddFormFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
+            Add(ClassId);
             Add(WorkflowName);
             Add(Description);
 
-            Uri = _ => CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Workflows.Index>();
+            this.DataService<global::KleeneStar.Core.WWW.Api._1_.Workflows.Index>();
         }
 
         /// <summary>
@@ -83,6 +100,15 @@ namespace KleeneStar.Core.WebFragment.Workflow
         /// </returns>
         public override IHtmlNode Render(IRenderControlFormContext renderContext, IVisualTreeControl visualTree)
         {
+            // the page the form is shown on is class scoped, so the class it creates the
+            // item in is taken from the request and carried in the hidden input
+            var classId = renderContext?.Request?.GetParameter<ClassIdParameter>()?.Value;
+
+            if (!string.IsNullOrWhiteSpace(classId))
+            {
+                renderContext.SetValue(ClassId, new ControlFormInputValueString(classId));
+            }
+
             return base.Render(renderContext, visualTree);
         }
     }

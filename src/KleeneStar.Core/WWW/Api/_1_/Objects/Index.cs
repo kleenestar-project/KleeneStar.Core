@@ -1,9 +1,15 @@
-﻿using KleeneStar.Model;
+﻿using KleeneStar.Core.WebControl;
+using KleeneStar.Core.WebManager;
+using KleeneStar.Core.WebRestApi;
+using KleeneStar.Model;
 using KleeneStar.Model.Entities;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using WebExpress.WebApp.WebRestApi;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebCore.WebRestApi;
@@ -22,6 +28,142 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Answers the dialog reads (<c>mode=new|clone|edit|delete</c>) only to a caller who may
+        /// make the change the dialog is for.
+        /// </summary>
+        /// <remarks>
+        /// A plain read needs no gate here: the object manager already leaves out what the caller
+        /// may not read, so such an object is answered as not found.
+        /// </remarks>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            var id = ContentAuthorization.ReadId(request);
+
+            var authorized = request?.GetParameter("mode")?.Value switch
+            {
+                "edit" or "delete" or "clone" => ContentAuthorization.MayWrite(Resolve(id), request),
+                "new" => id is null
+                    ? ContentAuthorization.MayCreateIn(ClassOfCreate(request), request)
+                    : ContentAuthorization.MayWrite(Resolve(id), request),
+                _ => true
+            };
+
+            return authorized ? base.Retrieve(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates an object in a class the caller may write in, or clones one they may change.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            var id = ContentAuthorization.ReadId(request);
+            var authorized = id is null
+                ? ContentAuthorization.MayCreateIn(ClassOfCreate(request), request)
+                : ContentAuthorization.MayWrite(Resolve(id), request);
+
+            return authorized ? base.Create(request) : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes an object, once the caller may.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return ContentAuthorization.MayWrite(Resolve(ContentAuthorization.ReadId(request)), request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Deletes an object, once the caller may change it.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            var target = Resolve(ContentAuthorization.ReadId(request));
+
+            if (!ContentAuthorization.MayWrite(target, request))
+            {
+                return new ResponseForbidden();
+            }
+
+            // ?mode=recursive (the whole subtree, children first) or ?mode=dissolve (the contents
+            // one level up, then the object) run as a recursive operation, judged and answered like
+            // POST /api/1/operations/{ws}; without a mode an object with children is
+            // refused, as it always was
+            var mode = request.GetParameter("mode")?.Value?.Trim().ToLowerInvariant();
+
+            if (mode is "recursive" or "dissolve" && target is not null)
+            {
+                var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+                if (identityId == Guid.Empty)
+                {
+                    return new ResponseForbidden();
+                }
+
+                var started = CoreHub.ObjectOperationManager.Start
+                (
+                    mode == "recursive" ? ObjectOperationKinds.Delete : ObjectOperationKinds.Dissolve,
+                    target.Id,
+                    null,
+                    request.GetParameter("key")?.Value,
+                    identityId,
+                    x => ContentAuthorization.MayWrite(x, request)
+                );
+
+                return global::KleeneStar.Core.WWW.Api._1_.Operations._workspacekey_.Index.Answer(started, request);
+            }
+
+            if (mode is not (null or "" or "refuse"))
+            {
+                return new ResponseBadRequest();
+            }
+
+            return base.Delete(request);
+        }
+
+        /// <summary>
+        /// Returns the class a create is made in: the one the payload names, else the one of
+        /// the template it names - the wizard sends a template, not always a class.
+        /// </summary>
+        /// <param name="request">The request.</param>
+        /// <returns>The class id, or <see langword="null"/>.</returns>
+        private static Guid? ClassOfCreate(IRequest request)
+        {
+            var choice = ContentAuthorization.ReadPayloadText(request, "templateid");
+
+            return ContentAuthorization.ReadPayloadGuid(request, "classid")
+                ?? (TemplateChoice.TryParse(choice, out var templateId)
+                    ? CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId
+                    : TemplateChoice.TryParseHierarchy(choice, out var hierarchyId) && CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId) is { } hierarchy
+                        ? RootClassOf(hierarchy)
+                        : null);
+        }
+
+        /// <summary>
+        /// Resolves the object an id addresses, as the caller may see it.
+        /// </summary>
+        /// <param name="id">The id, may be absent.</param>
+        /// <returns>The object, or <see langword="null"/>.</returns>
+        private static Model.Entities.Object Resolve(Guid? id)
+        {
+            return id is { } objectId ? CoreHub.ObjectManager.GetObject(objectId) : null;
         }
 
         /// <summary>
@@ -106,16 +248,24 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
             var newItem = new Model.Entities.Object()
             {
                 Summary = data.Summary + " (Copy)",
-                Description = data.Description,
+
+                // the prose editor of the clone wizard throws on null while the form fills its
+                // fields, and every field after it would stay empty
+                Description = data.Description ?? string.Empty,
                 Icon = data.Icon,
                 State = WorkspaceState.Active,
                 WorkspaceId = data.WorkspaceId,
                 ClassId = data.ClassId,
-                ParentId = data.ParentId
+                ParentId = data.ParentId,
+
+                // the copy of a classified record is classified the same way: a duplicate that
+                // quietly came out readable by more people than its original would be a leak
+                // dressed up as a convenience
+                SecurityLevelId = data.SecurityLevelId
             };
 
             var result = RetrieveForClone(request, newItem);
-            MergeFieldValues(result, data.Id, data.ClassId);
+            MergeFieldValues(result, data.Id, data.ClassId, request);
             return result;
         }
 
@@ -148,7 +298,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
             if (data is not null)
             {
-                MergeFieldValues(result, data.Id, data.ClassId);
+                MergeFieldValues(result, data.Id, data.ClassId, request);
             }
 
             return result;
@@ -167,7 +317,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="objectId">The id of the object whose values to merge.</param>
         /// <param name="classId">The id of the object's class, used to look up the
         /// field definitions for name + filtering.</param>
-        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId)
+        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
         {
             if (result?.Data is not IDictionary<string, object> data)
             {
@@ -186,7 +336,14 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                data[field.Name] = value.Data;
+                // the dialog inputs load what they submit (FieldValueForm): a boolean as a JSON
+                // boolean, a date in the short date pattern of the request culture
+                data[field.Name] = field.FieldType switch
+                {
+                    FieldType.Boolean => FieldValueForm.IsTrue(value.Data),
+                    FieldType.Date => FieldValueForm.ToDateInput(value.Data, request?.Culture),
+                    _ => value.Data
+                };
             }
         }
 
@@ -234,7 +391,121 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </returns>
         protected override IRestApiValidationResult Validate(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request)
         {
-            return base.Validate(existingItem, payload, request);
+            var result = base.Validate(existingItem, payload, request);
+
+            result = ValidateParent(existingItem, payload, request, result);
+
+            return ValidateSecurityLevel(existingItem, payload, request, result);
+        }
+
+        /// <summary>
+        /// Refuses a create that names the home page of a workspace as the parent.
+        /// </summary>
+        /// <remarks>
+        /// The home page is not part of the page tree. An update with a parent is a move and is
+        /// refused by <see cref="IObjectManager.SetParent(Guid, Guid?)"/>; a create binds the
+        /// parent onto the new row and is refused here, before anything is written. The parent is
+        /// read unrestricted, so the rule also holds for a home page the caller cannot read; the
+        /// message does not reveal it.
+        /// </remarks>
+        /// <param name="existingItem">The currently persisted item (null for create).</param>
+        /// <param name="payload">The submitted payload.</param>
+        /// <param name="request">The request, for the culture of the message.</param>
+        /// <param name="result">The validation result to add to.</param>
+        /// <returns>The validation result, for chaining.</returns>
+        private static IRestApiValidationResult ValidateParent(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request, IRestApiValidationResult result)
+        {
+            if (existingItem is not null
+                || !payload.TryGetGuid(nameof(Model.Entities.Object.ParentId), out var parentId)
+                || parentId == Guid.Empty)
+            {
+                return result;
+            }
+
+            var parent = global::KleeneStar.Core.WebManager.ObjectHierarchy.Read(parentId);
+
+            if (!CoreHub.WorkspaceManager.IsHome(parent))
+            {
+                return result;
+            }
+
+            return result.Add
+            (
+                I18N.Translate(request, "kleenestar.core:workspace.home.parent.refused"),
+                nameof(Model.Entities.Object.ParentId),
+                "workspace.home.parent"
+            );
+        }
+
+        /// <summary>
+        /// Refuses a classification the caller may not put on the object.
+        /// </summary>
+        /// <remarks>
+        /// The form only offers the levels the caller is cleared for, so this is not what stops
+        /// an honest mistake - it is what makes the rule true of the endpoint rather than of one
+        /// dialog. Two things are checked: that the level belongs to the class of the object,
+        /// and that the caller is cleared for it. Clearing the classification is always allowed:
+        /// it makes the record more visible, never less.
+        /// </remarks>
+        /// <param name="existingItem">The currently persisted item (null for create).</param>
+        /// <param name="payload">The submitted payload.</param>
+        /// <param name="request">The request, for the culture of the message.</param>
+        /// <param name="result">The validation result to add to.</param>
+        /// <returns>The validation result, for chaining.</returns>
+        private static IRestApiValidationResult ValidateSecurityLevel(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request, IRestApiValidationResult result)
+        {
+            if (!payload.TryGetGuid(nameof(Model.Entities.Object.SecurityLevelId), out var securityLevelId)
+                || securityLevelId == Guid.Empty)
+            {
+                return result;
+            }
+
+            // an unchanged classification is not a new decision and is left alone, so an edit of
+            // a record somebody was cleared for yesterday does not become unsavable today
+            if (existingItem?.SecurityLevelId == securityLevelId)
+            {
+                return result;
+            }
+
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var classId = existingItem?.ClassId
+                ?? (payload.TryGetGuid(nameof(Model.Entities.Object.ClassId), out var payloadClassId) ? payloadClassId : Guid.Empty);
+
+            var assignable = classId == Guid.Empty
+                ? []
+                : CoreHub.SecurityLevelManager.GetAssignableSecurityLevels(classId, identityId);
+
+            if (assignable.Any(x => x.Id == securityLevelId))
+            {
+                return result;
+            }
+
+            return result.Add
+            (
+                I18N.Translate(request, "kleenestar.core:securitylevel.object.restricted"),
+                nameof(Model.Entities.Object.SecurityLevelId),
+                "securitylevel.restricted"
+            );
+        }
+
+        /// <summary>
+        /// Resolves the identity a new object is attributed to, as the value its creator and
+        /// updater references take.
+        /// </summary>
+        /// <remarks>
+        /// An anonymous caller is nobody, and nobody is not a row in the identity table:
+        /// written as the empty guid the creator broke the foreign key and the create answered
+        /// a bare <em>error creating resource</em>, so the references stay unset instead - the
+        /// way the update path and the workspace templates already leave them. The commit the
+        /// creation is recorded in makes the same distinction on its own.
+        /// </remarks>
+        /// <param name="request">The request, or null to ask the ambient scope.</param>
+        /// <returns>The identity, or null for an anonymous caller.</returns>
+        public static Guid? ResolveAuthor(IRequest request)
+        {
+            var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
+
+            return identityId == Guid.Empty ? null : identityId;
         }
 
         /// <summary>
@@ -260,25 +531,236 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var id = Guid.NewGuid();
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
+
             newItem = new Model.Entities.Object(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
                 State = WorkspaceState.Active,
-                CreatorId = currentUser,
-                UpdaterId = currentUser
+                CreatorId = author,
+                UpdaterId = author
             };
 
             fieldMap.BindTo(newItem);
 
-            CoreHub.ObjectManager.Add(newItem);
+            DeriveReferences(fieldMap, newItem);
+            PlaceBelowOpenDocument(fieldMap, newItem);
+            EnsureKey(newItem);
 
-            UpsertFieldValues(newItem, fieldMap);
+            var template = ResolveTemplate(fieldMap);
+            var presets = template is null
+                ? new Dictionary<string, string>()
+                : CoreHub.TemplateManager.GetPresets(template.Id);
 
-            return new RestApiCrudResultCreate();
+            ApplyDefaultSecurityLevel(fieldMap, newItem, currentUser, presets);
+
+            // the creation runs under the client's key: a second submission of the same dialog
+            // is answered with what the first created, and a failure half-way through a work
+            // structure takes back what was written instead of leaving a fragment
+            var run = ObjectCreationRun.Claim(ReadIdempotencyKey(fieldMap, request), template?.Id, currentUser, out var existing);
+
+            if (run is null)
+            {
+                if (existing.State == ObjectCreationState.Completed
+                    && existing.RootObjectId is Guid rootId
+                    && CoreHub.ObjectManager.GetObject(rootId) is { } created)
+                {
+                    newItem = created;
+
+                    return Created(created);
+                }
+
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.create.running"));
+            }
+
+            // the summary and the description are columns of the object row, not value rows,
+            // so a preset on them has to land before the row is written - the genesis commit
+            // then records the object the way the template meant it
+            ApplyPresetProperties(newItem, presets);
+
+            try
+            {
+                // the object row, its field values and the presets of its template are one act
+                // of creation; the scope makes them one genesis commit rather than a create
+                // followed by a handful of edits nobody performed
+                using (CoreHub.CommitManager.BeginCommit(newItem.Id, CommitType.Created, currentUser))
+                {
+                    CoreHub.ObjectManager.Add(newItem);
+                    run.TrackObject(newItem.Id);
+
+                    UpsertFieldValues(newItem, fieldMap, request);
+
+                    ApplyPresetValues(newItem, presets, fieldMap);
+
+                    // a new record starts in the entry state of every workflow it has no state of
+                    StartWorkflows(newItem);
+                }
+
+                if (ResolveHierarchy(fieldMap) is { } hierarchy)
+                {
+                    CreateNodes(newItem, CoreHub.TemplateHierarchyManager.GetNodes(hierarchy.Id), null, request, run);
+                }
+
+                RelateToAggregate(fieldMap, newItem, request, currentUser, run);
+
+                run.Complete(newItem.Id);
+            }
+            catch (Exception ex)
+            {
+                run.RollBack(ex);
+
+                throw;
+            }
+
+            return Created(newItem);
         }
 
         /// <summary>
-        /// Creates a new instance by cloning data from the specified form fields and 
+        /// Reads the idempotency key a creation was submitted under: the wizard's hidden field,
+        /// or the <c>idempotencykey</c> query parameter of a REST client.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="request">The request.</param>
+        /// <returns>The key, or <see langword="null"/> when the client sent none.</returns>
+        private static string ReadIdempotencyKey(RestApiCrudFormData fieldMap, IRequest request)
+        {
+            var field = Convert.ToString
+            (
+                fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.IdempotencyKeyField, StringComparison.OrdinalIgnoreCase)).Value,
+                CultureInfo.InvariantCulture
+            );
+
+            if (!string.IsNullOrWhiteSpace(field))
+            {
+                return field;
+            }
+
+            // the framework exposes no arbitrary request header, so a client that cannot put the
+            // key into the payload names it in the query
+            return request?.GetParameter("idempotencykey")?.Value;
+        }
+
+        /// <summary>
+        /// Files a new object as a sub-task of the object the wizard was opened from.
+        /// </summary>
+        /// <remarks>
+        /// The sub-task is joined to its order by the first active relation type whose effect
+        /// aggregates progress - the relation model's answer to "is part of", which, unlike the
+        /// containment of <c>ParentId</c>, crosses workspaces: an order filed in one department
+        /// reports the progress of the sub-tasks the others work on in theirs. The order must be
+        /// one the caller may read and relate (<see cref="global::KleeneStar.Core.WebPermissions.ObjectRelationPermission"/>); otherwise
+        /// the object is created on its own, which is what the caller asked for first.
+        /// </remarks>
+        /// <param name="fieldMap">The payload, which may name the order.</param>
+        /// <param name="object">The object just created.</param>
+        /// <param name="request">The request.</param>
+        /// <param name="identityId">The identity creating it.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void RelateToAggregate(RestApiCrudFormData fieldMap, Model.Entities.Object @object, IRequest request, Guid identityId, ObjectCreationRun run)
+        {
+            var key = Convert.ToString
+            (
+                fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.SubtaskOfField, StringComparison.OrdinalIgnoreCase)).Value,
+                System.Globalization.CultureInfo.InvariantCulture
+            );
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            var order = CoreHub.ObjectManager.GetObjectByKey(key);
+
+            if (order is null || order.Id == @object.Id
+                || !ContentAuthorization.MayWrite(order, request, typeof(global::KleeneStar.Core.WebPermissions.ObjectRelationPermission)))
+            {
+                return;
+            }
+
+            Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, order.Id, @object.Id, identityId, run);
+        }
+
+        /// <summary>
+        /// Relates two objects by the first active relation type carrying an effect.
+        /// </summary>
+        /// <remarks>
+        /// The relation catalog is the installation's, and nothing here knows a relation by
+        /// name: "is part of" is whichever type aggregates progress, "has to wait for" whichever
+        /// blocks completion. An installation without such a type gets no relation rather than
+        /// an error - the objects exist either way.
+        /// </remarks>
+        /// <param name="effect">The effect the relation carries.</param>
+        /// <param name="sourceId">The source end - the order, the predecessor.</param>
+        /// <param name="targetId">The target end - the sub-task, the successor.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(WebExpress.WebApp.WebRelation.RelationEffect effect, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            var type = CoreHub.ObjectRelationTypeManager
+                .GetRelationTypes()
+                .Where(x => x.Active && x.Effect == effect
+                    && string.Equals(x.System, WebExpress.WebApp.WebRelation.RelationSystem.Object, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => x.Order)
+                .FirstOrDefault();
+
+            Relate(type, sourceId, targetId, identityId, run);
+        }
+
+        /// <summary>
+        /// Relates two objects by the active relation type of a key; a key the catalog does not
+        /// know, or knows inactive, relates nothing.
+        /// </summary>
+        /// <param name="key">The key of the relation type.</param>
+        /// <param name="sourceId">The source end.</param>
+        /// <param name="targetId">The target end.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(string key, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            var type = CoreHub.ObjectRelationTypeManager
+                .GetRelationTypes()
+                .FirstOrDefault(x => x.Active
+                    && string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(x.System, WebExpress.WebApp.WebRelation.RelationSystem.Object, StringComparison.OrdinalIgnoreCase));
+
+            Relate(type, sourceId, targetId, identityId, run);
+        }
+
+        /// <summary>
+        /// Writes the relation of a type between two objects and tracks it in the run.
+        /// </summary>
+        /// <param name="type">The relation type, or null to relate nothing.</param>
+        /// <param name="sourceId">The source end.</param>
+        /// <param name="targetId">The target end.</param>
+        /// <param name="identityId">The identity relating them.</param>
+        /// <param name="run">The creation the relation is part of.</param>
+        private static void Relate(ObjectRelationType type, Guid sourceId, Guid targetId, Guid identityId, ObjectCreationRun run)
+        {
+            if (type is null || sourceId == targetId)
+            {
+                return;
+            }
+
+            var relation = new ObjectRelation
+            {
+                Id = Guid.NewGuid(),
+                System = WebExpress.WebApp.WebRelation.RelationSystem.Object,
+                TypeKey = type.Key,
+                Direction = WebExpress.WebApp.WebRelation.RelationDirection.Bidirectional,
+                Status = WebExpress.WebApp.WebRelation.RelationStatus.Active,
+                SourceObjectId = sourceId,
+                TargetObjectId = targetId,
+                CreatedById = identityId == Guid.Empty ? null : identityId,
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow
+            };
+
+            CoreHub.ObjectRelationManager.Add(relation);
+            run?.TrackRelation(relation.Id);
+        }
+
+        /// <summary>
+        /// Creates a new instance by cloning data from the specified form fields and
         /// adds it to the class manager.
         /// </summary>
         /// <param name="existingItem">
@@ -303,21 +785,61 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         {
             var id = Guid.NewGuid();
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
+
             newItem = new Model.Entities.Object(id)
             {
                 Icon = CoreHub.GenerateIcon(id),
                 State = WorkspaceState.Active,
-                CreatorId = currentUser,
-                UpdaterId = currentUser
+                CreatorId = author,
+                UpdaterId = author
             };
 
             fieldMap.BindTo(newItem);
 
-            CoreHub.ObjectManager.Add(newItem);
+            newItem.ClassId = existingItem?.ClassId ?? newItem.ClassId;
+            newItem.WorkspaceId = existingItem?.WorkspaceId ?? newItem.WorkspaceId;
 
-            UpsertFieldValues(newItem, fieldMap);
+            // a copy keeps the classification of its original when the payload names none; see
+            // RetrieveForClone for why it is not allowed to come out more visible. The empty guid
+            // the clone wizard submits for its unclassified tile is a decision and declassifies
+            if (fieldMap.TryGetGuidReference(nameof(Model.Entities.Object.SecurityLevelId), out var securityLevelId))
+            {
+                newItem.SecurityLevelId = securityLevelId;
+            }
+            else
+            {
+                newItem.SecurityLevelId ??= existingItem?.SecurityLevelId;
+            }
 
-            return new RestApiCrudResultCreate();
+            DeriveReferences(fieldMap, newItem);
+            EnsureKey(newItem);
+
+            using (CoreHub.CommitManager.BeginCommit(newItem.Id, CommitType.Created, currentUser))
+            {
+                CoreHub.ObjectManager.Add(newItem);
+
+                // a date input carries no time: a copy whose date equals the original's keeps the
+                // original value with its time
+                UpsertFieldValues(newItem, fieldMap, request, existingItem is null
+                    ? null
+                    : CoreHub.ValueManager.GetValues(existingItem.Id)
+                        .GroupBy(x => x.FieldId)
+                        .ToDictionary(x => x.Key, x => x.First().Data));
+
+                // a field the dialog has no input for (avatar, a field off the edit form) is
+                // copied as the original holds it
+                if (existingItem is not null)
+                {
+                    CopyUnsentValues(existingItem, newItem, fieldMap);
+                }
+
+                // a copy is a new record of the process: the payload of the wizard carries no
+                // state and the original's is not copied, so it starts in the entry state
+                StartWorkflows(newItem);
+            }
+
+            return Created(newItem);
         }
 
         /// <summary>
@@ -334,6 +856,16 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// </param>
         protected override IRestApiCrudResultUpdate Update(Model.Entities.Object existingItem, RestApiCrudFormData payload, IRequest request)
         {
+            // a new parent is a move, and a move has rules a field binding knows nothing of -
+            // the cycle check, the depth limit, the hierarchy lock, the write right on both
+            // parents. The field is taken out of the payload and carried out as a move below,
+            // inside the same commit as the rest of the save
+            var parentSent = payload.Detach(nameof(Model.Entities.Object.ParentId), out var parentValue);
+            var previousParentId = existingItem.ParentId;
+            Guid? requestedParentId = Guid.TryParse(parentValue, out var parsedParent) && parsedParent != Guid.Empty
+                ? parsedParent
+                : null;
+
             var res = base.Update(existingItem, payload, request);
 
             // stamp the identity that performed this update (best-effort; keep the prior
@@ -345,11 +877,588 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                 existingItem.UpdaterId = currentUser;
             }
 
-            CoreHub.ObjectManager.Update(existingItem);
+            // one save is one commit, whether it moved a system property, a field value, or both
+            using (CoreHub.CommitManager.BeginCommit(existingItem.Id, CommitType.Updated, currentUser))
+            {
+                CoreHub.ObjectManager.Update(existingItem);
 
-            UpsertFieldValues(existingItem, payload);
+                UpsertFieldValues(existingItem, payload, request);
+
+                if (parentSent && requestedParentId != previousParentId)
+                {
+                    MoveTo(existingItem, requestedParentId, request);
+                }
+            }
 
             return res;
+        }
+
+        /// <summary>
+        /// Carries out the move an update asked for, through the same gate and the same rules
+        /// as the move endpoints (<see cref="ObjectMove"/>).
+        /// </summary>
+        /// <param name="object">The object, already updated.</param>
+        /// <param name="parentId">The new parent, or <c>null</c> for the root.</param>
+        /// <param name="request">The request.</param>
+        /// <exception cref="RestApiRefusal">The move is not possible; the reason is the message.</exception>
+        private static void MoveTo(Model.Entities.Object @object, Guid? parentId, IRequest request)
+        {
+            Model.Entities.Object parent = null;
+
+            if (parentId is Guid id)
+            {
+                parent = CoreHub.ObjectManager.GetObject(id)
+                    ?? throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.move.refused.parent"));
+            }
+
+            if (!ContentAuthorization.MayMove(@object, parent, request))
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.move.refused.permission"));
+            }
+
+            try
+            {
+                CoreHub.ObjectManager.SetParent(@object.Id, parentId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // the hierarchy rules (cycle, depth, other workspace, allowed children) and a
+                // conflict state their reason in English; it is still the reason
+                throw new RestApiRefusal(ex.Message, ex);
+            }
+
+            @object.ParentId = parentId;
+        }
+
+        /// <summary>
+        /// Determines whether the payload answers a key with something other than a blank.
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="key">The key, matched ignoring case.</param>
+        /// <returns><see langword="true"/> when the payload carries a non-blank value.</returns>
+        private static bool IsAnswered(RestApiCrudFormData fieldMap, string key)
+        {
+            return fieldMap.Any(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(Convert.ToString(x.Value, System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        /// <summary>
+        /// Puts the classification of the template, else the class's default classification, on
+        /// an object the payload left unclassified.
+        /// </summary>
+        /// <remarks>
+        /// A class that classifies its objects names one level as the starting point, and a
+        /// create that says nothing about the classification means "the usual one" rather than
+        /// "none" - otherwise every record filed through an interface that does not ask (the
+        /// api, a template, an import) would silently come out unclassified.
+        /// <para>
+        /// The default is only applied when the caller is cleared for it. Where they are not,
+        /// the object stays unclassified rather than disappearing from the list of the person
+        /// who just created it.
+        /// </para>
+        /// </remarks>
+        /// <param name="fieldMap">The payload carrying the answers.</param>
+        /// <param name="object">The object being created.</param>
+        /// <param name="identityId">The identity performing the create.</param>
+        /// <param name="presets">The presets of the template the object is created from; its
+        /// choice for the class (<see cref="TemplateSecurityLevels"/>) takes the place of the
+        /// default, an unclassified choice leaves the object unclassified.</param>
+        private static void ApplyDefaultSecurityLevel(RestApiCrudFormData fieldMap, Model.Entities.Object @object, Guid identityId, IReadOnlyDictionary<string, string> presets)
+        {
+            // an explicit answer wins, including the explicit "unclassified" the selection
+            // submits as the empty guid; a blank one is no answer - the wizard posts every input
+            // of its last step, and a selection that did not take its preset must not leave a
+            // classified class's record unclassified
+            if (IsAnswered(fieldMap, nameof(Model.Entities.Object.SecurityLevelId))
+                || @object.SecurityLevelId.HasValue
+                || @object.ClassId == Guid.Empty)
+            {
+                return;
+            }
+
+            if (TemplateSecurityLevels.TryResolve(presets, @object.ClassId, out var chosen) && chosen is null)
+            {
+                return;
+            }
+
+            var securityLevel = chosen is Guid chosenId && CoreHub.SecurityLevelManager.GetSecurityLevel(chosenId) is { } level && level.ClassId == @object.ClassId
+                ? level
+                : CoreHub.SecurityLevelManager.GetDefaultSecurityLevel(@object.ClassId);
+
+            if (securityLevel is not null && CoreHub.SecurityLevelManager.IsCleared(identityId, securityLevel.Id))
+            {
+                @object.SecurityLevelId = securityLevel.Id;
+            }
+        }
+
+        /// <summary>
+        /// Completes the references an object cannot be stored without from what the payload
+        /// does name.
+        /// </summary>
+        /// <remarks>
+        /// The references themselves are bound by <c>BindTo</c>. What it cannot do is derive
+        /// the ones the create form leaves out because they follow from another: a create
+        /// started from a template names only the template, one started from a workspace
+        /// overview only the class.
+        /// </remarks>
+        /// <param name="fieldMap">The payload carrying the references.</param>
+        /// <param name="object">The object to complete.</param>
+        private static void DeriveReferences(RestApiCrudFormData fieldMap, Model.Entities.Object @object)
+        {
+            // an object created from a template inherits the class the template instantiates
+            // when the payload names only the template
+            if (@object.ClassId == Guid.Empty && ResolveHierarchy(fieldMap) is { } hierarchy)
+            {
+                @object.ClassId = RootClassOf(hierarchy) ?? Guid.Empty;
+            }
+
+            if (@object.ClassId == Guid.Empty && TryGetTemplateId(fieldMap, out var templateId))
+            {
+                @object.ClassId = CoreHub.TemplateManager.GetTemplate(templateId)?.ClassId ?? Guid.Empty;
+            }
+
+            // an object created from a workspace overview inherits the workspace of its class when
+            // the payload names only the class
+            if (@object.WorkspaceId == Guid.Empty)
+            {
+                @object.WorkspaceId = CoreHub.ClassManager.GetClass(@object.ClassId)?.WorkspaceId ?? Guid.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Answers a create with what the page needs to open the new object.
+        /// </summary>
+        /// <remarks>
+        /// The answer is a <see cref="RestApiCreatedResult"/>: <c>uri</c> is the detail page of
+        /// the new object, which the create and clone wizards follow
+        /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>); <c>data</c> is
+        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>objectrefresh.js</c> not
+        /// to reload the page the wizard leaves.
+        /// </remarks>
+        /// <param name="object">The object that was created.</param>
+        /// <returns>The create result.</returns>
+        private static RestApiCreatedResult Created(Model.Entities.Object @object)
+        {
+            var uri = global::KleeneStar.Core.CoreHub.ObjectKindManager.ResolveDetailUri(@object)?.ToString();
+
+            return new RestApiCreatedResult
+            {
+                Uri = uri,
+                Data = new
+                {
+                    created = true,
+                    id = @object.Id,
+                    key = @object.Key,
+                    uri
+                }
+            };
+        }
+
+        /// <summary>
+        /// Places a new document below the document the create wizard was opened from.
+        /// </summary>
+        /// <remarks>
+        /// The header's create button names the open document
+        /// (<c>ObjectAddFormFragment.ParentKeyField</c>) whatever is created from it, so the
+        /// rule is decided here: the new object goes below it only when it is a document
+        /// itself and lives in the same workspace - an issue created while reading a page
+        /// stays a root, and a page tree does not reach across workspaces. The document is
+        /// read through the object manager, so one the caller may not read places nothing.
+        /// A <c>ParentId</c> the payload names itself (an API client) is left as it was bound.
+        /// </remarks>
+        /// <param name="fieldMap">The payload, which may name the open document.</param>
+        /// <param name="object">The object being created.</param>
+        private static void PlaceBelowOpenDocument(RestApiCrudFormData fieldMap, Model.Entities.Object @object)
+        {
+            var key = fieldMap.FirstOrDefault(x => string.Equals(x.Key, global::KleeneStar.Core.WebFragment.Object.ObjectAddFormFragment.ParentKeyField, StringComparison.OrdinalIgnoreCase))
+                .Value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            var parent = CoreHub.ObjectManager.GetObjectByKey(key);
+            var kind = CoreHub.ClassManager.GetClass(@object.ClassId)?.Kind;
+
+            // no object is placed below the home page
+            if (parent is not null
+                && !CoreHub.WorkspaceManager.IsHome(parent)
+                && parent.WorkspaceId == @object.WorkspaceId
+                && string.Equals(ObjectKind.Normalize(parent.Kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ObjectKind.Normalize(kind), ObjectKind.Document, StringComparison.OrdinalIgnoreCase))
+            {
+                @object.ParentId = parent.Id;
+            }
+        }
+
+        /// <summary>
+        /// Assigns the object a key when the payload carries none.
+        /// </summary>
+        /// <remarks>
+        /// The key is the human-readable handle an object is addressed by (<c>SD-17</c>), so it
+        /// has to exist before the record is written, and the create form does not ask for one.
+        /// The numbering itself belongs to the object manager, because this is not the only
+        /// caller that creates objects nobody named - the setup a workspace template performs is
+        /// another - and a second implementation of it would eventually hand out the same key
+        /// twice.
+        /// </remarks>
+        /// <param name="object">The object to assign a key to.</param>
+        private static void EnsureKey(Model.Entities.Object @object)
+        {
+            if (!string.IsNullOrWhiteSpace(@object.Key))
+            {
+                return;
+            }
+
+            @object.Key = CoreHub.ObjectManager.NextObjectKey(@object.WorkspaceId) ?? @object.Key;
+        }
+
+        /// <summary>
+        /// Resolves the template a create payload names, when it names one that can be applied.
+        /// </summary>
+        /// <remarks>
+        /// The template step of the wizard submits <c>none</c> for "no template", which is not a
+        /// guid and reads as absent; an archived template is offered nowhere and is not applied
+        /// through a stale id either.
+        /// </remarks>
+        /// <param name="fieldMap">The payload, which may name a template.</param>
+        /// <returns>The active template, or null when the payload names none.</returns>
+        private static Model.Entities.Template ResolveTemplate(RestApiCrudFormData fieldMap)
+        {
+            if (!TryGetTemplateId(fieldMap, out var templateId))
+            {
+                return null;
+            }
+
+            var template = CoreHub.TemplateManager.GetTemplate(templateId);
+
+            return template?.State == TemplateState.Active ? template : null;
+        }
+
+        /// <summary>
+        /// Reads the template a create payload names: a template id, or the value of a template
+        /// card offered under a further class of the template (<see cref="TemplateChoice"/>).
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <param name="templateId">When this method returns, the template id, or <see cref="Guid.Empty"/>.</param>
+        /// <returns><see langword="true"/> when the payload names a template.</returns>
+        private static bool TryGetTemplateId(RestApiCrudFormData fieldMap, out Guid templateId)
+        {
+            templateId = Guid.Empty;
+
+            if (!fieldMap.TryGetValue("TemplateId", out var value))
+            {
+                return false;
+            }
+
+            // a hierarchy card names the hierarchy; the object is created from its root template
+            if (TemplateChoice.TryParseHierarchy(value?.ToString(), out var hierarchyId))
+            {
+                templateId = CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId)?.RootTemplateId ?? Guid.Empty;
+
+                return templateId != Guid.Empty;
+            }
+
+            return TemplateChoice.TryParse(value?.ToString(), out templateId);
+        }
+
+        /// <summary>
+        /// Reads the hierarchy a create payload names through a hierarchy card
+        /// (<see cref="TemplateChoice.HierarchyValue"/>).
+        /// </summary>
+        /// <param name="fieldMap">The payload.</param>
+        /// <returns>The active hierarchy, or null when the payload names none.</returns>
+        private static Model.Entities.TemplateHierarchy ResolveHierarchy(RestApiCrudFormData fieldMap)
+        {
+            if (!fieldMap.TryGetValue("TemplateId", out var value)
+                || !TemplateChoice.TryParseHierarchy(value?.ToString(), out var hierarchyId))
+            {
+                return null;
+            }
+
+            var hierarchy = CoreHub.TemplateHierarchyManager.GetHierarchy(hierarchyId);
+
+            return hierarchy?.State == TemplateState.Active ? hierarchy : null;
+        }
+
+        /// <summary>
+        /// Returns the class the root object of a hierarchy is created in.
+        /// </summary>
+        /// <param name="hierarchy">The hierarchy.</param>
+        /// <returns>The class id, or null for an unknown root template.</returns>
+        private static Guid? RootClassOf(Model.Entities.TemplateHierarchy hierarchy)
+        {
+            var root = hierarchy.RootTemplate ?? CoreHub.TemplateManager.GetTemplate(hierarchy.RootTemplateId);
+
+            return root is null ? null : CoreHub.TemplateHierarchyManager.ResolveClassId(hierarchy.RootClassId, root);
+        }
+
+        /// <summary>
+        /// Puts the presets a template holds for the summary and the description onto an object
+        /// whose own are blank.
+        /// </summary>
+        /// <remarks>
+        /// The two are the attributes every object carries on its own row; a create form asks
+        /// for them under those names and <c>BindTo</c> writes them there, never into a value
+        /// row - so <see cref="UpsertFieldValues"/> skips them by design and a preset on either
+        /// would be lost without this. The caller's answer wins where there is one. The
+        /// description preset is what the template manager answers for it: the template's own
+        /// description unless its presets name one, so the text a template was written with is
+        /// the text its objects start with.
+        /// </remarks>
+        /// <param name="object">The object being created.</param>
+        /// <param name="presets">The presets of the template, keyed by field name.</param>
+        private static void ApplyPresetProperties(Model.Entities.Object @object, IReadOnlyDictionary<string, string> presets)
+        {
+            if (IsBlank(@object.Summary) && TryGetPreset(presets, nameof(Model.Entities.Object.Summary), out var summary))
+            {
+                @object.Summary = summary;
+            }
+
+            if (IsBlank(@object.Description) && TryGetPreset(presets, nameof(Model.Entities.Object.Description), out var description))
+            {
+                @object.Description = description;
+            }
+        }
+
+        /// <summary>
+        /// Writes the presets of a template as field values of an object, skipping the fields the
+        /// payload answered.
+        /// </summary>
+        /// <remarks>
+        /// A value the caller submitted wins over the preset that would otherwise fill the same
+        /// field - a template pre-fills a form, it does not overrule what the user typed into
+        /// it. What the caller submitted has to be an answer, though: the wizard posts every
+        /// input of the create form, so a field the form could not pre-fill (a choice the
+        /// template names by a value the field does not offer, a control that ignores a seeded
+        /// value) arrives as an empty string, and a payload that merely mentions the field used
+        /// to shadow the preset - the object then came out without the very value the template
+        /// was picked for. Blank is treated as unanswered, and the preset lands.
+        /// </remarks>
+        /// <param name="object">The object to write the values to.</param>
+        /// <param name="presets">The presets of the template, keyed by field name.</param>
+        /// <param name="payload">The payload whose own answers take precedence, or null.</param>
+        private static void ApplyPresetValues(Model.Entities.Object @object, IReadOnlyDictionary<string, string> presets, RestApiCrudFormData payload)
+        {
+            var values = new RestApiCrudFormData();
+
+            foreach (var preset in presets)
+            {
+                var key = preset.Key.ToLowerInvariant();
+
+                if (payload is not null
+                    && payload.TryGetValue(key, out var answer)
+                    && !IsBlank(SerializePayloadValue(answer)))
+                {
+                    continue;
+                }
+
+                values[key] = preset.Value;
+            }
+
+            UpsertFieldValues(@object, values);
+        }
+
+        /// <summary>
+        /// Reads a preset by field name, ignoring case - the presets are keyed the way the
+        /// template author wrote them, the payload keys arrive lower-cased.
+        /// </summary>
+        /// <param name="presets">The presets of the template.</param>
+        /// <param name="name">The field name.</param>
+        /// <param name="value">When this method returns, the preset, or null.</param>
+        /// <returns>True when the template presets the field with a non-blank value.</returns>
+        private static bool TryGetPreset(IReadOnlyDictionary<string, string> presets, string name, out string value)
+        {
+            value = presets
+                .FirstOrDefault(x => string.Equals(x.Key, name, StringComparison.OrdinalIgnoreCase))
+                .Value;
+
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        /// <summary>
+        /// Decides whether a submitted value says nothing.
+        /// </summary>
+        /// <remarks>
+        /// Null and whitespace are blank, and so is the document the prose editor submits for a
+        /// surface nobody wrote into: an editor posts a document rather than an empty string,
+        /// so a rich-text field the form could not pre-fill would otherwise arrive as an answer
+        /// and shadow the preset it was supposed to start from. A document carrying a picture
+        /// is not blank - <see cref="ProseText.IsEmpty"/> measures what is in it.
+        /// </remarks>
+        /// <param name="value">The serialized value.</param>
+        /// <returns>True when the value carries nothing.</returns>
+        private static bool IsBlank(string value)
+        {
+            return ProseText.IsEmpty(value);
+        }
+
+        /// <summary>
+        /// Creates one object per node of a template hierarchy below the supplied object, depth
+        /// first and in the order of the nodes: a work structure.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The nodes reference templates.</b> A node names an existing template
+        /// (<see cref="TemplateHierarchyNode.TemplateId"/>) and the class its object is created in
+        /// (<see cref="ITemplateHierarchyManager.ResolveClassId"/>: the chosen class of a template
+        /// serving several, else the bound one). A node referencing an archived template creates
+        /// nothing, nor do the nodes below it. The nodes below a node are created with the object
+        /// of that node as their parent.
+        /// </para>
+        /// <para>
+        /// <b>Sub-object, link or both.</b> A node with <see cref="TemplateHierarchyNode.AsChild"/>
+        /// creates a sub-object: it is placed below its parent (<c>ParentId</c>) inside the same
+        /// workspace where the parent's class allows the child's, and is joined to its parent by
+        /// the relation that aggregates progress, so the parent reports the progress of the whole
+        /// structure across workspaces. A node naming a relation type
+        /// (<see cref="TemplateHierarchyNode.RelationTypeKey"/>) links the created object to its
+        /// parent with that type, from the parent to the created object or, with
+        /// <see cref="TemplateHierarchyNode.RelationInverse"/>, the other way round. A node that is
+        /// neither counts as a sub-object. A sub-object the parent's class does not allow in the
+        /// same workspace is created as a link only where the node names one, and skipped
+        /// otherwise.
+        /// </para>
+        /// <para>
+        /// <b>An object is filed where its class lives.</b> A hierarchy may name classes of other
+        /// workspaces (an onboarding filed in HR creates the account request in the IT desk), so
+        /// the object takes the workspace of its class. It takes the security level the referenced
+        /// template chose for the class (<see cref="TemplateSecurityLevels"/>), else the default
+        /// level of the class.
+        /// </para>
+        /// <para>
+        /// <b>Who does it and what it waits for.</b> The node's assignee is the object's
+        /// (<see cref="TemplateHierarchyNode.AssigneeId"/>), and the sibling it waits for becomes a
+        /// blocking relation from that sibling's object to this one
+        /// (<see cref="TemplateHierarchyNode.PredecessorId"/>), so the workflow refuses to finish
+        /// it first.
+        /// </para>
+        /// <para>
+        /// The objects are created on the hierarchy's authority: the cross-workspace classes were
+        /// authorized when the hierarchy was saved, not by the person filing the structure. Every
+        /// object and relation is tracked by the run, which takes them back if anything fails.
+        /// </para>
+        /// </remarks>
+        /// <param name="parent">The object the created objects belong to.</param>
+        /// <param name="nodes">The nodes of the hierarchy, depth first.</param>
+        /// <param name="parentNodeId">The node whose children are created, or null for the root.</param>
+        /// <param name="request">The request, for resolving the acting identity.</param>
+        /// <param name="run">The creation the objects are part of.</param>
+        private static void CreateNodes(Model.Entities.Object parent, IReadOnlyList<TemplateHierarchyNode> nodes, Guid? parentNodeId, IRequest request, ObjectCreationRun run)
+        {
+            var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
+            var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var author = ResolveAuthor(request);
+            var createdBy = new Dictionary<Guid, Guid>();
+            var dependencies = new List<(Guid PredecessorNodeId, Guid ObjectId)>();
+
+            foreach (var node in nodes.Where(x => x.ParentNodeId == parentNodeId && x.Id != parentNodeId))
+            {
+                var template = CoreHub.TemplateManager.GetTemplate(node.TemplateId);
+
+                if (template is null || template.State != TemplateState.Active)
+                {
+                    continue;
+                }
+
+                var classId = CoreHub.TemplateHierarchyManager.ResolveClassId(node.ClassId, template);
+                var @class = CoreHub.ClassManager.GetClass(classId);
+
+                if (@class is null)
+                {
+                    continue;
+                }
+
+                var linked = !string.IsNullOrWhiteSpace(node.RelationTypeKey);
+                var asChild = node.AsChild || !linked;
+                var contained = @class.WorkspaceId == parent.WorkspaceId;
+
+                if (asChild
+                    && contained
+                    && parentClass?.AllowedChildren is { Count: > 0 }
+                    && parentClass.AllowedChildren.All(c => c.Id != classId))
+                {
+                    if (!linked)
+                    {
+                        continue;
+                    }
+
+                    asChild = false;
+                }
+
+                // nobody answers for the object, so every preset applies. The summary is the
+                // template's name unless a preset says otherwise; the description is what the
+                // template manager answers for it: the template's own unless a preset names one
+                var presets = CoreHub.TemplateManager.GetPresets(template.Id);
+                var id = Guid.NewGuid();
+
+                // the security level the referenced template chose for the class, else the class
+                // default; the structure is created on the hierarchy's authority
+                var securityLevelId = TemplateSecurityLevels.TryResolve(presets, classId, out var chosenLevel)
+                    ? (chosenLevel is Guid levelId && CoreHub.SecurityLevelManager?.GetSecurityLevel(levelId)?.ClassId == classId ? levelId : null)
+                    : CoreHub.SecurityLevelManager?.GetDefaultSecurityLevel(classId)?.Id;
+                var created = new Model.Entities.Object(id)
+                {
+                    Summary = TryGetPreset(presets, nameof(Model.Entities.Object.Summary), out var summary)
+                        ? summary
+                        : template.Name,
+                    Description = TryGetPreset(presets, nameof(Model.Entities.Object.Description), out var description)
+                        ? description
+                        : null,
+                    Icon = template.Icon ?? CoreHub.GenerateIcon(id),
+                    State = WorkspaceState.Active,
+                    ClassId = classId,
+                    WorkspaceId = @class.WorkspaceId,
+                    ParentId = asChild && contained ? parent.Id : null,
+                    AssigneeId = node.AssigneeId,
+                    SecurityLevelId = securityLevelId,
+                    CreatorId = author,
+                    UpdaterId = author
+                };
+
+                EnsureKey(created);
+
+                // the object gets a genesis commit of its own carrying its presets, so its history
+                // starts the same way a hand-created object's does
+                using (CoreHub.CommitManager.BeginCommit(created.Id, CommitType.Created, currentUser))
+                {
+                    CoreHub.ObjectManager.Add(created);
+                    run?.TrackObject(created.Id);
+
+                    ApplyPresetValues(created, presets, null);
+                    StartWorkflows(created);
+                }
+
+                if (asChild)
+                {
+                    Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, parent.Id, created.Id, currentUser, run);
+                }
+
+                if (linked)
+                {
+                    Relate(node.RelationTypeKey, node.RelationInverse ? created.Id : parent.Id, node.RelationInverse ? parent.Id : created.Id, currentUser, run);
+                }
+
+                createdBy[node.Id] = created.Id;
+
+                if (node.PredecessorId is Guid predecessorId)
+                {
+                    dependencies.Add((predecessorId, created.Id));
+                }
+
+                CreateNodes(created, nodes, node.Id, request, run);
+            }
+
+            // the dependencies are drawn once all siblings exist, so a predecessor ordered after
+            // its successor is found all the same
+            foreach (var (predecessorNodeId, objectId) in dependencies)
+            {
+                if (createdBy.TryGetValue(predecessorNodeId, out var predecessorObjectId) && predecessorObjectId != objectId)
+                {
+                    Relate(WebExpress.WebApp.WebRelation.RelationEffect.BlocksCompletion, predecessorObjectId, objectId, currentUser, run);
+                }
+            }
         }
 
         /// <summary>
@@ -360,15 +1469,20 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// The base <see cref="RestApiCrudFormData"/> binder only writes payload entries
         /// that match a public property of <see cref="Model.Entities.Object"/>; any other
         /// key (typically a field name like <c>AffectedCI</c>) is silently dropped. The
-        /// inline <c>ControlSmartEdit</c> on the object detail page (see
-        /// <c>ObjectItemDetailFragment</c>) PUTs exactly such payloads — a single
+        /// inline <c>ControlSmartEdit</c> of the object sheet (see
+        /// <c>ObjectFieldSheet</c>) PUTs exactly such payloads — a single
         /// <c>{ "FieldName": "new value" }</c> document per edit — so this method fills
         /// the gap by upserting the matching <see cref="Model.Entities.Value"/> row.
         /// Payload keys arrive in lower case (see
         /// <c>JsonExtensionsFieldMap.ToFieldMap</c>); the lookup honours that by
         /// lowering the field names before comparison.
         /// </remarks>
-        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload)
+        /// <param name="object">The object whose field values are written.</param>
+        /// <param name="payload">The payload carrying the values.</param>
+        /// <param name="request">The request, for the culture of submitted dates; may be null.</param>
+        /// <param name="baseline">The values a submitted date is compared with when the object
+        /// has none yet (the original of a clone), keyed by field id; may be null.</param>
+        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
         {
             if (@object is null || payload is null || payload.Count == 0)
             {
@@ -406,8 +1520,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                var raw = SerializePayloadValue(kv.Value);
                 existingByField.TryGetValue(field.Id, out var existing);
+                var previous = existing?.Data ?? (baseline is not null && baseline.TryGetValue(field.Id, out var source) ? source : null);
+                var raw = Normalize(SerializePayloadValue(kv.Value), field.FieldType, previous, request?.Culture);
 
                 if (existing is null)
                 {
@@ -435,10 +1550,125 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Copies the field values of the original a clone payload does not carry onto the copy,
+        /// except workflow fields (the copy starts in the entry state) and attachments (file
+        /// references of the original).
+        /// </summary>
+        /// <param name="original">The original.</param>
+        /// <param name="copy">The copy.</param>
+        /// <param name="payload">The clone payload; its keys arrive in lower case.</param>
+        private static void CopyUnsentValues(Model.Entities.Object original, Model.Entities.Object copy, RestApiCrudFormData payload)
+        {
+            var sent = payload.Select(x => x.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var fields = CoreHub.FieldManager
+                .GetFields(new WebParameter.ClassIdParameter(original.ClassId))
+                .Where(f => !f.Deprecated && f.State == FieldState.Active && f.FieldType is not (FieldType.Workflow or FieldType.Attachment))
+                .ToDictionary(f => f.Id);
+            var present = CoreHub.ValueManager.GetValues(copy.Id).Select(x => x.FieldId).ToHashSet();
+
+            foreach (var value in CoreHub.ValueManager.GetValues(original.Id))
+            {
+                if (!fields.TryGetValue(value.FieldId, out var field)
+                    || sent.Contains(field.Name)
+                    || present.Contains(field.Id)
+                    || string.IsNullOrEmpty(value.Data))
+                {
+                    continue;
+                }
+
+                CoreHub.ValueManager.Add(new Model.Entities.Value
+                {
+                    ObjectId = copy.Id,
+                    FieldId = field.Id,
+                    Data = value.Data,
+                    Created = DateTime.UtcNow,
+                    Updated = DateTime.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Places every workflow field of an object that holds no state on the first entry state
+        /// of its workflow (<see cref="WebManager.IWorkflowManager.GetTargetStatuses"/> with no
+        /// current state), stored as the state name like a transition stores it. A field with a
+        /// state (a template preset, an API payload) and a workflow without entry state keep what
+        /// they have.
+        /// </summary>
+        /// <param name="object">The object.</param>
+        private static void StartWorkflows(Model.Entities.Object @object)
+        {
+            var fields = CoreHub.FieldManager
+                .GetFields(new WebParameter.ClassIdParameter(@object.ClassId))
+                .Where(f => !f.Deprecated && f.State == FieldState.Active && f.FieldType == FieldType.Workflow && f.WorkflowId.HasValue);
+
+            foreach (var field in fields)
+            {
+                var workflow = CoreHub.WorkflowManager.GetWorkflowWithStructure(field.WorkflowId.Value);
+                var entry = workflow is null ? null : CoreHub.WorkflowManager.GetTargetStatuses(workflow, null).FirstOrDefault();
+
+                if (entry is null)
+                {
+                    continue;
+                }
+
+                var existing = CoreHub.ValueManager.GetValue(@object.Id, field.Id);
+
+                if (existing is null)
+                {
+                    CoreHub.ValueManager.Add(new Model.Entities.Value
+                    {
+                        ObjectId = @object.Id,
+                        FieldId = field.Id,
+                        Data = entry.Name,
+                        Created = DateTime.UtcNow,
+                        Updated = DateTime.UtcNow
+                    });
+                }
+                else if (string.IsNullOrWhiteSpace(existing.Data))
+                {
+                    existing.Data = entry.Name;
+                    existing.Updated = DateTime.UtcNow;
+                    CoreHub.ValueManager.Update(existing);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Brings a serialized payload into the canonical storage form of its field type.
+        /// </summary>
+        /// <remarks>
+        /// Only tags need it. A tag list is stored comma-separated, which is what the
+        /// object detail page writes and reads, but the tag input control of the table
+        /// cells submits its tags semicolon-separated. Rewriting the separator here keeps
+        /// one shape in the value row no matter which surface wrote it.
+        /// </remarks>
+        /// <param name="raw">The serialized payload.</param>
+        /// <param name="fieldType">The type of the field being written.</param>
+        /// <param name="previous">The previous stored value, or <see langword="null"/>.</param>
+        /// <param name="culture">The culture of the submit, or <see langword="null"/>.</param>
+        /// <returns>The payload in storage form.</returns>
+        private static string Normalize(string raw, FieldType fieldType, string previous, System.Globalization.CultureInfo culture)
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                return raw;
+            }
+
+            return fieldType switch
+            {
+                FieldType.Tag => string.Join(",", raw
+                    .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)),
+                FieldType.Boolean => FieldValueForm.StoreBoolean(raw),
+                FieldType.Date => FieldValueForm.StoreDate(raw, previous, culture),
+                _ => raw
+            };
+        }
+
+        /// <summary>
         /// Serializes a single field-payload value into the string form persisted in
         /// <see cref="Model.Entities.Value.Data"/>. Tag-style list payloads collapse to
         /// a comma-separated representation that matches the parse logic of
-        /// <c>ObjectItemDetailFragment.BuildInputValue</c>.
+        /// <c>ObjectFieldSheet.CreateInputValue</c>.
         /// </summary>
         private static string SerializePayloadValue(object value)
         {
@@ -468,9 +1698,29 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <returns>
         /// A result object containing information about the delete operation.
         /// </returns>
+        /// <exception cref="RestApiRefusal">
+        /// The object still contains objects. The framework answers the refusal with its
+        /// translated reason, which the delete dialog shows.
+        /// </exception>
         protected override IRestApiCrudResultDelete Delete(Model.Entities.Object existingItem, IRequest request)
         {
-            CoreHub.ObjectManager.Remove(existingItem.Id);
+            try
+            {
+                CoreHub.ObjectManager.Remove(existingItem.Id);
+            }
+            catch (HierarchyConflictException ex)
+            {
+                throw new RestApiRefusal
+                (
+                    string.Format
+                    (
+                        request?.Culture ?? CultureInfo.InvariantCulture,
+                        I18N.Translate(request, "kleenestar.core:object.delete.refused.children"),
+                        ex.Count
+                    ),
+                    ex
+                );
+            }
 
             return base.Delete(existingItem, request);
         }

@@ -9,6 +9,7 @@ using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
 using WebExpress.WebIndex.Queries;
+using WebExpress.WebIndex.Wql;
 
 namespace KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_
 {
@@ -31,6 +32,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_
         }
 
         /// <summary>
+        /// Returns how a WQL statement is turned into a query: translatable, because the
+        /// query runs against the database.
+        /// </summary>
+        protected override WqlQueryMode QueryMode => WqlQueryMode.Translatable;
+
+        /// <summary>
         /// Applies the specified filter criteria to the given query object.
         /// </summary>
         protected override IQuery<Workspace> Filter(string filter, IQuery<Workspace> query, IRequest request)
@@ -50,7 +57,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces._workspacekey_
         {
             var key = request.GetParameter<WorkspaceKeyParameter>()?.Value;
             var current = CoreHub.WorkspaceManager.GetWorkspaceByKey(key);
-            var all = CoreHub.WorkspaceManager.GetWorkspaces(query, context).ToList();
+            var all = CoreHub.WorkspaceManager.GetWorkspaces(global::KleeneStar.Core.WebPermission.ContentVisibility.Restrict(query), context).ToList();
 
             var invalidIds = new HashSet<Guid>();
             if (current != null)

@@ -1,4 +1,4 @@
-using WebExpress.WebApp.WebSection;
+﻿using WebExpress.WebApp.WebSection;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -18,11 +18,12 @@ namespace KleeneStar.Core.WebFragment.Profile
     [Order(0)]
     [Scope<global::KleeneStar.Core.WWW.Profile.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Account>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tenant>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Appearance>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Notifications>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Security>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions>]
-    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Sessions.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Profile.Tokens.Index>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Integrations>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Data>]
     [Scope<global::KleeneStar.Core.WWW.Profile.Delete>]
@@ -41,7 +42,7 @@ namespace KleeneStar.Core.WebFragment.Profile
         public ProfileSidebarDataLinkFragment(IFragmentContext fragmentContext)
             : base(fragmentContext)
         {
-            Icon = _ => new IconDatabase(TypeIconTheme.Light);
+            Icon = _ => new IconDatabase();
             Text = _ => "kleenestar.core:profile.data.title";
             Uri = _ => _uri;
             Active = renderContext => ProfileSidebarUriHelper.IsActive(renderContext, _uri)

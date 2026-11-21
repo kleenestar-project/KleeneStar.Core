@@ -10,7 +10,7 @@ namespace KleeneStar.Core.WWW.Settings.Group._groupid_
     /// <summary>
     /// Represents a page for deleting a group.
     /// </summary>
-    [WebIcon<IconTrashAlt>]
+    [WebIcon<IconTrash>]
     [Title("kleenestar.core:setting.group.delete.title")]
     [Scope<IScopeGeneral>]
     public sealed class Delete : IPage<VisualTreeWebApp>, IScope

@@ -21,12 +21,14 @@ namespace KleeneStar.Core.WebFragment.Class
     [Section<SectionSidebarPreferences>]
     [Scope<global::KleeneStar.Core.WWW.Class._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Fields._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.SecurityLevels._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Forms._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Priorities._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflows._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Statuses._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Slas._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Calendars._classid_.Index>]
+    [Scope<global::KleeneStar.Core.WWW.Relations._classid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Form._formid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Workflow._workflowid_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Sla._slaid_.Index>]
@@ -57,11 +59,17 @@ namespace KleeneStar.Core.WebFragment.Class
         }
 
         /// <summary>
-        /// Convert the fragment to HTML.
+        /// Renders the control as an HTML node.
         /// </summary>
-        /// <param name="renderContext">The context in which the fragment is rendered.</param>
-        /// <param name="visualTree">The visual tree used for rendering the fragment.</param>
-        /// <returns>An HTML node representing the rendered fragments. Can be null if no nodes are present.</returns>
+        /// <param name="renderContext">
+        /// The context in which the control is rendered.
+        /// </param>
+        /// <param name="visualTree">
+        /// The visual tree representing the control's structure.
+        /// </param>
+        /// <returns>
+        /// An HTML node representing the rendered control.
+        /// </returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
             return base.Render(renderContext, visualTree);
@@ -102,10 +110,11 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var form = CoreHub.FormManager.GetForm(formId) ?? throw new InvalidOperationException($"Form with ID '{formId}' not found.");
-
-                // create a synthetic class parameter based on the form's ClassId
-                classParameter = new ClassIdParameter(form.ClassId.ToString());
+                // an id from the url may address a form that no longer exists; the class
+                // is then simply unresolved rather than the render being aborted
+                classParameter = CoreHub.FormManager.GetForm(formId) is { } form
+                    ? new ClassIdParameter(form.ClassId.ToString())
+                    : null;
             }
             else if (classParameter == null && workflowParameter != null)
             {
@@ -113,11 +122,9 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var workflow = CoreHub.WorkflowManager.GetWorkflow(workflowId)
-                    ?? throw new InvalidOperationException($"Workflow with ID '{workflowId}' not found.");
-
-                // create a synthetic class parameter based on the form's ClassId
-                classParameter = new ClassIdParameter(workflow.ClassId.ToString());
+                classParameter = CoreHub.WorkflowManager.GetWorkflow(workflowId) is { } workflow
+                    ? new ClassIdParameter(workflow.ClassId.ToString())
+                    : null;
             }
 
             var uri = CoreHub.GetUri<Avatar>()?
@@ -157,10 +164,11 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var form = CoreHub.FormManager.GetForm(formId) ?? throw new InvalidOperationException($"Form with ID '{formId}' not found.");
-
-                // create a synthetic class parameter based on the form's ClassId
-                classParameter = new ClassIdParameter(form.ClassId.ToString());
+                // an id from the url may address a form that no longer exists; the class
+                // is then simply unresolved rather than the render being aborted
+                classParameter = CoreHub.FormManager.GetForm(formId) is { } form
+                    ? new ClassIdParameter(form.ClassId.ToString())
+                    : null;
             }
             else if (classParameter == null && workflowParameter != null)
             {
@@ -168,11 +176,9 @@ namespace KleeneStar.Core.WebFragment.Class
                     ? formGuid
                     : Guid.Empty;
 
-                var workflow = CoreHub.WorkflowManager.GetWorkflow(workflowId)
-                    ?? throw new InvalidOperationException($"Workflow with ID '{workflowId}' not found.");
-
-                // create a synthetic class parameter based on the form's ClassId
-                classParameter = new ClassIdParameter(workflow.ClassId.ToString());
+                classParameter = CoreHub.WorkflowManager.GetWorkflow(workflowId) is { } workflow
+                    ? new ClassIdParameter(workflow.ClassId.ToString())
+                    : null;
             }
 
             var guid = Guid.TryParse(classParameter?.Value, out var classGuid)

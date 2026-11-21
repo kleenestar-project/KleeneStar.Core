@@ -72,12 +72,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The field.</returns>
         public Field GetField(Guid fieldId)
         {
-            var query = new Query<Field>()
-                .Where(x => x.Id == fieldId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetField), fieldId, () =>
+            {
+                var query = new Query<Field>()
+                    .Where(x => x.Id == fieldId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetFields(query)
-                .FirstOrDefault();
+                return ModelHub.GetFields(query)
+                    .FirstOrDefault();
+            }, typeof(Field));
         }
 
         /// <summary>
@@ -103,10 +106,14 @@ namespace KleeneStar.Core.WebManager
         public IEnumerable<Field> GetFields(ClassIdParameter classId)
         {
             var guid = Guid.TryParse(classId.Value, out Guid id) ? id : Guid.Empty;
-            var query = new Query<Field>()
-                .WhereEquals(x => x.ClassId, guid);
 
-            return ModelHub.GetFields(query);
+            return RequestReadCache.Get<IReadOnlyList<Field>>(nameof(GetFields), guid, () =>
+            {
+                var query = new Query<Field>()
+                    .WhereEquals(x => x.ClassId, guid);
+
+                return [.. ModelHub.GetFields(query)];
+            }, typeof(Field));
         }
 
         /// <summary>
@@ -157,7 +164,7 @@ namespace KleeneStar.Core.WebManager
             FieldAdded?.Invoke(this, fieldEntity);
 
             // create notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.field.created", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.field.created", fieldEntity);
 
             return this;
         }
@@ -176,7 +183,7 @@ namespace KleeneStar.Core.WebManager
             FieldUpdated?.Invoke(this, fieldEntity);
 
             // update notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.field.updated", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.field.updated", fieldEntity);
 
             return this;
         }

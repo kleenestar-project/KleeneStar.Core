@@ -106,12 +106,15 @@ namespace KleeneStar.Core.WebManager
         /// <returns>The workflow state.</returns>
         public Status GetStatus(Guid workflowId)
         {
-            var query = new Query<Status>()
-                .Where(x => x.Id == workflowId)
-                .WithPaging(0, 1);
+            return RequestReadCache.Get(nameof(GetStatus), workflowId, () =>
+            {
+                var query = new Query<Status>()
+                    .Where(x => x.Id == workflowId)
+                    .WithPaging(0, 1);
 
-            return ModelHub.GetStatuses(query)
-                .FirstOrDefault();
+                return ModelHub.GetStatuses(query)
+                    .FirstOrDefault();
+            }, typeof(Status), typeof(StatusCategory));
         }
 
         /// <summary>
@@ -137,10 +140,14 @@ namespace KleeneStar.Core.WebManager
         public IEnumerable<Status> GetStatuses(ClassIdParameter classId)
         {
             var guid = Guid.TryParse(classId.Value, out Guid id) ? id : Guid.Empty;
-            var query = new Query<Status>()
-                .WhereEquals(x => x.ClassId, guid);
 
-            return ModelHub.GetStatuses(query);
+            return RequestReadCache.Get<IReadOnlyList<Status>>(nameof(GetStatuses), guid, () =>
+            {
+                var query = new Query<Status>()
+                    .WhereEquals(x => x.ClassId, guid);
+
+                return [.. ModelHub.GetStatuses(query)];
+            }, typeof(Status), typeof(StatusCategory));
         }
 
         /// <summary>
@@ -191,7 +198,7 @@ namespace KleeneStar.Core.WebManager
             StatusAdded?.Invoke(this, stateEntity);
 
             // create notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.status.created", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.created", "kleenestar.core:notification.status.created", stateEntity);
 
             return this;
         }
@@ -210,7 +217,7 @@ namespace KleeneStar.Core.WebManager
             StatusUpdated?.Invoke(this, stateEntity);
 
             // update notification
-            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.status.updated", 5000);
+            CoreHub.AddNotification("kleenestar.core:notification.title.updated", "kleenestar.core:notification.status.updated", stateEntity);
 
             return this;
         }
