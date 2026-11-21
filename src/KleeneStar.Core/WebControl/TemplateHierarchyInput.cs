@@ -32,7 +32,8 @@ namespace KleeneStar.Core.WebControl
     ///   <item><c>data-assignees</c>: the active accounts of the operator side.</item>
     ///   <item><c>data-links</c>: the links a node may name (<see cref="TemplateHierarchyNodeList.LinkTypes"/>),
     ///   each relation type with its label and, unless it is symmetric, with its inverse label
-    ///   (value <c>{key}:inverse</c>), translated.</item>
+    ///   (value <c>{key}:inverse</c>), translated, and whether it blocks the completion of its
+    ///   target (<c>blocking</c>, for the cycle check of the client).</item>
     /// </list>
     /// </remarks>
     public sealed class TemplateHierarchyInput : ControlFormItemInput<ControlFormInputValueString>
@@ -154,9 +155,9 @@ namespace KleeneStar.Core.WebControl
         }
 
         /// <summary>
-        /// Collects the links a node may name, read from the parent object: the label of a
-        /// relation type for the link from the parent to the created object, the inverse label
-        /// for the other direction.
+        /// Collects the links a node may name, read from the node: the label of a relation type
+        /// for the link from the object of the node to the objects of its targets, the inverse
+        /// label for the other direction.
         /// </summary>
         /// <param name="renderContext">The context in which the control is rendered.</param>
         /// <returns>The links in the order of the catalog.</returns>
@@ -164,11 +165,14 @@ namespace KleeneStar.Core.WebControl
         {
             foreach (var type in TemplateHierarchyNodeList.LinkTypes())
             {
+                var blocking = type.Effect == WebExpress.WebApp.WebRelation.RelationEffect.BlocksCompletion;
+
                 yield return new
                 {
                     Value = TemplateHierarchyNodeList.FormatLink(type.Key, false),
                     Label = I18N.Translate(renderContext, type.Label),
-                    Icon = type.Icon
+                    Icon = type.Icon,
+                    Blocking = blocking
                 };
 
                 if (!type.Symmetric && !string.IsNullOrWhiteSpace(type.InverseLabel))
@@ -177,7 +181,8 @@ namespace KleeneStar.Core.WebControl
                     {
                         Value = TemplateHierarchyNodeList.FormatLink(type.Key, true),
                         Label = I18N.Translate(renderContext, type.InverseLabel),
-                        Icon = type.Icon
+                        Icon = type.Icon,
+                        Blocking = blocking
                     };
                 }
             }

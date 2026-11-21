@@ -38,8 +38,9 @@ namespace KleeneStar.Core.Test.WebControl
 
         /// <summary>
         /// A row naming a stored node keeps its id, a new row gets a fresh one, and the parent
-        /// and waits-for references follow the rows to their ids; a missing child flag counts as
-        /// a sub-object and a link carries its direction.
+        /// and the link targets follow the rows to their ids; a missing child flag counts as a
+        /// sub-object, a link carries its direction, and a target naming no row, the row itself
+        /// or nothing is dropped with the links left empty.
         /// </summary>
         [Fact]
         public void ToNodes_KeepsStoredIdsAndTranslatesReferences()
@@ -49,8 +50,16 @@ namespace KleeneStar.Core.Test.WebControl
             var rows = new List<TemplateHierarchyNodeList.Row>
             {
                 new() { Id = stored.Id.ToString(), Template = stored.TemplateId },
-                new() { Id = "new-1", Parent = stored.Id.ToString(), Template = Guid.NewGuid(), Class = Guid.Empty, Child = false, Link = "blocks:inverse" },
-                new() { Id = foreign.ToString(), Parent = stored.Id.ToString(), Template = Guid.NewGuid(), WaitsFor = "new-1", Assignee = Guid.Empty, Link = "references" }
+                new()
+                {
+                    Id = "new-1", Parent = stored.Id.ToString(), Template = Guid.NewGuid(), Class = Guid.Empty, Child = false,
+                    Links = [new() { Link = "blocks:inverse", Targets = ["ROOT", "new-1", "unknown"] }, new() { Link = "", Targets = ["root"] }]
+                },
+                new()
+                {
+                    Id = foreign.ToString(), Parent = stored.Id.ToString(), Template = Guid.NewGuid(), Assignee = Guid.Empty,
+                    Links = [new() { Link = "references", Targets = ["new-1", stored.Id.ToString()] }, new() { Link = "causes", Targets = ["unknown"] }]
+                }
             };
 
             var nodes = TemplateHierarchyNodeList.ToNodes(rows, [stored]);
@@ -60,13 +69,20 @@ namespace KleeneStar.Core.Test.WebControl
             Assert.Null(nodes[0].ParentNodeId);
             Assert.Equal(nodes[0].Id, nodes[1].ParentNodeId);
             Assert.Equal(nodes[0].Id, nodes[2].ParentNodeId);
-            Assert.Equal(nodes[1].Id, nodes[2].PredecessorId);
             Assert.True(nodes[0].AsChild);
             Assert.False(nodes[1].AsChild);
-            Assert.Equal("blocks", nodes[1].RelationTypeKey);
-            Assert.True(nodes[1].RelationInverse);
-            Assert.Equal("references", nodes[2].RelationTypeKey);
-            Assert.False(nodes[2].RelationInverse);
+            Assert.Empty(nodes[0].Links);
+
+            var blocked = Assert.Single(nodes[1].Links);
+            Assert.Equal("blocks", blocked.Type);
+            Assert.True(blocked.Inverse);
+            Assert.Equal([TemplateHierarchyNodeLink.RootTarget], blocked.Targets);
+
+            var references = Assert.Single(nodes[2].Links);
+            Assert.Equal("references", references.Type);
+            Assert.False(references.Inverse);
+            Assert.Equal([nodes[1].Id.ToString(), nodes[0].Id.ToString()], references.Targets);
+
             Assert.Null(nodes[1].ClassId);
             Assert.Null(nodes[2].AssigneeId);
         }
@@ -78,8 +94,10 @@ namespace KleeneStar.Core.Test.WebControl
         public void Serialize_RoundTrips()
         {
             var first = new TemplateHierarchyNode { TemplateId = Guid.NewGuid(), ClassId = Guid.NewGuid(), AssigneeId = Guid.NewGuid() };
-            var second = new TemplateHierarchyNode { TemplateId = Guid.NewGuid(), ParentNodeId = first.Id, AsChild = false, RelationTypeKey = "causes", RelationInverse = true };
-            var third = new TemplateHierarchyNode { TemplateId = Guid.NewGuid(), PredecessorId = first.Id };
+            var second = new TemplateHierarchyNode { TemplateId = Guid.NewGuid(), ParentNodeId = first.Id, AsChild = false };
+            var third = new TemplateHierarchyNode { TemplateId = Guid.NewGuid() };
+            second.Links = [new() { Type = "causes", Inverse = true, Targets = [TemplateHierarchyNodeLink.RootTarget, third.Id.ToString()] }];
+            third.Links = [new() { Type = "blocks", Inverse = true, Targets = [first.Id.ToString()] }];
 
             Assert.True(TemplateHierarchyNodeList.TryParse(TemplateHierarchyNodeList.Serialize([first, second, third]), out var rows));
 
@@ -89,9 +107,15 @@ namespace KleeneStar.Core.Test.WebControl
             Assert.Equal(first.AssigneeId, nodes[0].AssigneeId);
             Assert.Equal(first.Id, nodes[1].ParentNodeId);
             Assert.False(nodes[1].AsChild);
-            Assert.Equal("causes", nodes[1].RelationTypeKey);
-            Assert.True(nodes[1].RelationInverse);
-            Assert.Equal(first.Id, nodes[2].PredecessorId);
+
+            var causes = Assert.Single(nodes[1].Links);
+            Assert.Equal("causes", causes.Type);
+            Assert.True(causes.Inverse);
+            Assert.Equal([TemplateHierarchyNodeLink.RootTarget, third.Id.ToString()], causes.Targets);
+
+            var blocks = Assert.Single(nodes[2].Links);
+            Assert.Equal("blocks", blocks.Type);
+            Assert.Equal([first.Id.ToString()], blocks.Targets);
         }
 
         /// <summary>
@@ -109,26 +133,43 @@ namespace KleeneStar.Core.Test.WebControl
         }
 
         /// <summary>
-        /// Rows waiting for each other in a circle are found; a chain is not a circle.
+        /// Blocking links running in a circle are found, in either direction and through the
+        /// root; a chain is not a circle, and links of a type that does not block never are.
         /// </summary>
         [Fact]
-        public void HasWaitingCycle_FindsCircles()
+        public void HasBlockingCycle_FindsCircles()
         {
-            Assert.False(TemplateHierarchyNodeList.HasWaitingCycle(
+            static bool Blocking(string key) => key == "blocks";
+            static TemplateHierarchyNodeList.LinkRow Link(string link, params string[] targets) => new() { Link = link, Targets = [.. targets] };
+
+            // b is blocked by a, c by b: a chain
+            Assert.False(TemplateHierarchyNodeList.HasBlockingCycle(
             [
                 new() { Id = "a" },
-                new() { Id = "b", WaitsFor = "a" },
-                new() { Id = "c", WaitsFor = "b" }
-            ]));
+                new() { Id = "b", Links = [Link("blocks:inverse", "a")] },
+                new() { Id = "c", Links = [Link("blocks:inverse", "b")] }
+            ], Blocking));
 
-            Assert.True(TemplateHierarchyNodeList.HasWaitingCycle(
+            // a blocks b, b blocks c, c is blocking a
+            Assert.True(TemplateHierarchyNodeList.HasBlockingCycle(
             [
-                new() { Id = "a", WaitsFor = "c" },
-                new() { Id = "b", WaitsFor = "a" },
-                new() { Id = "c", WaitsFor = "b" }
-            ]));
+                new() { Id = "a", Links = [Link("blocks", "b")] },
+                new() { Id = "b", Links = [Link("blocks", "c")] },
+                new() { Id = "c", Links = [Link("blocks", "a")] }
+            ], Blocking));
 
-            Assert.True(TemplateHierarchyNodeList.HasWaitingCycle([new() { Id = "a", WaitsFor = "a" }]));
+            // the root blocks a, and a blocks the root
+            Assert.True(TemplateHierarchyNodeList.HasBlockingCycle(
+            [
+                new() { Id = "a", Links = [Link("blocks:inverse", "root"), Link("blocks", "root")] }
+            ], Blocking));
+
+            // the same circle with a relation that does not block
+            Assert.False(TemplateHierarchyNodeList.HasBlockingCycle(
+            [
+                new() { Id = "a", Links = [Link("references", "b")] },
+                new() { Id = "b", Links = [Link("references", "a")] }
+            ], Blocking));
         }
     }
 }

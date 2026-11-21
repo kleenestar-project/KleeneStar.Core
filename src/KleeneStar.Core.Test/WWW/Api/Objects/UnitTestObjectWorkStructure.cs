@@ -54,7 +54,14 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
                     // the onboarding hierarchy references both templates; the desk set-up waits for the account
                     db.TemplateHierarchies.Add(new TemplateHierarchy(HierarchyId) { Name = "Onboarding", WorkspaceId = HrWorkspaceId, RootTemplateId = OnboardingTemplateId, State = TemplateState.Active, Created = DateTime.UtcNow, Updated = DateTime.UtcNow });
                     db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = AccountEntryId, HierarchyId = HierarchyId, TemplateId = AccountTemplateId, AssigneeId = AgentId, Order = 1 });
-                    db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode { Id = DeskEntryId, HierarchyId = HierarchyId, TemplateId = DeskTemplateId, PredecessorId = AccountEntryId, Order = 2 });
+                    db.TemplateHierarchyNodes.Add(new TemplateHierarchyNode
+                    {
+                        Id = DeskEntryId,
+                        HierarchyId = HierarchyId,
+                        TemplateId = DeskTemplateId,
+                        Order = 2,
+                        Links = [new TemplateHierarchyNodeLink { Type = "blocks", Inverse = true, Targets = [AccountEntryId.ToString()] }]
+                    });
 
                     db.SaveChanges();
                 }
@@ -99,11 +106,11 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
         private static void CreateChildren(ObjectEntity order, ObjectCreationRun run)
         {
             var method = typeof(global::KleeneStar.Core.WWW.Api._1_.Objects.Index)
-                .GetMethod("CreateNodes", BindingFlags.Static | BindingFlags.NonPublic);
+                .GetMethod("CreateStructure", BindingFlags.Static | BindingFlags.NonPublic);
 
             Assert.NotNull(method);
 
-            method!.Invoke(null, [order, CoreHub.TemplateHierarchyManager.GetNodes(HierarchyId), null, null, run]);
+            method!.Invoke(null, [order, CoreHub.TemplateHierarchyManager.GetNodes(HierarchyId), null, run]);
         }
 
         /// <summary>
@@ -220,15 +227,16 @@ namespace KleeneStar.Core.Test.WWW.Api.Objects
             {
                 foreach (var node in db.TemplateHierarchyNodes.Where(x => x.HierarchyId == HierarchyId))
                 {
+                    // the account references the root object; the desk is referenced by it and
+                    // still waits for the account
                     if (node.Id == AccountEntryId)
                     {
                         node.AsChild = false;
-                        node.RelationTypeKey = "references";
-                        node.RelationInverse = true;
+                        node.Links = [new TemplateHierarchyNodeLink { Type = "references", Targets = [TemplateHierarchyNodeLink.RootTarget] }];
                     }
                     else
                     {
-                        node.RelationTypeKey = "references";
+                        node.Links = [.. node.Links, new TemplateHierarchyNodeLink { Type = "references", Inverse = true, Targets = [TemplateHierarchyNodeLink.RootTarget] }];
                     }
                 }
 

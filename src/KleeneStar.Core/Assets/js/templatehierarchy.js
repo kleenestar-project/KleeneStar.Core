@@ -4,23 +4,27 @@ kleenestar.core = kleenestar.core || {}
 /**
  * The node tree of a template hierarchy in the hierarchy wizard: the existing templates whose
  * objects are created with the object of the root template, each below its parent node as a
- * sub-object, linked to it by a relation type, or both.
+ * sub-object, linked to other objects of the structure, or both.
  *
  * The host (WebControl/TemplateHierarchyInput) carries the stored nodes depth first
  * (data-value), the templates that may be added (data-candidates, each with the classes it
- * serves), the accounts a node may be assigned to (data-assignees) and the links a node may
- * name (data-links, each relation type in both directions). The control shows the root
- * template the wizard chose (the tile selection "Root" of the same form) on top and draws one
- * row per node, indented by its depth: drag handle, position, icon, name, workspace, a badge
- * naming the connection, and the buttons to indent, outdent, move and remove it; below the head
- * the class, the connection, the assignee and the sibling it waits for. A row moves with its
- * subtree; a removed row hands its children to its parent. The picker below the tree adds a
- * template at the end, below the root; indenting places it below the node above.
+ * serves), the accounts a node may be assigned to (data-assignees) and the relation types a link
+ * may name (data-links, each in both directions, read from the node, with the flag blocking).
+ * The control shows the root template the wizard chose (the tile selection "Root" of the same
+ * form) on top and draws one row per node, indented by its depth: drag handle, position, icon,
+ * name, workspace, a badge naming the connection, and the buttons to indent, outdent, move and
+ * remove it; below the head the class, the sub-object switch and the assignee, and the inner
+ * list of links: per line a relation type, a multiple selection of the objects of the structure
+ * (the root and the other nodes) and a button removing the line; a button below adds a line. A
+ * row moves with its subtree; a removed row hands its children to its parent and leaves the
+ * links naming it. The picker below the tree adds a template at the end, below the root;
+ * indenting places it below the node above.
  *
  * The nodes are submitted through one hidden input as JSON (WebControl/TemplateHierarchyNodeList):
- * [{ id, parent, template, class, child, link, assignee, waitsFor }], depth first. The pickers
- * inside the rows are framework selections without a name, so they post nothing themselves;
- * their change events stay inside the control, which announces one change of its own value.
+ * [{ id, parent, template, class, child, assignee, links: [{ link, targets }] }], depth first;
+ * a target is the key of a row or "root". The pickers inside the rows are framework selections
+ * without a name, so they post nothing themselves; their change events stay inside the control,
+ * which announces one change of its own value.
  */
 kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
     /**
@@ -32,6 +36,11 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
      * The name of the root selection of the wizard.
      */
     static ROOT_FIELD = "Root";
+
+    /**
+     * The target of a link that names the object created from the root template.
+     */
+    static ROOT_TARGET = "root";
 
     /**
      * The counter behind the keys of rows added on this page.
@@ -119,7 +128,9 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
     /**
      * Validates the nodes: every node referencing a template that serves several classes names
-     * the class its object is created in, and every node is a sub-object, linked or both.
+     * the class its object is created in, every node is a sub-object, linked or both, every
+     * link line names a relation type and at least one object, and the blocking links do not
+     * run in a circle.
      * @returns {Array<string>} The messages, empty when the nodes are valid.
      */
     validate() {
@@ -128,19 +139,32 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         for (const row of this._rows) {
             const missingClass = this._needsClass(row) && !row.class;
             const unconnected = !this._isConnected(row);
-            row.element.classList.toggle("ks-template-child-invalid", missingClass || unconnected);
+            const incomplete = row.links.filter((x) => !this._isComplete(x));
+            row.element.classList.toggle("ks-template-child-invalid", missingClass || unconnected || incomplete.length > 0);
 
             // the form moves the focus to the first element marked invalid, which brings the
             // row into view with the choice that is missing
             row.element.querySelector(".ks-template-child-class .wx-selection-trigger")?.setAttribute("aria-invalid", missingClass ? "true" : "false");
-            row.element.querySelector(".ks-template-child-link .wx-selection-trigger")?.setAttribute("aria-invalid", unconnected ? "true" : "false");
+            row.linkAdd?.setAttribute("aria-invalid", unconnected && row.links.length === 0 ? "true" : "false");
+            for (const link of row.links) {
+                const broken = incomplete.includes(link);
+                link.element.classList.toggle("ks-template-child-link-invalid", broken);
+                link.typeHost.querySelector(".wx-selection-trigger")?.setAttribute("aria-invalid", broken && !link.link ? "true" : "false");
+                link.targetHost.querySelector(".wx-selection-trigger")?.setAttribute("aria-invalid", broken && link.targets.length === 0 ? "true" : "false");
+            }
 
             if (missingClass) {
                 messages.push(this._t("class.required", "Choose the class for \"{0}\".").replace("{0}", () => this._nameOf(row)));
             }
-            if (unconnected) {
-                messages.push(this._t("connection.required", "Create \"{0}\" as a sub-object or choose a link.").replace("{0}", () => this._nameOf(row)));
+            if (incomplete.length > 0) {
+                messages.push(this._t("link.incomplete", "Each link of \"{0}\" needs a relation and at least one object.").replace("{0}", () => this._nameOf(row)));
+            } else if (unconnected) {
+                messages.push(this._t("connection.required", "Create \"{0}\" as a sub-object or add a link.").replace("{0}", () => this._nameOf(row)));
             }
+        }
+
+        if (this._hasBlockingCycle()) {
+            messages.push(this._t("link.cycle", "The blocking links run in a circle; none of these objects could ever be finished."));
         }
 
         return messages;
@@ -166,6 +190,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
         const depths = new Map();
 
+        // a link may name a node further down, which does not exist yet while the rows are
+        // built; the targets are offered, and checked, once every row is there (_render)
+        this._loading = true;
+
         for (const entry of entries || []) {
             if (!entry || !entry.template) {
                 continue;
@@ -182,12 +210,17 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
                 template: String(entry.template),
                 class: entry.class ? String(entry.class) : null,
                 child: entry.child !== false,
-                link: entry.link ? String(entry.link) : null,
                 assignee: entry.assignee ? String(entry.assignee) : null,
-                waitsFor: entry.waitsFor ? String(entry.waitsFor) : null
+                links: (Array.isArray(entry.links) ? entry.links : [])
+                    .filter((x) => x && (x.link || (x.targets || []).length > 0))
+                    .map((x) => ({
+                        link: x.link ? String(x.link) : null,
+                        targets: (x.targets || []).map((t) => String(t))
+                    }))
             }));
         }
 
+        this._loading = false;
         this._render();
         this._sync(false);
     }
@@ -211,11 +244,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
             template: String(candidate.id),
             // a template serving one class needs no choice
             class: classes.length === 1 ? String(classes[0].id) : null,
-            // a new node is a sub-object; a link is added on the row
+            // a new node is a sub-object; links are added on the row
             child: true,
-            link: null,
             assignee: null,
-            waitsFor: null
+            links: []
         });
 
         this._rows.push(row);
@@ -232,8 +264,8 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
     }
 
     /**
-     * Removes a row; its children move up to its parent, and the rows waiting for it wait for
-     * nothing afterwards.
+     * Removes a row; its children move up to its parent, and the links naming it name it no
+     * longer.
      * @param {object} row - The row.
      */
     _remove(row) {
@@ -251,8 +283,8 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         this._rows.splice(index, 1);
 
         for (const other of this._rows) {
-            if (other.waitsFor === row.key) {
-                other.waitsFor = null;
+            for (const link of other.links) {
+                link.targets = link.targets.filter((x) => x !== row.key);
             }
         }
 
@@ -319,9 +351,6 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
             this._rows[i].depth += delta;
         }
 
-        // a new parent has other siblings; the old dependency names none of them
-        row.waitsFor = null;
-
         this._render();
         this._commit();
         this._keepFocus(row, focusOf);
@@ -351,7 +380,6 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         const at = this._rows.indexOf(target);
         const insert = before ? at : this._subtreeEnd(at);
         this._rows.splice(insert, 0, ...block);
-        row.waitsFor = null;
 
         this._render();
         this._commit();
@@ -405,8 +433,8 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
     }
 
     /**
-     * Draws the rows in their order: indentation, positions, buttons, the options of the
-     * waits-for selections and the empty state.
+     * Draws the rows in their order: indentation, positions, buttons, the objects the links
+     * may name and the empty state.
      */
     _render() {
         // a depth may not exceed the depth of the row before it by more than one
@@ -431,8 +459,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
             row.indent.disabled = this._previousSibling(index) < 0;
             row.outdent.disabled = row.depth === 0;
             row.parentName.textContent = this._parentOf(index) ? this._nameOf(this._parentOf(index)) : this._rootName();
-            this._renderWaitsFor(row, index);
         });
+
+        // the targets name the positions, which are known only now
+        this._rows.forEach((row) => this._renderLinkTargets(row));
 
         this._empty.hidden = this._rows.length > 0;
         this._list.hidden = this._rows.length === 0;
@@ -447,9 +477,15 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         // a row that was invalid may be valid now; the marker follows the tree, and the badge
         // of the head names the connection as it is
         for (const row of this._rows) {
-            if (row.element.classList.contains("ks-template-child-invalid") && (!this._needsClass(row) || row.class) && this._isConnected(row)) {
+            for (const link of row.links) {
+                if (link.element.classList.contains("ks-template-child-link-invalid") && this._isComplete(link)) {
+                    link.element.classList.remove("ks-template-child-link-invalid");
+                    link.element.querySelectorAll(".wx-selection-trigger[aria-invalid]").forEach((x) => x.setAttribute("aria-invalid", "false"));
+                }
+            }
+            if (row.element.classList.contains("ks-template-child-invalid") && (!this._needsClass(row) || row.class) && this._isConnected(row) && row.links.every((x) => this._isComplete(x))) {
                 row.element.classList.remove("ks-template-child-invalid");
-                row.element.querySelectorAll(".wx-selection-trigger[aria-invalid]").forEach((x) => x.setAttribute("aria-invalid", "false"));
+                row.element.querySelectorAll("[aria-invalid]").forEach((x) => x.setAttribute("aria-invalid", "false"));
             }
             this._renderConnection(row);
         }
@@ -486,9 +522,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
             template: row.template,
             class: row.class || null,
             child: row.child !== false,
-            link: row.link || null,
             assignee: row.assignee || null,
-            waitsFor: row.waitsFor || null
+            links: row.links
+                .filter((x) => x.link || x.targets.length > 0)
+                .map((x) => ({ link: x.link || null, targets: [...x.targets] }))
         })));
     }
 
@@ -550,11 +587,12 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
     /**
      * Creates the row of a node.
-     * @param {object} entry - The node: key, depth, template, class, child, link, assignee, waitsFor.
+     * @param {object} entry - The node: key, depth, template, class, child, assignee, links.
      * @returns {object} The row: the node with its elements and selections.
      */
     _createRow(entry) {
         const row = Object.assign({}, entry);
+        row.links = [];
         const candidate = this._candidate(row.template);
         const element = document.createElement("li");
         element.className = "ks-template-child";
@@ -634,14 +672,15 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
         element.appendChild(head);
 
-        // the settings of the node: class, connection, assignee, waits for
+        // the settings of the node: class, sub-object, assignee, and the links below them
         const fields = document.createElement("div");
         fields.className = "ks-template-child-fields";
         fields.appendChild(this._createClassField(row, candidate));
         fields.appendChild(this._createConnectionField(row));
         fields.appendChild(this._createAssigneeField(row));
-        fields.appendChild(this._createWaitsForField(row));
+        fields.appendChild(this._createLinksField(row, entry.links || []));
         element.appendChild(fields);
+        this._renderConnection(row);
 
         this._attachDrag(row, handle);
 
@@ -718,8 +757,7 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
     /**
      * Creates the connection field of a row: a switch that creates the object as a sub-object
-     * of its parent and a selection of the link to the parent object, each relation type in
-     * both directions as read from the parent.
+     * of its parent.
      * @param {object} row - The row.
      * @returns {HTMLElement} The field.
      */
@@ -751,36 +789,205 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         });
 
         body.appendChild(check);
-
-        const linkHost = document.createElement("div");
-        linkHost.className = "ks-template-child-link";
-        body.appendChild(linkHost);
         field.appendChild(body);
 
-        // a stored link the catalog no longer offers is dropped rather than shown as an id
-        if (row.link && !this._links.some((x) => x.value === row.link)) {
-            row.link = null;
+        return field;
+    }
+
+    /**
+     * Creates the links field of a row: the inner list of links, one line per link with the
+     * relation type, the objects it joins and a button removing the line, and a button adding
+     * a line.
+     * @param {object} row - The row.
+     * @param {Array<object>} links - The stored links: link, targets.
+     * @returns {HTMLElement} The field.
+     */
+    _createLinksField(row, links) {
+        const field = this._field(this._t("links", "Links"), "ks-template-child-links");
+
+        row.linkList = document.createElement("ul");
+        row.linkList.className = "ks-template-child-link-list";
+        // a list with a role is left alone by the content styles of plain lists
+        row.linkList.setAttribute("role", "list");
+        field.appendChild(row.linkList);
+
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "btn btn-sm btn-link ks-template-child-link-add";
+        add.append(this._icon("plus"), document.createTextNode(" " + this._t("link.add", "Add link")));
+        add.addEventListener("click", (event) => {
+            event.preventDefault();
+            const link = this._addLink(row, { link: null, targets: [] });
+            this._commit();
+            link.typeHost.querySelector(".wx-selection-trigger")?.focus({ preventScroll: true });
+        });
+        row.linkAdd = add;
+        field.appendChild(add);
+
+        for (const link of links) {
+            this._addLink(row, link);
         }
 
-        this._selection(linkHost, {
-            placeholder: this._t("link.placeholder", "No link"),
-            sticky: false,
+        return field;
+    }
+
+    /**
+     * Adds a line to the links of a row.
+     * @param {object} row - The row.
+     * @param {object} entry - The link: link (relation type key, ":inverse" for the other
+     * direction), targets (row keys or "root").
+     * @returns {object} The link with its elements.
+     */
+    _addLink(row, entry) {
+        // a relation type the catalog no longer offers is dropped rather than shown as a key
+        const link = {
+            link: entry.link && this._links.some((x) => x.value === entry.link) ? entry.link : null,
+            targets: [...(entry.targets || [])]
+        };
+
+        link.element = document.createElement("li");
+        link.element.className = "ks-template-child-link-row";
+
+        link.typeHost = document.createElement("div");
+        link.typeHost.className = "ks-template-child-link-type";
+        link.targetHost = document.createElement("div");
+        link.targetHost.className = "ks-template-child-link-targets";
+
+        this._selection(link.typeHost, {
+            placeholder: this._t("link.placeholder", "Choose a relation"),
+            sticky: true,
             options: this._links.map((x) => ({
                 id: String(x.value),
                 label: x.label,
                 content: this._esc(x.label),
                 icon: x.icon ? this._iconClass(x.icon) : null
             })),
-            value: row.link,
+            value: link.link,
             onChange: (value) => {
-                row.link = value;
+                link.link = value;
                 this._commit();
             }
         });
 
-        this._renderConnection(row);
+        link.targetSelection = this._selection(link.targetHost, {
+            placeholder: this._t("link.targets.placeholder", "Choose objects"),
+            sticky: false,
+            multiple: true,
+            options: [],
+            value: null,
+            onChange: (values) => {
+                link.targets = values;
+                this._commit();
+            }
+        });
 
-        return field;
+        const remove = this._button("trash", this._t("link.remove", "Remove link"), "ks-template-child-link-remove", () => {
+            row.links = row.links.filter((x) => x !== link);
+            link.element.remove();
+            this._commit();
+            row.linkAdd?.focus({ preventScroll: true });
+        });
+
+        link.element.append(link.typeHost, link.targetHost, remove);
+        row.linkList.appendChild(link.element);
+        row.links.push(link);
+
+        this._renderLinkTargets(row);
+
+        return link;
+    }
+
+    /**
+     * Offers every place of the structure but the row itself to the links of a row: the root
+     * and the other nodes, each named with its position. Targets naming a place that no longer
+     * exists are dropped.
+     * @param {object} row - The row.
+     */
+    _renderLinkTargets(row) {
+        if (this._loading || !row.links || row.links.length === 0 || !row.position) {
+            return;
+        }
+
+        // the chosen objects show as info chips, apart from the relation beside them
+        const rootTarget = kleenestar.core.TemplateHierarchyCtrl.ROOT_TARGET;
+        const color = "wx-selection-info";
+        const options = [{
+            id: rootTarget,
+            label: this._rootName(),
+            color: color,
+            content: `<span class="ks-template-child-option-position">${this._esc(this._t("root", "Root"))}</span> ${this._esc(this._rootName())}`
+        }].concat(this._rows
+            .filter((other) => other !== row)
+            .map((other) => ({
+                id: other.key,
+                label: `${other.position.textContent} ${this._nameOf(other)}`,
+                color: color,
+                content: `<span class="ks-template-child-option-position">${this._esc(other.position.textContent)}</span> ${this._esc(this._nameOf(other))}`
+            })));
+
+        for (const link of row.links) {
+            link.targets = link.targets.filter((x) => options.some((o) => o.id === x));
+            link.targetSelection._silent = true;
+            link.targetSelection.options = options;
+            link.targetSelection.value = [...link.targets];
+            link.targetSelection._silent = false;
+        }
+    }
+
+    /**
+     * Tells whether a link line is complete: it names a relation type and at least one object.
+     * @param {object} link - The link.
+     * @returns {boolean} True when the line is complete.
+     */
+    _isComplete(link) {
+        return !!link.link && link.targets.length > 0;
+    }
+
+    /**
+     * Tells whether the blocking links close a circle. A blocking link without inverse runs
+     * from its row to its targets (the row blocks them), with inverse the other way round.
+     * @returns {boolean} True when an object would be blocked by itself.
+     */
+    _hasBlockingCycle() {
+        const blocking = new Set(this._links.filter((x) => x.blocking).map((x) => x.value));
+        const edges = new Map();
+        const add = (from, to) => {
+            if (!edges.has(from)) {
+                edges.set(from, new Set());
+            }
+            edges.get(from).add(to);
+        };
+
+        for (const row of this._rows) {
+            for (const link of row.links) {
+                if (!link.link || !blocking.has(link.link)) {
+                    continue;
+                }
+                const inverse = link.link.endsWith(":inverse");
+                for (const target of link.targets) {
+                    if (inverse) {
+                        add(target, row.key);
+                    } else {
+                        add(row.key, target);
+                    }
+                }
+            }
+        }
+
+        const state = new Map();
+        const visit = (place) => {
+            state.set(place, 1);
+            for (const next of edges.get(place) || []) {
+                const seen = state.get(next) || 0;
+                if (seen === 1 || (seen === 0 && visit(next))) {
+                    return true;
+                }
+            }
+            state.set(place, 2);
+            return false;
+        };
+
+        return [...edges.keys()].some((place) => !state.has(place) && visit(place));
     }
 
     /**
@@ -796,10 +1003,11 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         if (row.child !== false) {
             parts.push(this._t("child", "Sub-object"));
         }
-        const link = row.link ? this._links.find((x) => x.value === row.link) : null;
-        if (link) {
-            parts.push(link.label);
-        }
+        const labels = new Set(row.links
+            .filter((x) => this._isComplete(x))
+            .map((x) => this._links.find((l) => l.value === x.link)?.label)
+            .filter(Boolean));
+        parts.push(...labels);
 
         row.connection.textContent = parts.length > 0 ? parts.join(" · ") : this._t("connection.none", "Not connected");
         row.connection.classList.toggle("ks-template-child-connection-none", parts.length === 0);
@@ -808,10 +1016,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
     /**
      * Tells whether a row is a sub-object, linked or both.
      * @param {object} row - The row.
-     * @returns {boolean} True when the object is connected to its parent.
+     * @returns {boolean} True when the object is connected to the structure.
      */
     _isConnected(row) {
-        return row.child !== false || !!row.link;
+        return row.child !== false || row.links.some((x) => this._isComplete(x));
     }
 
     /**
@@ -839,84 +1047,6 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         });
 
         return field;
-    }
-
-    /**
-     * Creates the waits-for field of a row; its options are the siblings and follow the tree
-     * (_renderWaitsFor).
-     * @param {object} row - The row.
-     * @returns {HTMLElement} The field.
-     */
-    _createWaitsForField(row) {
-        const field = this._field(this._t("waitsfor", "Waits for"), "ks-template-child-waitsfor");
-
-        row.waitsForSelection = this._selection(field, {
-            placeholder: this._t("waitsfor.placeholder", "Nothing"),
-            sticky: false,
-            options: [],
-            value: null,
-            onChange: (value) => {
-                row.waitsFor = value;
-                this._commit();
-            }
-        });
-
-        return field;
-    }
-
-    /**
-     * Offers the siblings of a row to wait for. A sibling that waits, directly or through
-     * others, for this one is not offered, because the objects would wait for each other in
-     * a circle.
-     * @param {object} row - The row.
-     * @param {number} index - The index of the row.
-     */
-    _renderWaitsFor(row, index) {
-        const selection = row.waitsForSelection;
-
-        if (!selection) {
-            return;
-        }
-
-        const parent = this._parentOf(index);
-        const options = this._rows
-            .map((other, i) => ({ other, i }))
-            .filter(({ other, i }) => other !== row && other.depth === row.depth && this._parentOf(i) === parent && !this._waitsOn(other, row.key))
-            .map(({ other }) => ({
-                id: other.key,
-                label: `${other.position.textContent} ${this._nameOf(other)}`,
-                content: `<span class="ks-template-child-option-position">${this._esc(other.position.textContent)}</span> ${this._esc(this._nameOf(other))}`
-            }));
-
-        if (row.waitsFor && !options.some((x) => x.id === row.waitsFor)) {
-            row.waitsFor = null;
-        }
-
-        selection._silent = true;
-        selection.options = options;
-        selection.value = row.waitsFor ? [row.waitsFor] : [];
-        selection._silent = false;
-    }
-
-    /**
-     * Tells whether a row waits for another, directly or through the rows it waits for.
-     * @param {object} row - The waiting row.
-     * @param {string} key - The key of the row waited for.
-     * @returns {boolean} True when the row waits for it.
-     */
-    _waitsOn(row, key) {
-        const seen = new Set();
-        let cursor = row.waitsFor;
-
-        while (cursor && !seen.has(cursor)) {
-            if (cursor === key) {
-                return true;
-            }
-            seen.add(cursor);
-            cursor = this._rows.find((x) => x.key === cursor)?.waitsFor || null;
-        }
-
-        return false;
     }
 
     /**
@@ -1003,9 +1133,10 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
 
     /**
      * Creates a framework selection inside a container. The selection carries no name, so it
-     * posts nothing; its value is reported through onChange.
+     * posts nothing; its value is reported through onChange: the chosen id or null, or with
+     * multiple the array of the chosen ids.
      * @param {HTMLElement} container - The element the selection is appended to.
-     * @param {object} config - placeholder, sticky, options, value, onChange.
+     * @param {object} config - placeholder, sticky, multiple, options, value, onChange.
      * @returns {webexpress.webui.InputSelectionCtrl} The selection.
      */
     _selection(container, config) {
@@ -1013,6 +1144,9 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
         host.setAttribute("placeholder", config.placeholder || "");
         if (config.sticky) {
             host.dataset.stickySelection = "true";
+        }
+        if (config.multiple) {
+            host.dataset.multiselection = "true";
         }
         container.appendChild(host);
 
@@ -1030,8 +1164,8 @@ kleenestar.core.TemplateHierarchyCtrl = class extends webexpress.webui.Ctrl {
             if (event.target !== host || selection._silent) {
                 return;
             }
-            const values = (event.detail && event.detail.value) || [];
-            config.onChange(values.length > 0 ? String(values[0]) : null);
+            const values = ((event.detail && event.detail.value) || []).map((x) => String(x));
+            config.onChange(config.multiple ? values : (values.length > 0 ? values[0] : null));
         });
 
         return selection;

@@ -21,8 +21,8 @@ using WebExpress.WebUI.WebIcon;
 namespace KleeneStar.Core.WWW.Api._1_.TemplateHierarchies._workspacekey_
 {
     /// <summary>
-    /// The table of the template hierarchies of a workspace, shown on the template overview
-    /// beside the templates.
+    /// The table of the template hierarchies of a workspace, shown on the hierarchy overview
+    /// (<c>/templates/{workspacekey}/hierarchies</c>).
     /// </summary>
     /// <remarks>
     /// Columns: name, description, root template (with the class where the root template serves

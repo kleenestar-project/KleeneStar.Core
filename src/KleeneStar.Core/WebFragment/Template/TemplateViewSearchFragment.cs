@@ -14,6 +14,7 @@ namespace KleeneStar.Core.WebFragment.Template
     /// </summary>
     [Section<SectionViewHeaderPrimary>]
     [Scope<TemplateViewFragment>]
+    [Scope<KleeneStar.Core.WebFragment.TemplateHierarchy.TemplateHierarchyViewFragment>]
     [Cache]
     public sealed class TemplateViewSearchFragment : FragmentControlViewHeader
     {

@@ -78,9 +78,18 @@ namespace KleeneStar.Core.Test.WebManager
             var hierarchy = Hierarchy("Structure", root);
 
             var a = new TemplateHierarchyNode { TemplateId = first.Id };
-            var b = new TemplateHierarchyNode { TemplateId = second.Id, ParentNodeId = a.Id, AsChild = false, RelationTypeKey = " blocks ", RelationInverse = true };
-            var c = new TemplateHierarchyNode { TemplateId = first.Id, PredecessorId = a.Id };
-            var d = new TemplateHierarchyNode { TemplateId = second.Id, PredecessorId = b.Id, AssigneeId = Guid.Empty };
+            var b = new TemplateHierarchyNode { TemplateId = second.Id, ParentNodeId = a.Id, AsChild = false };
+            var c = new TemplateHierarchyNode { TemplateId = first.Id };
+            var d = new TemplateHierarchyNode { TemplateId = second.Id, AssigneeId = Guid.Empty };
+
+            // b is linked to the root and to c; a link without type, a target outside the list
+            // and the node itself are dropped, and a link left without targets with them
+            b.Links =
+            [
+                new() { Type = " blocks ", Inverse = true, Targets = ["root", c.Id.ToString(), Guid.NewGuid().ToString(), b.Id.ToString()] },
+                new() { Type = "", Targets = [a.Id.ToString()] }
+            ];
+            d.Links = [new() { Type = "references", Targets = [Guid.NewGuid().ToString()] }];
 
             CoreHub.TemplateHierarchyManager.SetNodes(hierarchy.Id, [a, b, c, d]);
 
@@ -88,10 +97,12 @@ namespace KleeneStar.Core.Test.WebManager
             Assert.Equal([a.Id, b.Id, c.Id, d.Id], stored.Select(x => x.Id));
             Assert.Equal(a.Id, stored[1].ParentNodeId);
             Assert.False(stored[1].AsChild);
-            Assert.Equal("blocks", stored[1].RelationTypeKey);
-            Assert.True(stored[1].RelationInverse);
-            Assert.Equal(a.Id, stored[2].PredecessorId);
-            Assert.Null(stored[3].PredecessorId);
+
+            var link = Assert.Single(stored[1].Links);
+            Assert.Equal("blocks", link.Type);
+            Assert.True(link.Inverse);
+            Assert.Equal(["root", c.Id.ToString()], link.Targets);
+            Assert.Empty(stored[3].Links);
             Assert.Null(stored[3].AssigneeId);
 
             // a parent that comes later moves the node below the root

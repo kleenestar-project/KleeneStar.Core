@@ -2011,15 +2011,12 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     color: var(--wx-danger-text-emphasis, var(--wx-danger));
 }
 
-.ks-template-child-connect {
-    grid-column: span 2;
-}
-
 .ks-template-child-connect-body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     min-width: 0;
+    min-height: 2.25rem;
 }
 
 .ks-template-child-sub {
@@ -2028,9 +2025,54 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     white-space: nowrap;
 }
 
-.ks-template-child-link {
-    flex: 1 1 auto;
+/* the links of a node: one line per link, relation type, objects and the remove button */
+.ks-template-child-links {
+    grid-column: 1 / -1;
+}
+
+.ks-template-child-link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ks-template-child-link-list:empty {
+    display: none;
+}
+
+.ks-template-child-link-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.5rem;
+}
+
+.ks-template-child-link-type,
+.ks-template-child-link-targets {
     min-width: 0;
+}
+
+.ks-template-child-link-remove {
+    align-self: center;
+}
+
+/* removing is destructive: the icon turns red under the pointer, as the remove of a node does */
+.ks-template-child-link-row .ks-template-child-link-remove:hover,
+.ks-template-child-link-row .ks-template-child-link-remove:focus-visible {
+    color: var(--wx-danger);
+}
+
+.ks-template-child-link-add {
+    align-self: flex-start;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.ks-template-child-link-invalid .form-control {
+    border-color: var(--wx-form-invalid-border-color, var(--wx-danger));
 }
 
 .ks-template-child-archived {
@@ -2054,7 +2096,9 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     color: var(--wx-body-color);
 }
 
-.ks-template-child-actions .ks-template-child-remove:hover {
+/* as specific as the hover rule of the buttons above and after it, so the remove turns red */
+.ks-template-child-actions .ks-template-child-remove:hover:not(:disabled),
+.ks-template-child-actions .ks-template-child-remove:focus-visible {
     color: var(--wx-danger);
 }
 
@@ -2200,8 +2244,18 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
         padding-left: 0;
     }
 
-    .ks-template-child-connect {
-        grid-column: auto;
+    .ks-template-child-link-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .ks-template-child-link-type,
+    .ks-template-child-link-targets {
+        grid-column: 1;
+    }
+
+    .ks-template-child-link-remove {
+        grid-column: 2;
+        grid-row: 1;
     }
 
     .ks-template-child-connect-body {
