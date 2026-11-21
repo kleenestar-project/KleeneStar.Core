@@ -1,3 +1,4 @@
+using KleeneStar.Core.WebRestApi;
 using System;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebMessage;
@@ -34,6 +35,12 @@ namespace KleeneStar.Core.WWW.Api._1_.NavigatorLinks
         [Method(RequestMethod.PUT)]
         public IResponse MoveLink(IRequest request)
         {
+            // the order is the navigator of every user; only an administrator arranges it
+            if (!AccountAuthorization.IsAdministrator(request))
+            {
+                return new ResponseForbidden();
+            }
+
             var id = request?.GetParameter("id")?.Value;
             var direction = request?.GetParameter("direction")?.Value;
 

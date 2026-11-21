@@ -171,6 +171,12 @@ namespace KleeneStar.Core.WWW.Api._1_.NavigatorLinks
         /// <param name="request">The triggering request.</param>
         protected override void UpdateRows(IEnumerable<string> rowIds, IRequest request)
         {
+            // the order is the navigator of every user; only an administrator arranges it
+            if (!AccountAuthorization.IsAdministrator(request))
+            {
+                return;
+            }
+
             var ordered = (rowIds ?? [])
                 .Select(x => Guid.TryParse(x, out var id) ? (Guid?)id : null)
                 .Where(x => x.HasValue)

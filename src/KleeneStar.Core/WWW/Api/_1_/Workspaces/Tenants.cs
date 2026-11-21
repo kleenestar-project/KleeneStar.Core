@@ -16,7 +16,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
     /// <remarks>
     /// The workspace dialogs edit the assignment as a multi-select over this endpoint. The value
     /// they submit is the id list <see cref="Workspace.TenantIds"/>, which the workspace endpoint
-    /// maps onto <see cref="Workspace.Tenants"/>. Only active tenants are offered.
+    /// maps onto <see cref="Workspace.Tenants"/>. Only active tenants are offered, and only to a signed-in caller.
     /// </remarks>
     [Title("kleenestar.core:workspace.tenant.label")]
     [Cache]
@@ -53,6 +53,13 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
         /// <returns>The selection items.</returns>
         protected override IQueryable<RestApiSelectionItem> RetrieveItems(IQuery<Tenant> query, IQueryContext context, IRequest request)
         {
+            // the names of the customers are offered to those who create or edit workspaces,
+            // never to an anonymous caller
+            if (CoreHub.SessionManager.GetCurrentIdentityId(request) == Guid.Empty)
+            {
+                return Enumerable.Empty<RestApiSelectionItem>().AsQueryable();
+            }
+
             return CoreHub.TenantManager
                 .GetTenants(query)
                 .Where(x => x.State == TenantState.Active)

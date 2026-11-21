@@ -23,8 +23,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_
     ///   the people card rendered anew; <c>Assets/js/assignee.js</c> puts it in place of the old
     ///   one, so the page is not reloaded. Nobody signed in is <c>403</c>, an object the caller
     ///   cannot see is <c>404</c>, one they may not change <c>403</c>.</item>
-    ///   <item><c>GET</c> does the same and redirects to the object's detail page, for a plain
-    ///   navigation without the script.</item>
+    ///   <item><c>GET</c> changes nothing and redirects to the object's detail page, so a link
+    ///   opened in a new tab or followed from another site cannot change an assignment.</item>
     /// </list>
     /// </remarks>
     [Title("kleenestar.core:object.assignee.api.title")]
@@ -40,24 +40,33 @@ namespace KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_
         }
 
         /// <summary>
-        /// Handles <c>GET {base}</c>: changes the assignment, then redirects to the object detail
-        /// page.
+        /// Handles <c>GET {base}</c>: redirects to the object detail page without changing the
+        /// assignment.
         /// </summary>
+        /// <remarks>
+        /// A GET travels with the session cookie on any top-level navigation, a link in a mail or
+        /// on another site included, so it must not write.
+        /// </remarks>
         /// <param name="request">The incoming request.</param>
-        /// <returns>A <c>302</c> redirect to the object detail page.</returns>
+        /// <returns>A <c>302</c> redirect to the object detail page, or <c>404</c>.</returns>
         [Method(RequestMethod.GET)]
         public IResponse Assign(IRequest request)
         {
             var @object = CoreHub.ObjectManager.GetObjectByKey(request?.GetParameter<ObjectKeyParameter>()?.Value);
 
-            Change(@object, request);
+            if (@object is null)
+            {
+                return new ResponseNotFound();
+            }
 
             // dispatch to the detail view matching the object's kind (/issue, /document, …)
             var target = CoreHub.ObjectKindManager
                 .ResolveDetailUri(@object)?
                 .BindParameters(request);
 
-            return new ResponseMovedTemporarily(target);
+            return target is null
+                ? new ResponseNotFound()
+                : new ResponseMovedTemporarily(target);
         }
 
         /// <summary>

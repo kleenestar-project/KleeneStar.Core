@@ -120,6 +120,66 @@ namespace KleeneStar.Core.Test
         }
 
         /// <summary>
+        /// Tests that a database whose history names a retired migration id starts: the history
+        /// is rewritten into the ids describing the same schema, nothing is created twice and
+        /// the data stays.
+        /// </summary>
+        [Fact]
+        public void RetiredMigrationIdIsReplaced()
+        {
+            using (var db = ModelHub.CreateDbContext())
+            {
+                DatabaseStartup.Run(db, null, null);
+            }
+
+            var (retired, replacements) = DatabaseStartup.RetiredMigrations.First();
+
+            Execute
+            (
+                "DELETE FROM __EFMigrationsHistory; " +
+                $"INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('{retired}', '10.0.0'); " +
+                "CREATE TABLE Marker (Id INTEGER PRIMARY KEY); INSERT INTO Marker (Id) VALUES (42);"
+            );
+
+            using (var db = ModelHub.CreateDbContext())
+            {
+                DatabaseStartup.Run(db, null, null);
+
+                Assert.Empty(db.Database.GetPendingMigrations());
+                Assert.Equal(replacements.Order(), db.Database.GetAppliedMigrations().Order());
+            }
+
+            Assert.Equal(42L, Scalar("SELECT Id FROM Marker;"));
+        }
+
+        /// <summary>
+        /// Tests that a database whose history names no migration this build knows fails its
+        /// start with a message saying so, and keeps its data.
+        /// </summary>
+        [Fact]
+        public void UnknownHistoryFailsWithExplanation()
+        {
+            using (var db = ModelHub.CreateDbContext())
+            {
+                DatabaseStartup.Run(db, null, null);
+            }
+
+            Execute
+            (
+                "DELETE FROM __EFMigrationsHistory; " +
+                "INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('20260624163028_InitialCreate', '10.0.0');"
+            );
+
+            using (var db = ModelHub.CreateDbContext())
+            {
+                var ex = Assert.Throws<InvalidOperationException>(() => DatabaseStartup.Run(db, null, null));
+
+                Assert.Contains("20260624163028_InitialCreate", ex.Message);
+                Assert.NotEmpty(db.Groups);
+            }
+        }
+
+        /// <summary>
         /// Tests that a replica which cannot get the startup lock fails its start without
         /// touching the database.
         /// </summary>

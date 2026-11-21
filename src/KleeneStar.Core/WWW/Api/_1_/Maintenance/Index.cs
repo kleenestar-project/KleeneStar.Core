@@ -1,3 +1,5 @@
+using WebExpress.WebCore.WebRestApi;
+using KleeneStar.Core.WebRestApi;
 using KleeneStar.Model;
 using System.Collections.Generic;
 using WebExpress.WebApp.WebRestApi;
@@ -23,6 +25,66 @@ namespace KleeneStar.Core.WWW.Api._1_.Maintenance
         /// </summary>
         public Index()
         {
+        }
+
+        /// <summary>
+        /// Answers a read; the reads that prepare a change (the new, edit, clone and delete
+        /// dialogs) only for an administrator.
+        /// </summary>
+        /// <remarks>
+        /// The notice is shown to every visitor, signed in or not, so a write open to anybody is a defacement open to anybody. The administrators are those of the accounts (<see cref="AccountAuthorization"/>),
+        /// the only installation-wide administration there is.
+        /// </remarks>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.GET)]
+        public override IResponse Retrieve(IRequest request)
+        {
+            var preparesChange = request?.GetParameter("mode")?.Value is "edit" or "delete" or "clone" or "new";
+
+            return !preparesChange || AccountAuthorization.IsAdministrator(request)
+                ? base.Retrieve(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Creates or clones an entry of the maintenance notice, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.POST)]
+        public override IResponse Create(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Create(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Changes an entry of the maintenance notice, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.PUT)]
+        [Method(RequestMethod.PATCH)]
+        public override IResponse Update(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Update(request)
+                : new ResponseForbidden();
+        }
+
+        /// <summary>
+        /// Removes an entry of the maintenance notice, once the caller is an administrator.
+        /// </summary>
+        /// <param name="request">The incoming request.</param>
+        /// <returns>The HTTP response.</returns>
+        [Method(RequestMethod.DELETE)]
+        public override IResponse Delete(IRequest request)
+        {
+            return AccountAuthorization.IsAdministrator(request)
+                ? base.Delete(request)
+                : new ResponseForbidden();
         }
 
         /// <summary>

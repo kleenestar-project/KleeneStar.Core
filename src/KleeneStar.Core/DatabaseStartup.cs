@@ -72,6 +72,11 @@ namespace KleeneStar.Core
         {
             using var startup = AcquireClusterLock(cluster, log);
 
+            using (AcquireDatabaseLock(db))
+            {
+                ReplaceRetiredMigrations(db, log);
+            }
+
             MigrateWithLegacyDbReset(db, log);
 
             using (AcquireDatabaseLock(db))
@@ -124,6 +129,78 @@ namespace KleeneStar.Core
                     // entities the failed seed left tracked would be written by the next one
                     db.ChangeTracker.Clear();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Migration ids a database may have recorded that no longer exist, each with the ids
+        /// that describe the same schema now.
+        /// </summary>
+        /// <remarks>
+        /// <c>20261120173108_InitialCreate</c> holds the same schema as
+        /// <c>20261121082301_InitialCreate</c>; only the id differs.
+        /// </remarks>
+        public static readonly IReadOnlyDictionary<string, string[]> RetiredMigrations =
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["20261120173108_InitialCreate"] =
+                [
+                    "20261121082301_InitialCreate"
+                ]
+            };
+
+        /// <summary>
+        /// Rewrites the migration history of a database that recorded a retired migration id
+        /// (<see cref="RetiredMigrations"/>) into the ids that describe the same schema, so
+        /// <c>Migrate()</c> finds them applied instead of creating every table again.
+        /// </summary>
+        /// <remarks>
+        /// Only the history rows change; the schema is left as it is. A replacement is written
+        /// only when this build knows every one of its ids, so a provider with migrations of its
+        /// own is never touched.
+        /// </remarks>
+        /// <param name="db">The database context.</param>
+        /// <param name="log">The log, or null.</param>
+        private static void ReplaceRetiredMigrations(KleeneStarDbContext db, ILog log)
+        {
+            if (!db.Database.IsRelational())
+            {
+                return;
+            }
+
+            var history = db.GetService<IHistoryRepository>();
+
+            if (!history.Exists())
+            {
+                return;
+            }
+
+            var applied = history.GetAppliedMigrations()
+                .Select(x => x.MigrationId)
+                .ToHashSet(StringComparer.Ordinal);
+            var known = db.Database.GetMigrations().ToHashSet(StringComparer.Ordinal);
+
+            foreach (var (retired, replacements) in RetiredMigrations)
+            {
+                if (!applied.Contains(retired) || !replacements.All(known.Contains))
+                {
+                    continue;
+                }
+
+                log?.Info($"Replacing the retired migration '{retired}' in the migration history by '{string.Join("', '", replacements)}'.");
+
+                using var transaction = db.Database.BeginTransaction();
+
+                db.Database.ExecuteSqlRaw(history.GetDeleteScript(retired));
+
+                foreach (var replacement in replacements.Where(x => !applied.Contains(x)))
+                {
+                    db.Database.ExecuteSqlRaw(history.GetInsertScript(new HistoryRow(replacement, ProductInfo.GetVersion())));
+                    applied.Add(replacement);
+                }
+
+                transaction.Commit();
+                applied.Remove(retired);
             }
         }
 
@@ -235,6 +312,18 @@ namespace KleeneStar.Core
 
                 db.Database.EnsureDeleted();
                 db.Database.Migrate();
+            }
+            catch (Exception ex) when (IsAlreadyExistsError(ex) && !db.Database.GetAppliedMigrations().Intersect(db.Database.GetMigrations()).Any())
+            {
+                var recorded = string.Join("', '", db.Database.GetAppliedMigrations());
+
+                throw new InvalidOperationException
+                (
+                    $"The database was created by an earlier schema (migration '{recorded}') that this " +
+                    "build cannot upgrade: none of its recorded migrations is known here. Back up the " +
+                    "database and start with an empty one, or run the release that created it.",
+                    ex
+                );
             }
         }
 

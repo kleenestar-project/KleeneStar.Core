@@ -8,8 +8,8 @@ kleenestar.core = kleenestar.core || {}
  * ks-assignee-action) addresses /api/1/assignee/{objectkey}, with ?clear=1 to unassign. A click
  * sends that address as PUT; the endpoint changes the assignment and answers { html }, the row
  * rendered anew, which takes the place of the old one - with the action that now applies. When
- * the request fails the link is followed as a plain navigation, whose GET does the same and
- * comes back to the page.
+ * the request fails the page is reloaded and shows the assignment as it is stored; the GET of
+ * the address changes nothing and only leads to the object.
  *
  * The row belongs to a framework section, so this is no control of its own but a singleton
  * listening on the document.
@@ -77,7 +77,7 @@ kleenestar.core.Assignee = new class {
             row.replaceWith(next);
         } catch (error) {
             console.warn("kleenestar.core.Assignee:", error);
-            window.location.href = link.href;
+            window.location.reload();
         }
     }
 };
