@@ -956,6 +956,7 @@ object.add.workspace.search=Arbeitsbereich suchen…
 object.attachment.api.title=Objektanhänge
 object.assignee.api.title=Objektzuweisung
 object.assignee.assignme.label=Mir zuweisen
+object.assignee.assignto.label=Zuweisen an …
 object.assignee.label=Zugewiesen an
 object.assignee.unassign.label=Zuweisung aufheben
 object.assignee.unassigned.label=Nicht zugewiesen

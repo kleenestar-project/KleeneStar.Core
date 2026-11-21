@@ -1804,6 +1804,23 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
     padding: 0 0.4rem;
 }
 
+/* the assignee row (ControlDataAssignment) offers two actions; the property column is too narrow
+   to hold them beside the name, so they go on a line of their own below it, aligned with the text */
+.ks-people > .wx-assignment {
+    flex-wrap: wrap;
+    row-gap: 0.1rem;
+}
+
+.ks-people > .wx-assignment > .wx-assignment-text {
+    flex-basis: calc(100% - 2.6rem);
+}
+
+.ks-people > .wx-assignment > .wx-assignment-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: 2.2rem;
+}
+
 /* the dates card uses the field sheet; in the narrow property column its rows are tighter */
 .ks-field-sheet-compact .ks-field-row {
     padding: 0.2rem 0.4rem;

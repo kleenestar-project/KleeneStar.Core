@@ -955,6 +955,7 @@ object.add.workspace.search=Search workspaces…
 object.attachment.api.title=Object attachments
 object.assignee.api.title=Object assignee
 object.assignee.assignme.label=Assign to me
+object.assignee.assignto.label=Assign to …
 object.assignee.label=Assignee
 object.assignee.unassign.label=Unassign
 object.assignee.unassigned.label=Unassigned

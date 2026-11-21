@@ -13,7 +13,6 @@ using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
 using WebExpress.WebCore.WebMessage;
-using WebExpress.WebCore.WebUri;
 using WebExpress.WebUI.WebControl;
 using WebExpress.WebUI.WebFragment;
 using WebExpress.WebUI.WebIcon;
@@ -21,6 +20,8 @@ using WebExpress.WebUI.WebPage;
 
 namespace KleeneStar.Core.WebFragment.Object
 {
+    using AssigneeApi = global::KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_.Index;
+
     /// <summary>
     /// Object-scoped property card that shows the people of the current object on the issue and
     /// asset pages, one <see cref="ObjectPersonRow"/> each: who is responsible, who created it,
@@ -28,11 +29,12 @@ namespace KleeneStar.Core.WebFragment.Object
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
-    ///   <item><b>Assignee</b> first, because it answers "who works on this": the person, or a
-    ///   muted "not assigned" row. A signed-in caller who may change the object gets the action
-    ///   <i>assign to me</i> or <i>unassign</i> at the end of the row: <c>Assets/js/assignee.js</c>
-    ///   sends it as <c>PUT</c> to <see cref="WWW.Api._1_.Assignee._objectkey_.Index"/> and swaps
-    ///   in the row the endpoint renders, without reloading the page.</item>
+    ///   <item><b>Assignee</b> first, because it answers "who works on this": the framework's
+    ///   <see cref="ControlDataAssignment"/> over <see cref="WWW.Api._1_.Assignee._objectkey_.Index"/>,
+    ///   seeded with the stored assignment. A signed-in caller who may change the object gets
+    ///   <i>assign to me</i> or <i>unassign</i> at the end of the row and can search for another
+    ///   assignee (<see cref="WWW.Api._1_.WatcherUsers._objectkey_.Index"/>); the row is redrawn
+    ///   from the answer, without reloading the page.</item>
     ///   <item><b>Creator</b>, when the object names one.</item>
     ///   <item><b>Approvers</b>, only when the object has an approval: the pending one, else the
     ///   latest that was not cancelled. Each approver who decided carries the verdict, each account
@@ -128,46 +130,31 @@ namespace KleeneStar.Core.WebFragment.Object
         }
 
         /// <summary>
-        /// Builds the assignee row with the assign or unassign action. The assignee endpoint
-        /// renders the same row after a change (<c>PUT</c>), and <c>Assets/js/assignee.js</c> puts
-        /// it in place of this one.
+        /// Builds the assignee row, seeded with the stored assignment so it renders without a
+        /// round trip.
         /// </summary>
         /// <param name="object">The object.</param>
         /// <param name="request">The request.</param>
         /// <returns>The row.</returns>
-        internal static ObjectPersonRow BuildAssignee(Model.Entities.Object @object, IRequest request)
+        private static ControlDataAssignment BuildAssignee(Model.Entities.Object @object, IRequest request)
         {
-            var currentUserId = CoreHub.SessionManager.GetCurrentIdentityId(request);
-            var assignedToMe = @object.AssigneeId.HasValue && @object.AssigneeId.Value == currentUserId;
-            var row = Person("object-property-assignee", @object.AssigneeId, "kleenestar.core:object.assignee.label")
-                ?? new ObjectPersonRow("object-property-assignee")
-                {
-                    Caption = "kleenestar.core:object.assignee.label",
-                    Name = "kleenestar.core:object.assignee.unassigned.label",
-                    Muted = true
-                };
+            var assignee = AssigneeApi.ToItem(@object.AssigneeId);
+            var self = AssigneeApi.ToItem(CoreHub.SessionManager.GetCurrentIdentityId(request));
+            var mayChange = AssigneeApi.MayChange(@object, request);
 
-            if (currentUserId != Guid.Empty && ContentAuthorization.MayWrite(@object, request))
+            return new ControlDataAssignment("object-property-assignee")
             {
-                row.Action = new ControlLink("object-property-assignee-action")
-                {
-                    Classes = ["ks-assignee-action"],
-                    Text = _ => assignedToMe
-                        ? "kleenestar.core:object.assignee.unassign.label"
-                        : "kleenestar.core:object.assignee.assignme.label",
-                    Icon = _ => assignedToMe ? new IconUserXmark() : new IconUserPlus(),
-                    Uri = ctx =>
-                    {
-                        var uri = CoreHub
-                            .GetUri<global::KleeneStar.Core.WWW.Api._1_.Assignee._objectkey_.Index>()
-                            ?.BindParameters(ctx.Request);
-
-                        return assignedToMe ? uri?.Add(new UriQuery("clear", "1")) : uri;
-                    }
-                };
+                Caption = _ => "kleenestar.core:object.assignee.label",
+                Placeholder = _ => "kleenestar.core:object.assignee.unassigned.label",
+                AssignToMeText = _ => "kleenestar.core:object.assignee.assignme.label",
+                UnassignText = _ => "kleenestar.core:object.assignee.unassign.label",
+                AssignToText = _ => "kleenestar.core:object.assignee.assignto.label",
+                Assignee = _ => assignee,
+                Self = _ => self,
+                MayChange = _ => mayChange
             }
-
-            return row;
+                .DataService<AssigneeApi>()
+                .UsersService<global::KleeneStar.Core.WWW.Api._1_.WatcherUsers._objectkey_.Index>();
         }
 
         /// <summary>
