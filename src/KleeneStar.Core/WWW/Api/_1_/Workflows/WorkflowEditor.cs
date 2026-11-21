@@ -390,6 +390,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var retained = new HashSet<Guid>();
+            // archived forms stay eligible: archiving a form must not quietly strip it from every
+            // transition on the next autosave; the dialog is simply not shown while it is archived
+            var screenForms = ScreenForms(db, workflow.ClassId, activeOnly: false)
+                .Select(f => f.Id)
+                .ToHashSet();
 
             foreach (var transition in transitions)
             {
@@ -424,6 +429,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                     current.GuardExpression = ToExpression(transition.Guards?.Select(x => RuleKey(x?.Type)), current.GuardExpression);
                     current.ValidatorExpression = ToExpression(transition.Validators?.Select(x => RuleKey(x?.Type)), current.ValidatorExpression);
                     current.PostFunctionKeys = ToKeys(transition.PostFunctions?.Select(x => RuleKey(x?.Type)));
+                    current.ScreenFormId = ToScreenForm(transition.Form, screenForms);
                     current.Updated = timestamp;
 
                     continue;
@@ -444,6 +450,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                     GuardExpression = ToExpression(transition.Guards?.Select(x => RuleKey(x?.Type)), null),
                     ValidatorExpression = ToExpression(transition.Validators?.Select(x => RuleKey(x?.Type)), null),
                     PostFunctionKeys = ToKeys(transition.PostFunctions?.Select(x => RuleKey(x?.Type))),
+                    ScreenFormId = ToScreenForm(transition.Form, screenForms),
                     Created = timestamp,
                     Updated = timestamp
                 };
@@ -453,6 +460,43 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
             }
 
             db.Transitions.RemoveRange(existing.Values.Where(t => !retained.Contains(t.Id)));
+        }
+
+        /// <summary>
+        /// Returns the forms of a class a transition may show before it runs: the additional
+        /// forms, which an administrator creates for exactly such a purpose.
+        /// </summary>
+        /// <remarks>
+        /// The create, edit and view forms are left out. They are the masks the object itself is
+        /// created, edited and read through, and a transition that borrowed one would change
+        /// whenever someone rearranged the edit dialog.
+        /// </remarks>
+        /// <param name="db">The database context.</param>
+        /// <param name="classId">The class the workflow belongs to.</param>
+        /// <param name="activeOnly">Whether archived forms are left out.</param>
+        /// <returns>The forms, ordered by name.</returns>
+        private static IQueryable<Model.Entities.Form> ScreenForms(KleeneStarDbContext db, Guid classId, bool activeOnly)
+        {
+            return db.Forms
+                .Where(f => f.ClassId == classId && f.FormType == FormType.Default)
+                .Where(f => !activeOnly || f.State == FormState.Active)
+                .OrderBy(f => f.Name);
+        }
+
+        /// <summary>
+        /// Reads the form a transition is to show out of what the editor posted.
+        /// </summary>
+        /// <remarks>
+        /// A form that is not one of the class's screen forms is not stored: the editor offers
+        /// only those, so anything else is a stale picker or a hand-written payload, and a
+        /// reference to it would open a dialog the transition was never meant to show.
+        /// </remarks>
+        /// <param name="posted">The form id as posted, or empty for none.</param>
+        /// <param name="eligible">The ids of the forms that may be chosen.</param>
+        /// <returns>The form id, or <see langword="null"/> when the transition shows none.</returns>
+        internal static Guid? ToScreenForm(string posted, IReadOnlySet<Guid> eligible)
+        {
+            return Guid.TryParse(posted, out var formId) && eligible.Contains(formId) ? formId : null;
         }
 
         /// <summary>
@@ -585,6 +629,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                 To = t.TargetId.ToString(),
                 Label = t.Name,
                 Description = t.Description,
+                Form = t.ScreenFormId?.ToString() ?? string.Empty,
                 Color = t.Color,
                 DashArray = t.DashArray,
                 Waypoints = t.Waypoints?
@@ -796,6 +841,36 @@ namespace KleeneStar.Core.WWW.Api._1_.Workflows
                 request,
                 (key, label) => new RestApiWorkflowGuard { Id = key, Type = key, Label = label }
             );
+        }
+
+        /// <summary>
+        /// Retrieves the forms a transition of the workflow may show before it runs: the active
+        /// additional forms of the class the workflow belongs to.
+        /// </summary>
+        /// <param name="workflowId">The unique identifier of the workflow.</param>
+        /// <param name="context">The query context providing access to the database.</param>
+        /// <param name="request">The current API request.</param>
+        /// <returns>The forms, ordered by name; empty for an unknown workflow.</returns>
+        protected override IEnumerable<RestApiWorkflowForm> RetrieveForms(string workflowId, IQueryContext context, IRequest request)
+        {
+            if (!Guid.TryParse(workflowId, out var guid) || context is not KleeneStarDbContext db)
+            {
+                return [];
+            }
+
+            var classId = db.Workflows
+                .Where(w => w.Id == guid)
+                .Select(w => (Guid?)w.ClassId)
+                .FirstOrDefault();
+
+            if (classId is null)
+            {
+                return [];
+            }
+
+            return [.. ScreenForms(db, classId.Value, activeOnly: true)
+                .AsNoTracking()
+                .Select(f => new RestApiWorkflowForm { Id = f.Id.ToString(), Label = f.Name })];
         }
     }
 }

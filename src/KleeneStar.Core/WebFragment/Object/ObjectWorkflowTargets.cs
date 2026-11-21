@@ -7,6 +7,7 @@ using WebExpress.WebCore.WebUri;
 namespace KleeneStar.Core.WebFragment.Object
 {
     using Field = KleeneStar.Model.Entities.Field;
+    using FormEntity = KleeneStar.Model.Entities.Form;
     using Status = KleeneStar.Model.Entities.Status;
     using Workflow = KleeneStar.Model.Entities.Workflow;
 
@@ -73,6 +74,48 @@ namespace KleeneStar.Core.WebFragment.Object
                 .BindParameters(new ObjectKeyParameter(@object.Key))
                 .Add(new UriQuery(FieldIdParameter.Key, field.Id.ToString()))
                 .Add(new UriQuery(WorkflowStateIdParameter.Key, target.Id.ToString()));
+        }
+
+        /// <summary>
+        /// Returns the address of the dialog that shows the form of a transition before moving
+        /// the object into the target state through the supplied field.
+        /// </summary>
+        /// <param name="object">The object.</param>
+        /// <param name="field">The workflow field.</param>
+        /// <param name="target">The target state.</param>
+        /// <returns>The address.</returns>
+        public static IUri ScreenUri(Model.Entities.Object @object, Field field, Status target)
+        {
+            return CoreHub.GetUri<global::KleeneStar.Core.WWW.Issue._objectkey_.Transition>()?
+                .BindParameters(new ObjectKeyParameter(@object.Key))
+                .Add(new UriQuery(FieldIdParameter.Key, field.Id.ToString()))
+                .Add(new UriQuery(WorkflowStateIdParameter.Key, target.Id.ToString()));
+        }
+
+        /// <summary>
+        /// Returns the form a transition shows before it runs, or <see langword="null"/> when the
+        /// move is made at once.
+        /// </summary>
+        /// <remarks>
+        /// An archived form is treated as none. The transition keeps the reference, so restoring
+        /// the form brings the dialog back, but a form nobody maintains any more is not put in
+        /// front of a person moving a record.
+        /// </remarks>
+        /// <param name="transition">The transition, or <see langword="null"/> for an entry move.</param>
+        /// <param name="withStructure">Whether the tabs and elements of the form are loaded.</param>
+        /// <returns>The form, or <see langword="null"/>.</returns>
+        public static FormEntity ScreenForm(Transition transition, bool withStructure = false)
+        {
+            if (transition?.ScreenFormId is not { } formId)
+            {
+                return null;
+            }
+
+            var form = withStructure
+                ? CoreHub.FormManager.GetFormWithStructure(formId)
+                : CoreHub.FormManager.GetForm(formId);
+
+            return form is { State: FormState.Active } ? form : null;
         }
     }
 }

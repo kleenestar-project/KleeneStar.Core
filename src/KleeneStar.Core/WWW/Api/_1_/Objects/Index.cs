@@ -317,7 +317,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="objectId">The id of the object whose values to merge.</param>
         /// <param name="classId">The id of the object's class, used to look up the
         /// field definitions for name + filtering.</param>
-        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
+        internal static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
         {
             if (result?.Data is not IDictionary<string, object> data)
             {
@@ -1528,7 +1528,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="request">The request, for the culture of submitted dates; may be null.</param>
         /// <param name="baseline">The values a submitted date is compared with when the object
         /// has none yet (the original of a clone), keyed by field id; may be null.</param>
-        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
+        internal static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
         {
             if (@object is null || payload is null || payload.Count == 0)
             {
@@ -1716,7 +1716,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// a comma-separated representation that matches the parse logic of
         /// <c>ObjectFieldSheet.CreateInputValue</c>.
         /// </summary>
-        private static string SerializePayloadValue(object value)
+        internal static string SerializePayloadValue(object value)
         {
             return value switch
             {

@@ -40,7 +40,9 @@ namespace KleeneStar.Core.WebFragment.Object
     /// through the workflow's active transitions. Choosing one drives
     /// <see cref="WWW.Api._1_.Transitions._objectkey_.Index"/>, which asks
     /// <see cref="IWorkflowManager.ExecuteTransition"/> to run the state change - guard,
-    /// validators, value write, post functions - and redirects back here. The last dropdown
+    /// validators, value write, post functions - and redirects back here; a transition the
+    /// workflow gives a form opens <see cref="WWW.Issue._objectkey_.Transition"/> instead, which
+    /// runs the same change once the form is submitted. The last dropdown
     /// item opens the workflow itself in a modal
     /// (<see cref="WWW.Workflow._workflowid_.Flow"/>). These fields are intentionally omitted
     /// from the form-driven detail view rendered by <see cref="ObjectItemDetailFragment"/> so
@@ -288,14 +290,30 @@ namespace KleeneStar.Core.WebFragment.Object
 
             foreach (var (status, transition) in targets)
             {
-                split.Add(new ControlSplitButtonItemLink("object-workflow-status-" + status.Id.ToString("N"))
+                var item = new ControlSplitButtonItemLink("object-workflow-status-" + status.Id.ToString("N"))
                 {
                     Text = _ => status.Name,
                     Icon = _ => ResolveIcon(status),
                     Tooltip = _ => transition?.Name,
-                    TextColor = _ => new PropertyColorText(status.Category?.Color),
-                    Uri = _ => ObjectWorkflowTargets.TransitionUri(@object, field, status)
-                });
+                    TextColor = _ => new PropertyColorText(status.Category?.Color)
+                };
+
+                // a transition with a form asks for its input first; the dialog runs the move
+                if (ObjectWorkflowTargets.ScreenForm(transition) is not null)
+                {
+                    item.PrimaryAction = ctx => new ActionModal
+                    (
+                        "modal-form",
+                        ObjectWorkflowTargets.ScreenUri(@object, field, status)?.BindParameters(ctx.Request),
+                        TypeModalSize.Large
+                    );
+                }
+                else
+                {
+                    item.Uri = _ => ObjectWorkflowTargets.TransitionUri(@object, field, status);
+                }
+
+                split.Add(item);
             }
         }
 

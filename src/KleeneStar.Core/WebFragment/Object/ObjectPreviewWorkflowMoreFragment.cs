@@ -119,13 +119,29 @@ namespace KleeneStar.Core.WebFragment.Object
 
                 foreach (var (status, transition) in targets)
                 {
-                    nodes.Add(new ControlDropdownItemLink(Id + "-" + id + "-" + status.Id.ToString("N"))
+                    var item = new ControlDropdownItemLink(Id + "-" + id + "-" + status.Id.ToString("N"))
                     {
                         Text = _ => status.Name,
                         Icon = _ => ObjectPropertyWorkflowCardFragment.ResolveIcon(status),
-                        Tooltip = _ => transition?.Name,
-                        Uri = _ => ObjectWorkflowTargets.TransitionUri(@object, field, status)
-                    }.Render(renderContext, visualTree));
+                        Tooltip = _ => transition?.Name
+                    };
+
+                    // a transition with a form asks for its input first; the dialog runs the move
+                    if (ObjectWorkflowTargets.ScreenForm(transition) is not null)
+                    {
+                        item.PrimaryAction = ctx => new ActionModal
+                        (
+                            "modal-form",
+                            ObjectWorkflowTargets.ScreenUri(@object, field, status)?.BindParameters(ctx.Request),
+                            TypeModalSize.Large
+                        );
+                    }
+                    else
+                    {
+                        item.Uri = _ => ObjectWorkflowTargets.TransitionUri(@object, field, status);
+                    }
+
+                    nodes.Add(item.Render(renderContext, visualTree));
                 }
             }
 
