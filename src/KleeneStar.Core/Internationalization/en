@@ -1013,6 +1013,7 @@ object.kanban.refused.permission=You may not change the status of this card.
 object.kanban.refused.workflow=This card has no workflow to move it through.
 object.kanban.refused.arrange=The board may be arranged only by those who may change the content of the workspace.
 object.kanban.refused.filter=The board filter is not a valid WQL expression: {0}
+object.kanban.refused.screen=This change of status asks for input first. Reload the board and drop the card again to fill in the form.
 object.view.list.title=Object List
 object.view.scrum.backlog.title=Scrum Backlog
 object.view.scrum.description=Active sprint and product backlog in one view.

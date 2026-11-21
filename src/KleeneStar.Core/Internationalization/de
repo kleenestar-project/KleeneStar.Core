@@ -1014,6 +1014,7 @@ object.kanban.refused.permission=Sie dürfen den Status dieser Karte nicht ände
 object.kanban.refused.workflow=Diese Karte hat keinen Workflow, über den sie verschoben werden kann.
 object.kanban.refused.arrange=Das Board dürfen nur diejenigen anordnen, die den Inhalt des Arbeitsbereichs ändern dürfen.
 object.kanban.refused.filter=Der Board-Filter ist kein gültiger WQL-Ausdruck: {0}
+object.kanban.refused.screen=Dieser Statuswechsel verlangt zuerst Eingaben. Laden Sie das Board neu und legen Sie die Karte erneut ab, um das Formular auszufüllen.
 object.view.list.title=Objekt-Liste
 object.view.scrum.backlog.title=Scrum-Backlog
 object.view.scrum.description=Aktiver Sprint und Produkt-Backlog in einer Ansicht.

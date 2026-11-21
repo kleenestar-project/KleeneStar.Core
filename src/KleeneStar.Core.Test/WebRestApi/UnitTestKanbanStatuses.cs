@@ -211,6 +211,38 @@ namespace KleeneStar.Core.Test.WebRestApi
         }
 
         /// <summary>
+        /// Tests that a drop into a status whose transition shows a form is refused: the board
+        /// opens the transition's dialog instead, so a drop that arrives anyway moves nothing.
+        /// </summary>
+        [Fact]
+        public void DropThroughATransitionWithAFormIsRefused()
+        {
+            Seed(nameof(DropThroughATransitionWithAFormIsRefused));
+            GiveStartAForm(nameof(DropThroughATransitionWithAFormIsRefused), FormState.Active);
+
+            var error = Assert.Throws<TargetInvocationException>(() => Move("inprogress"));
+
+            var refusal = Assert.IsType<RestApiRefusal>(error.InnerException);
+            Assert.Contains("object.kanban.refused.screen", refusal.Message);
+            Assert.Equal("new", CurrentKey());
+        }
+
+        /// <summary>
+        /// Tests that an archived form counts as none: the transition shows no dialog, so the
+        /// drop moves the card at once.
+        /// </summary>
+        [Fact]
+        public void DropThroughATransitionWithAnArchivedFormMoves()
+        {
+            Seed(nameof(DropThroughATransitionWithAnArchivedFormMoves));
+            GiveStartAForm(nameof(DropThroughATransitionWithAnArchivedFormMoves), FormState.Archived);
+
+            Move("inprogress");
+
+            Assert.Equal("inprogress", CurrentKey());
+        }
+
+        /// <summary>
         /// Tests that a drop naming the card's own status - a reorder within the column - does
         /// not touch the workflow.
         /// </summary>
@@ -222,6 +254,22 @@ namespace KleeneStar.Core.Test.WebRestApi
             Move("new");
 
             Assert.Equal("new", CurrentKey());
+        }
+
+        /// <summary>
+        /// Gives the incident's transition New -> In Progress an additional form of its class.
+        /// </summary>
+        private static void GiveStartAForm(string connectionString, FormState state)
+        {
+            using var db = CoreHubFixture.CreateDbContext(connectionString);
+
+            var form = new Form { Id = Guid.NewGuid(), Name = "Start note", ClassId = IncidentId, FormType = FormType.Default, State = state };
+            db.Forms.Add(form);
+
+            var workflowId = db.Fields.Single(x => x.Id == IncidentFieldId).WorkflowId;
+            db.Transitions.Single(x => x.WorkflowId == workflowId && x.Name == "Start").ScreenFormId = form.Id;
+
+            db.SaveChanges();
         }
 
         /// <summary>

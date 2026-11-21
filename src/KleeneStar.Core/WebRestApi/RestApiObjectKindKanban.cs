@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using WebExpress.WebApp.WebRestApi;
 using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebMessage;
@@ -47,8 +48,11 @@ namespace KleeneStar.Core.WebRestApi
     /// through by the guards, empty for a caller who may not change the object). A drop into a
     /// column with one fitting status moves the card at once, with several the board asks which;
     /// <see cref="MoveCard"/> then runs the transition, guards, validators and post functions
-    /// included. A board whose classes have no workflow offers no statuses and moves cards on
-    /// screen only, as before.
+    /// included. A transition the workflow gives a form is not run by a drop: the card carries
+    /// the address of the transition's dialog (<see cref="ScreenMarker"/>), the board's script
+    /// opens it instead of saving the drop, and <see cref="MoveCard"/> refuses such a move. A
+    /// board whose classes have no workflow offers no statuses and moves cards on screen only,
+    /// as before.
     /// </para>
     /// </summary>
     public abstract class RestApiObjectKindKanban : RestApiKanban<Model.Entities.Object>
@@ -302,6 +306,14 @@ namespace KleeneStar.Core.WebRestApi
                 .FirstOrDefault(x => KanbanStatusCatalog.Key(x) == move.StatusId)
                 ?? throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.property.workflow.transition.notallowed"));
 
+            // a transition with a form runs through its dialog, which the board opens instead of
+            // saving the drop; a drop that arrives anyway comes from a board loaded before the
+            // form was given to the transition
+            if (ScreenTransition(workflow, current, target, null) is not null)
+            {
+                throw new RestApiRefusal(I18N.Translate(request, "kleenestar.core:object.kanban.refused.screen"));
+            }
+
             var result = CoreHub.WorkflowManager.ExecuteTransition(@object.Id, field.Id, target.Id, identityId);
 
             if (!result.Succeeded && result.Outcome != WorkflowTransitionOutcome.Unchanged)
@@ -435,6 +447,7 @@ namespace KleeneStar.Core.WebRestApi
             }
 
             var mayMoveByClass = new Dictionary<Guid, bool>();
+            var screenForms = new Dictionary<Guid, bool>();
             var identityId = CoreHub.SessionManager.GetCurrentIdentityId(request);
 
             var contextByClass = new Dictionary<Guid, ObjectBoardClassContext>();
@@ -508,12 +521,14 @@ namespace KleeneStar.Core.WebRestApi
 
                 // what the state dropdown would offer this caller: reachable and let through by
                 // the guards; a card that cannot be moved still reorders within its column
-                card.AllowedStatusIds = workflow is null || !mayMove
+                var offered = workflow is null || !mayMove
                     ? []
-                    : [.. CoreHub.WorkflowManager
+                    : CoreHub.WorkflowManager
                         .GetOfferedStatuses(workflow, current, entity, field, identityId)
-                        .Select(KanbanStatusCatalog.Key)
-                        .Distinct()];
+                        .ToList();
+
+                card.AllowedStatusIds = [.. offered.Select(KanbanStatusCatalog.Key).Distinct()];
+                card.Html += ScreenMarker(entity, field, workflow, current, offered, screenForms);
 
                 yield return card;
             }
@@ -803,6 +818,99 @@ namespace KleeneStar.Core.WebRestApi
             }
 
             return CoreHub.KanbanBoardManager.GetBoard(scope.OwnerId, scope.BoardKind, scope.ViewId)?.Filter;
+        }
+
+        /// <summary>
+        /// Returns the transition that moves an object from its current state into a target
+        /// state and shows a form before it runs.
+        /// </summary>
+        /// <remarks>
+        /// The transition is the first active one between the two states, the one the dialog
+        /// (<see cref="WebFragment.Object.ObjectTransitionFormFragment"/>) resolves as well; an
+        /// archived form counts as none (<see cref="WebFragment.Object.ObjectWorkflowTargets.ScreenForm"/>).
+        /// </remarks>
+        /// <param name="workflow">The workflow, loaded with its structure.</param>
+        /// <param name="current">The current state, or <see langword="null"/>.</param>
+        /// <param name="target">The target state.</param>
+        /// <param name="screenForms">Whether a transition shows its form, by transition id,
+        /// shared across the cards of one request; may be <see langword="null"/>.</param>
+        /// <returns>The transition, or <see langword="null"/> when the move needs no input.</returns>
+        private static Transition ScreenTransition(Workflow workflow, Status current, Status target, Dictionary<Guid, bool> screenForms)
+        {
+            if (current is null || target is null)
+            {
+                return null;
+            }
+
+            var transition = (workflow?.Transitions ?? [])
+                .FirstOrDefault(t => t.State == TransitionState.Active && t.SourceId == current.Id && t.TargetId == target.Id);
+
+            if (transition?.ScreenFormId is null)
+            {
+                return null;
+            }
+
+            if (screenForms is null || !screenForms.TryGetValue(transition.Id, out var shows))
+            {
+                shows = WebFragment.Object.ObjectWorkflowTargets.ScreenForm(transition) is not null;
+
+                if (screenForms is not null)
+                {
+                    screenForms[transition.Id] = shows;
+                }
+            }
+
+            return shows ? transition : null;
+        }
+
+        /// <summary>
+        /// Builds the hidden marker a card carries when some of the states it may be dropped
+        /// into are reached through a transition with a form: the address of the dialog per
+        /// status key.
+        /// </summary>
+        /// <remarks>
+        /// The framework's card carries no data of the application's, so the marker travels in
+        /// the card's markup. <c>Assets/js/kleenestar.core.kanban.transition.js</c> reads it when the board is
+        /// about to save a drop, refuses the save - the board takes the card back - and opens
+        /// the dialog instead, whose submit moves the object.
+        /// </remarks>
+        /// <param name="object">The object of the card.</param>
+        /// <param name="field">The workflow field.</param>
+        /// <param name="workflow">The workflow, loaded with its structure.</param>
+        /// <param name="current">The current state, or <see langword="null"/>.</param>
+        /// <param name="offered">The states the card may be moved to.</param>
+        /// <param name="screenForms">Whether a transition shows its form, by transition id.</param>
+        /// <returns>The marker, or an empty string when no move asks for input.</returns>
+        private static string ScreenMarker(Model.Entities.Object @object, Field field, Workflow workflow, Status current, IEnumerable<Status> offered, Dictionary<Guid, bool> screenForms)
+        {
+            var screens = new Dictionary<string, string>();
+
+            foreach (var status in offered ?? [])
+            {
+                if (ScreenTransition(workflow, current, status, screenForms) is null)
+                {
+                    continue;
+                }
+
+                var key = KanbanStatusCatalog.Key(status);
+                var uri = WebFragment.Object.ObjectWorkflowTargets.ScreenUri(@object, field, status)?.ToString();
+
+                // the dialog is loaded by the page that shows the board, so the address stays on
+                // the origin the board was opened from rather than on the configured external one
+                if (Uri.TryCreate(uri, UriKind.Absolute, out var absolute))
+                {
+                    uri = absolute.PathAndQuery;
+                }
+
+                if (key.Length > 0 && !string.IsNullOrEmpty(uri))
+                {
+                    screens.TryAdd(key, uri);
+                }
+            }
+
+            return screens.Count == 0
+                ? string.Empty
+                : $"<span hidden data-ks-transition-screens=\"{WebUtility.HtmlEncode(JsonSerializer.Serialize(screens))}\"></span>";
         }
 
         /// <summary>
