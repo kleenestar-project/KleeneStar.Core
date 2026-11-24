@@ -36,6 +36,11 @@ namespace KleeneStar.Core.WebFragment.Object
     /// or the name of a transition they never saw.
     /// </para>
     /// <para>
+    /// A successful submit reloads the page, which then shows the new state. A Kanban board opens
+    /// the dialog as the move dialog of a card (<c>RestApiKanbanCard.MoveDialogs</c>); WebExpress
+    /// then overrides the success action in the modal and loads only the board again.
+    /// </para>
+    /// <para>
     /// Workflow fields are left out of the form even when it places one: the state moves through
     /// the transition, and an input showing the old state would only contradict it. A transition
     /// whose form is gone in the meantime still renders - with its description and the button -
@@ -76,7 +81,8 @@ namespace KleeneStar.Core.WebFragment.Object
 
             ItemId = renderContext => ResolveObject(renderContext.Request)?.Id.ToString();
 
-            // the page behind the dialog shows the old state until it is loaded again
+            // the page behind the dialog shows the old state until it is loaded again; a Kanban
+            // board that opens the dialog tells its modal to keep the page and reloads itself
             SuccessAction = _ => TypeRestFormSuccess.Reload;
 
             Submit.Text = ctx => Resolve(ctx?.Request).Target?.Name

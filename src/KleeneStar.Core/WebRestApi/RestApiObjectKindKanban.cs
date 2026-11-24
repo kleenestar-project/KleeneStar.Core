@@ -48,9 +48,9 @@ namespace KleeneStar.Core.WebRestApi
     /// through by the guards, empty for a caller who may not change the object). A drop into a
     /// column with one fitting status moves the card at once, with several the board asks which;
     /// <see cref="MoveCard"/> then runs the transition, guards, validators and post functions
-    /// included. A transition the workflow gives a form is not run by a drop: the card carries
-    /// the address of the transition's dialog (<see cref="ScreenMarker"/>), the board's script
-    /// opens it instead of saving the drop, and <see cref="MoveCard"/> refuses such a move. A
+    /// included. A transition the workflow gives a form is not run by a drop: the card names
+    /// the transition's dialog (<see cref="RestApiKanbanCard.MoveDialogs"/>), the board opens it
+    /// instead of saving the drop, and <see cref="MoveCard"/> refuses such a move. A
     /// board whose classes have no workflow offers no statuses and moves cards on screen only,
     /// as before.
     /// </para>
@@ -528,7 +528,7 @@ namespace KleeneStar.Core.WebRestApi
                         .ToList();
 
                 card.AllowedStatusIds = [.. offered.Select(KanbanStatusCatalog.Key).Distinct()];
-                card.Html += ScreenMarker(entity, field, workflow, current, offered, screenForms);
+                card.MoveDialogs = MoveDialogs(entity, field, workflow, current, offered, screenForms);
 
                 yield return card;
             }
@@ -864,15 +864,15 @@ namespace KleeneStar.Core.WebRestApi
         }
 
         /// <summary>
-        /// Builds the hidden marker a card carries when some of the states it may be dropped
-        /// into are reached through a transition with a form: the address of the dialog per
-        /// status key.
+        /// Collects the dialogs of the moves that ask for input first: the address of the
+        /// transition dialog per status key, for every offered state reached through a transition
+        /// with a form.
         /// </summary>
         /// <remarks>
-        /// The framework's card carries no data of the application's, so the marker travels in
-        /// the card's markup. <c>Assets/js/kleenestar.core.kanban.transition.js</c> reads it when the board is
-        /// about to save a drop, refuses the save - the board takes the card back - and opens
-        /// the dialog instead, whose submit moves the object.
+        /// They become the card's <see cref="RestApiKanbanCard.MoveDialogs"/>. The board does not
+        /// store a drop into such a state; it opens the dialog in the page's form modal, keeps
+        /// the page when the dialog succeeds and loads itself again. The dialog's submit moves
+        /// the object.
         /// </remarks>
         /// <param name="object">The object of the card.</param>
         /// <param name="field">The workflow field.</param>
@@ -880,8 +880,8 @@ namespace KleeneStar.Core.WebRestApi
         /// <param name="current">The current state, or <see langword="null"/>.</param>
         /// <param name="offered">The states the card may be moved to.</param>
         /// <param name="screenForms">Whether a transition shows its form, by transition id.</param>
-        /// <returns>The marker, or an empty string when no move asks for input.</returns>
-        private static string ScreenMarker(Model.Entities.Object @object, Field field, Workflow workflow, Status current, IEnumerable<Status> offered, Dictionary<Guid, bool> screenForms)
+        /// <returns>The dialogs by status key, or <see langword="null"/> when no move asks for input.</returns>
+        private static Dictionary<string, string> MoveDialogs(Model.Entities.Object @object, Field field, Workflow workflow, Status current, IEnumerable<Status> offered, Dictionary<Guid, bool> screenForms)
         {
             var screens = new Dictionary<string, string>();
 
@@ -908,9 +908,7 @@ namespace KleeneStar.Core.WebRestApi
                 }
             }
 
-            return screens.Count == 0
-                ? string.Empty
-                : $"<span hidden data-ks-transition-screens=\"{WebUtility.HtmlEncode(JsonSerializer.Serialize(screens))}\"></span>";
+            return screens.Count == 0 ? null : screens;
         }
 
         /// <summary>
