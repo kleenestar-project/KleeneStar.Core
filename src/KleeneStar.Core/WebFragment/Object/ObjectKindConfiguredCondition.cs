@@ -10,9 +10,10 @@ namespace KleeneStar.Core.WebFragment.Object
     /// <remarks>
     /// A concrete subclass names one kind. The subclasses exist because a condition is
     /// bound through <c>[Condition&lt;T&gt;]</c>, which takes a type rather than a value —
-    /// they carry no logic of their own.
+    /// they carry no logic of their own. The base is public so that an add-on gates the link of
+    /// the kind it contributes the same way.
     /// </remarks>
-    internal abstract class ObjectKindConfiguredCondition : ICondition
+    public abstract class ObjectKindConfiguredCondition : ICondition
     {
         /// <summary>
         /// Gets the kind key the condition asks about.

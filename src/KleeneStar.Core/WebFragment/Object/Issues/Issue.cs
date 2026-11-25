@@ -29,9 +29,10 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         public IIcon Icon => new IconListCheck();
 
         /// <summary>
-        /// Gets the display order; issues close the built-in kind listings.
+        /// Gets the display order; issues follow the documents, blogs and - between those and
+        /// the issues, at 3 - an add-on's calendar.
         /// </summary>
-        public int Order => 3;
+        public int Order => 4;
 
         /// <summary>
         /// Gets the unbound route of the issue overview page (the issue list).

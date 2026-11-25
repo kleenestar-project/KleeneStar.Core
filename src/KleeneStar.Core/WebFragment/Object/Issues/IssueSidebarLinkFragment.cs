@@ -15,15 +15,17 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
     [Scope<global::KleeneStar.Core.WWW.Blogs._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindOverview>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Edit>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Edit>]
     [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Condition<IssueKindConfiguredCondition>]
-    [Order(3)]
+    [Order(4)]
     [Cache]
     public sealed class IssueSidebarLinkFragment : ObjectKindSidebarLinkFragment
     {

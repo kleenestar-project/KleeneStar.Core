@@ -13,9 +13,9 @@ namespace KleeneStar.Core.WebRestApi
     /// <summary>
     /// Captures the per-class lookup data needed to project workspace objects onto the
     /// Kanban and Scrum boards — the workflow and priority fields of the class and its
-    /// active statuses.
+    /// active statuses. Public, like the projection, for the views add-ons contribute.
     /// </summary>
-    internal sealed class ObjectBoardClassContext
+    public sealed class ObjectBoardClassContext
     {
         /// <summary>Gets the class the context belongs to.</summary>
         public Class Class { get; init; }
@@ -46,9 +46,11 @@ namespace KleeneStar.Core.WebRestApi
     /// Provides the shared projection logic of the object board REST endpoints (Kanban,
     /// Scrum backlog, Scrum sprint): resolving an object's workflow-field value to a
     /// status category, its priority value to a display code, and deriving assignee
-    /// display data. Mirrors the resolution rules of the portal's issue projection.
+    /// display data. Mirrors the resolution rules of the portal's issue projection. The
+    /// projection is public so that a view an add-on contributes (a calendar showing the
+    /// objects of a query) places and colours objects exactly as the core's views do.
     /// </summary>
-    internal static class ObjectBoardProjection
+    public static class ObjectBoardProjection
     {
         /// <summary>
         /// Builds the board context of a class from the field, status and category

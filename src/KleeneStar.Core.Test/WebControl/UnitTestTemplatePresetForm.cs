@@ -170,6 +170,32 @@ namespace KleeneStar.Core.Test.WebControl
         }
 
         /// <summary>
+        /// Verifies that the preset of an add-on (<c>{plugin id}:{name}</c>), for which the step
+        /// offers no input, is kept as stored, while a stored preset naming no field is dropped.
+        /// </summary>
+        [Fact]
+        public void Collect_KeepsThePresetsOfAddOns()
+        {
+            Seed(nameof(Collect_KeepsThePresetsOfAddOns));
+
+            var stored = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["kleenestar.calendar:duration"] = "45",
+                ["Vanished"] = "gone"
+            };
+            var payload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["preset_category"] = "Network" };
+
+            var kept = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                TemplatePresetForm.Collect(payload, [IncidentId], stored, CultureInfo.InvariantCulture));
+
+            Assert.Equal("45", kept["kleenestar.calendar:duration"]);
+            Assert.False(kept.ContainsKey("Vanished"));
+            Assert.True(TemplatePresetForm.IsAddOnKey("kleenestar.calendar:duration"));
+            Assert.False(TemplatePresetForm.IsAddOnKey(":duration"));
+            Assert.False(TemplatePresetForm.IsAddOnKey("Duration"));
+        }
+
+        /// <summary>
         /// Verifies that a control submitting its starting value presets nothing, unless the
         /// field already carried a preset the control was started from.
         /// </summary>
