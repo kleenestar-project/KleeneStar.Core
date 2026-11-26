@@ -30,9 +30,9 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
 
         /// <summary>
         /// Gets the display order; issues follow the documents, blogs and - between those and
-        /// the issues, at 3 - an add-on's calendar.
+        /// the issues, at 3 and 4 - the add-ons' calendar and polls.
         /// </summary>
-        public int Order => 4;
+        public int Order => 5;
 
         /// <summary>
         /// Gets the unbound route of the issue overview page (the issue list).

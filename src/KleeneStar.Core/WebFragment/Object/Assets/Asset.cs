@@ -31,7 +31,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
         /// <summary>
         /// Gets the display order; assets close the built-in kind listings.
         /// </summary>
-        public int Order => 5;
+        public int Order => 6;
 
         /// <summary>
         /// Gets <see langword="false"/>: an asset is inventory, not work - nothing waits on

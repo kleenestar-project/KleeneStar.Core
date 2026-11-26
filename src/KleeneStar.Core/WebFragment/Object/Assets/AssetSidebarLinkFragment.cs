@@ -25,7 +25,7 @@ namespace KleeneStar.Core.WebFragment.Object.Assets
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Edit>]
     [Condition<global::KleeneStar.Core.WebPermission.PolicyCondition<WorkspaceViewPolicy>>]
     [Condition<AssetKindConfiguredCondition>]
-    [Order(5)]
+    [Order(6)]
     [Cache]
     public sealed class AssetSidebarLinkFragment : ObjectKindSidebarLinkFragment
     {

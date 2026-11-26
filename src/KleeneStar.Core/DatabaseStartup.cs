@@ -140,7 +140,7 @@ namespace KleeneStar.Core
         /// A history that recorded <c>20261121092836_TemplateHierarchies</c> holds the whole chain
         /// <c>20261121082301_InitialCreate</c>, <c>20261121084614_TemplateChildren</c>,
         /// <c>20261121092836_TemplateHierarchies</c>, whose schema is the schema of
-        /// <c>20261121193944_InitialCreate</c>; the two earlier ids stay in the history as
+        /// <c>20261126042723_InitialCreate</c>; the two earlier ids stay in the history as
         /// unknown entries. A history ending at an earlier id of that chain holds an older schema
         /// and is not mapped.
         /// </remarks>
@@ -149,7 +149,7 @@ namespace KleeneStar.Core
             {
                 ["20261121092836_TemplateHierarchies"] =
                 [
-                    "20261121193944_InitialCreate"
+                    "20261126042723_InitialCreate"
                 ]
             };
 
