@@ -4,8 +4,8 @@
  * dialog and the default widgets; this file only adds the app's own items.
  *
  * The widget strings live in the app's regular i18n (Internationalization/en|de,
- * namespace "kleenestar.core"); the dashboard fragment bridges them into the
- * client i18n registry ahead of this script, so the I18N lookups below resolve.
+ * namespace "kleenestar.core"); IncludeDashboardWidgetsScript links the client
+ * translations ahead of this script, so the I18N lookups below resolve.
  */
 webexpress.webui.DashboardWidgets.register("widget_kleenestar_note", {
     title: webexpress.webui.I18N.translate("kleenestar.core:dashboard.widget.note.title"),

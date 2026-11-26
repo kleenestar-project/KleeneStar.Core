@@ -33,8 +33,8 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
     /// <summary>
     /// The dashboard of an insight: columns of freely arranged widgets, backed by
     /// <c>/api/1/insights/{insightid}/view</c>, which persists every change of a caller who may
-    /// change the insight. The KleeneStar widget types and their texts are inlined into the page
-    /// (<see cref="DashboardWidgetScript"/>).
+    /// change the insight. The KleeneStar widget types are registered by
+    /// <see cref="WebInclude.IncludeDashboardWidgetsScript"/>.
     /// </summary>
     [Section<SectionTabTemplatePrimary>]
     [Scope<InsightTabDashboardTemplateFragment>]
@@ -64,20 +64,13 @@ namespace KleeneStar.Core.WebFragment.Insight.Views
         }
 
         /// <summary>
-        /// Renders the board, first injecting the KleeneStar widget registration into the page head.
+        /// Renders the board and points its service island at the board endpoint.
         /// </summary>
         /// <param name="renderContext">The context in which the control is rendered.</param>
         /// <param name="visualTree">The visual tree.</param>
         /// <returns>The HTML node.</returns>
         public override IHtmlNode Render(IRenderControlContext renderContext, IVisualTreeControl visualTree)
         {
-            var script = DashboardWidgetScript.Value;
-
-            if (!string.IsNullOrEmpty(script))
-            {
-                visualTree.AddHeaderScript(script);
-            }
-
             var html = base.Render(renderContext, visualTree);
             // the target is resolved within the board, so only its own island is pointed at it
             new Binding().Add(new BindTemplate().Add("boardservice", TypeBindMode.Attr,
