@@ -2280,3 +2280,568 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
         align-items: stretch;
     }
 }
+
+/* ====================================================== workspace transfer */
+
+/* The settings page that exports and imports workspaces (WorkspaceTransferExportControl,
+   WorkspaceTransferImportControl): two tabs, each a short lede, the thing to work on - the
+   workspaces as cards, the drop zone - and a quiet action row. The work runs on the server in
+   the background; its panel (.ks-transfer-job) shows phase, share and bar, and the report
+   follows as rows with a state chip rather than as a wall of numbers. */
+.ks-transfer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-top: 1.25rem;
+    max-width: 72rem;
+}
+
+.ks-transfer-lede {
+    margin: 0;
+    color: var(--wx-secondary-color);
+    max-width: 52rem;
+}
+
+/* -------------------------------------------------------------- toolbar */
+
+.ks-transfer-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.ks-transfer-search {
+    position: relative;
+    flex: 0 1 18rem;
+}
+
+.ks-transfer-search > i {
+    position: absolute;
+    left: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--wx-secondary-color);
+    pointer-events: none;
+}
+
+.ks-transfer-search > input {
+    padding-left: 2rem;
+}
+
+.ks-transfer-toolbar-actions .btn-link {
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+    text-decoration: none;
+}
+
+.ks-transfer-count {
+    margin-left: auto;
+    font-size: 0.875rem;
+    color: var(--wx-secondary-color);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.ks-transfer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.75rem;
+}
+
+.ks-transfer-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius);
+    background: var(--wx-body-bg);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.ks-transfer-card:hover {
+    border-color: var(--wx-primary-border-subtle, var(--wx-primary));
+}
+
+.ks-transfer-card-chosen {
+    border-color: var(--wx-primary);
+    background: var(--wx-primary-bg-subtle, var(--wx-body-bg));
+    box-shadow: 0 0 0 1px var(--wx-primary) inset;
+}
+
+.ks-transfer-card[hidden] {
+    display: none;
+}
+
+/* the checkbox sits in the corner; the whole card is its label */
+.ks-transfer-card > .ks-transfer-workspace {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    margin: 0;
+}
+
+.ks-transfer-avatar {
+    flex: 0 0 2.25rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--wx-border-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-transfer-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ks-transfer-avatar-letters {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--wx-primary);
+}
+
+.ks-transfer-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    padding-right: 1.25rem;
+}
+
+.ks-transfer-card-title {
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-transfer-card-meta {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.ks-transfer-card-teaser {
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ks-transfer-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--wx-font-monospace);
+    background: var(--wx-tertiary-bg);
+    color: var(--wx-body-color);
+}
+
+.ks-transfer-chip-muted {
+    font-family: inherit;
+    font-weight: 500;
+    color: var(--wx-secondary-color);
+}
+
+.ks-transfer-empty {
+    margin: 0;
+    color: var(--wx-secondary-color);
+}
+
+/* ---------------------------------------------------------------- scope */
+
+/* what travels with an export and what stays: two quiet columns, divided by a hairline */
+.ks-transfer-scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    border-top: 1px solid var(--wx-border-color);
+    border-bottom: 1px solid var(--wx-border-color);
+}
+
+.ks-transfer-scope-col {
+    padding: 0.85rem 1rem 0.85rem 0;
+}
+
+.ks-transfer-scope-col + .ks-transfer-scope-col {
+    padding-left: 1rem;
+    border-left: 1px solid var(--wx-border-color);
+}
+
+.ks-transfer-scope-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+}
+
+.ks-transfer-scope-in .ks-transfer-scope-title > i { color: var(--wx-success); }
+.ks-transfer-scope-out .ks-transfer-scope-title > i { color: var(--wx-secondary-color); }
+
+.ks-transfer-scope-col > p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--wx-secondary-color);
+}
+
+/* -------------------------------------------------------------- actions */
+
+.ks-transfer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.ks-transfer-actions .btn,
+.ks-transfer-job .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.ks-transfer-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-transfer-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-transfer-message {
+    font-size: 0.875rem;
+    color: var(--wx-danger);
+}
+
+/* ------------------------------------------------------------------ job */
+
+.ks-transfer-job {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--wx-border-color);
+    border-radius: var(--wx-border-radius);
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-transfer-job[hidden] {
+    display: none;
+}
+
+.ks-transfer-job-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.875rem;
+}
+
+.ks-transfer-job-phase {
+    color: var(--wx-body-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-transfer-job-percent {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-transfer-progress {
+    height: 0.5rem;
+    background: var(--wx-body-bg);
+}
+
+.ks-transfer-progress-bar {
+    transition: width 0.4s ease;
+}
+
+.ks-transfer-job-ready {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-top: 0.35rem;
+}
+
+.ks-transfer-job-ready[hidden] {
+    display: none;
+}
+
+.ks-transfer-job-ready-icon {
+    font-size: 1.5rem;
+    color: var(--wx-success);
+}
+
+.ks-transfer-job-ready-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+.ks-transfer-job-ready-title {
+    font-weight: 600;
+}
+
+.ks-transfer-job-ready-meta {
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+    overflow-wrap: anywhere;
+}
+
+.ks-transfer-job-error {
+    font-size: 0.875rem;
+    color: var(--wx-danger);
+}
+
+/* ------------------------------------------------------------ drop zone */
+
+.ks-transfer-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 10rem;
+    padding: 1.5rem;
+    border: 2px dashed var(--wx-border-color);
+    border-radius: var(--wx-border-radius);
+    background: var(--wx-body-bg);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ks-transfer-drop:hover,
+.ks-transfer-drop:focus-visible,
+.ks-transfer-drop-over {
+    border-color: var(--wx-primary);
+    background: var(--wx-primary-bg-subtle, var(--wx-tertiary-bg));
+    outline: none;
+}
+
+.ks-transfer-drop-chosen {
+    border-style: solid;
+    border-color: var(--wx-primary-border-subtle, var(--wx-primary));
+}
+
+.ks-transfer-drop-busy {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.ks-transfer-drop-icon {
+    font-size: 2rem;
+    color: var(--wx-primary);
+}
+
+.ks-transfer-drop-title {
+    font-weight: 600;
+}
+
+.ks-transfer-drop-hint {
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-transfer-drop-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: var(--wx-tertiary-bg);
+    font-size: 0.875rem;
+}
+
+.ks-transfer-drop-file[hidden] {
+    display: none;
+}
+
+.ks-transfer-drop-size {
+    color: var(--wx-secondary-color);
+}
+
+/* --------------------------------------------------------------- option */
+
+.ks-transfer-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ks-transfer-option .form-check {
+    margin: 0;
+}
+
+.ks-transfer-option-help {
+    padding-left: 2.5em;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+    max-width: 52rem;
+}
+
+/* --------------------------------------------------------------- report */
+
+.ks-transfer-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.ks-transfer-result:empty {
+    display: none;
+}
+
+.ks-transfer-callout {
+    --ks-transfer-tone: var(--wx-info);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    border-left: 3px solid var(--ks-transfer-tone);
+    border-radius: var(--wx-border-radius-sm);
+    background: var(--wx-tertiary-bg);
+}
+
+.ks-transfer-callout > i {
+    color: var(--ks-transfer-tone);
+    margin-top: 0.15rem;
+}
+
+.ks-transfer-callout-success { --ks-transfer-tone: var(--wx-success); }
+.ks-transfer-callout-danger { --ks-transfer-tone: var(--wx-danger); }
+.ks-transfer-callout-warning { --ks-transfer-tone: var(--wx-warning); }
+
+.ks-transfer-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--wx-danger);
+    border-radius: var(--wx-border-radius);
+}
+
+.ks-transfer-confirm-text {
+    flex: 1 1 20rem;
+}
+
+.ks-transfer-confirm-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ks-transfer-outcome {
+    display: flex;
+    flex-direction: column;
+}
+
+.ks-transfer-outcome-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--wx-border-color);
+}
+
+.ks-transfer-outcome-row:last-child {
+    border-bottom: 0;
+}
+
+.ks-transfer-outcome-name {
+    font-weight: 600;
+}
+
+.ks-transfer-outcome-reason {
+    flex-basis: 100%;
+    font-size: 0.8125rem;
+    color: var(--wx-secondary-color);
+}
+
+.ks-transfer-state {
+    --ks-transfer-tone: var(--wx-secondary-color);
+    margin-left: auto;
+    padding: 0.05rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--ks-transfer-tone);
+    color: var(--ks-transfer-tone);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ks-transfer-state-new { --ks-transfer-tone: var(--wx-success); }
+.ks-transfer-state-replaced { --ks-transfer-tone: var(--wx-warning); }
+.ks-transfer-state-skipped { --ks-transfer-tone: var(--wx-secondary-color); }
+
+/* the details of a report are sections of the framework; the table keeps to its content */
+.ks-transfer-section .wx-section-body {
+    padding-top: 0.35rem;
+}
+
+.ks-transfer-table {
+    width: auto;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.ks-transfer-table td:not(:first-child),
+.ks-transfer-table th:not(:first-child) {
+    text-align: right;
+    padding-left: 1.25rem;
+}
+
+.ks-transfer-count-zero { color: var(--wx-secondary-color); }
+.ks-transfer-count-written { color: var(--wx-success); }
+.ks-transfer-count-updated { color: var(--wx-warning-text-emphasis, var(--wx-warning)); }
+.ks-transfer-count-deleted,
+.ks-transfer-count-skipped { color: var(--wx-danger); }
+
+.ks-transfer-notes {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 720px) {
+    .ks-transfer-scope-col + .ks-transfer-scope-col {
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--wx-border-color);
+    }
+
+    .ks-transfer-count {
+        margin-left: 0;
+        flex-basis: 100%;
+    }
+}

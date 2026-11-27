@@ -67,6 +67,9 @@ namespace KleeneStar.Core.WebMaintenance
 
                     // a backup that fails is logged and tried again at the next housekeeping
                     Guard(() => DatabaseBackups.RunDue(now));
+
+                    // the files of finished workspace exports are not kept for ever
+                    Guard(() => CoreHub.WorkspaceTransferManager.Prune(now));
                 }
             }
             finally
