@@ -843,6 +843,13 @@
     padding-top: 1.75rem;
 }
 
+/* A sheet with tabs opens with the tab bar, whose right end is free; the chips sit there, in the
+   row the tabs take anyway, and the padding would only push the tabs away from the section title
+   they belong to. */
+.wx-kleenestar-collaborative:has(> .wx-kleenestar-object-detail > .wx-tab-container) {
+    padding-top: 0;
+}
+
 
 /* ----------------------------------------------------- form reading view */
 
