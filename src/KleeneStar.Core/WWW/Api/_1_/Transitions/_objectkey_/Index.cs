@@ -19,7 +19,10 @@ namespace KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_
     /// A <c>GET</c> moves the addressed object's workflow-backed field to the requested state
     /// and then issues a <c>302</c> redirect back to the object detail page, so a plain
     /// navigation link inside a dropdown can drive the change without any client-side
-    /// scripting — the same shape the assignee toggle uses. The state machine itself is
+    /// scripting — the same shape the assignee toggle uses. On a detail page the refresh script
+    /// (<see cref="WebInclude.IncludeObjectRefreshScript"/>) requests the link in the background
+    /// instead, follows the redirect and lays the page it ends on over the one on screen, so the
+    /// page is not reloaded; the redirect target is therefore part of the contract. The state machine itself is
     /// enforced by <see cref="IWorkflowManager.ExecuteTransition"/>: this endpoint only
     /// translates the request into that call and turns its outcome into a toast.
     /// </remarks>

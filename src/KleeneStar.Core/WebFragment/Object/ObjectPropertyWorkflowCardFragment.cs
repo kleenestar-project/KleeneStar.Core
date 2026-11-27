@@ -40,7 +40,9 @@ namespace KleeneStar.Core.WebFragment.Object
     /// through the workflow's active transitions. Choosing one drives
     /// <see cref="WWW.Api._1_.Transitions._objectkey_.Index"/>, which asks
     /// <see cref="IWorkflowManager.ExecuteTransition"/> to run the state change - guard,
-    /// validators, value write, post functions - and redirects back here; a transition the
+    /// validators, value write, post functions - and redirects back here. The refresh script
+    /// (<see cref="WebInclude.IncludeObjectRefreshScript"/>) runs the link in the background and
+    /// replaces only what the new state changed on the page, so the page is not reloaded; a transition the
     /// workflow gives a form opens <see cref="WWW.Issue._objectkey_.Transition"/> instead, which
     /// runs the same change once the form is submitted. The last dropdown
     /// item opens the workflow itself in a modal

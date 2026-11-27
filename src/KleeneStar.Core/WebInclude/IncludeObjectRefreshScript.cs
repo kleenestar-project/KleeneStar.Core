@@ -4,8 +4,8 @@ using WebExpress.WebCore.WebInclude;
 namespace KleeneStar.Core.WebInclude
 {
     /// <summary>
-    /// The script that reloads an object detail page after a dialog has changed the object
-    /// it shows.
+    /// The script that brings an object detail page up to date after a dialog or a workflow
+    /// transition has changed the object it shows.
     /// </summary>
     /// <remarks>
     /// The detail pages are rendered once by the server and the dialogs that write the record
@@ -15,6 +15,9 @@ namespace KleeneStar.Core.WebInclude
     /// the page when the form edited the object the page names in its
     /// <see cref="WebFragment.Object.ObjectRefreshFragment"/> meta tag; it is scoped to the
     /// detail pages, because that is the only place a page is about one record.
+    /// A workflow transition - an entry of the status menu, or the submit of a transition's
+    /// dialog - does not reload the page: the script runs it in the background, fetches the page
+    /// with the new state and replaces only the elements whose server markup changed.
     /// </remarks>
     [Asset("/assets/js/kleenestar.core.object.refresh.js")]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]

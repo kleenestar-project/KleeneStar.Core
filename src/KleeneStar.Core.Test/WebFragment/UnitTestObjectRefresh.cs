@@ -116,5 +116,21 @@ namespace KleeneStar.Core.Test.WebFragment
             Assert.Contains("\"delete\"", script);
             Assert.Contains("formId !== id", script);
         }
+
+        /// <summary>
+        /// A workflow transition is run in the background and laid over the page instead of
+        /// reloading it: the script reads the endpoint from the tag the fragment writes and
+        /// recognises the transition dialog by the input its data service reads the state from.
+        /// </summary>
+        [Fact]
+        public void Script_RunsTransitionsWithoutReload()
+        {
+            var script = Script();
+
+            Assert.Contains($"\"{ObjectRefreshFragment.TransitionMetaName}\"", script);
+            Assert.Contains($"\"{(global::KleeneStar.Core.WWW.Api._1_.Objects.Transition.StateKey)}\"", script);
+            Assert.Contains("preventDefault()", script);
+            Assert.Contains("DOMParser", script);
+        }
     }
 }

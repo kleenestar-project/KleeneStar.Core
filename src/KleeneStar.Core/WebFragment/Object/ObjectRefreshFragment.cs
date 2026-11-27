@@ -10,8 +10,10 @@ namespace KleeneStar.Core.WebFragment.Object
 {
     /// <summary>
     /// Names the object an object detail page shows, in a meta tag of the page head, so the
-    /// reload script (<see cref="WebInclude.IncludeObjectRefreshScript"/>) can tell a dialog
-    /// that changed <em>this</em> record from one that changed something else on the page.
+    /// refresh script (<see cref="WebInclude.IncludeObjectRefreshScript"/>) can tell a dialog
+    /// that changed <em>this</em> record from one that changed something else on the page; a
+    /// second tag names the object's transition endpoint, whose links the script runs in the
+    /// background.
     /// </summary>
     /// <remarks>
     /// The route carries the object's key, the dialogs address the record by its id; the two
@@ -33,6 +35,13 @@ namespace KleeneStar.Core.WebFragment.Object
         /// match the name the script reads.
         /// </summary>
         public const string MetaName = "kleenestar.object";
+
+        /// <summary>
+        /// The name of the meta tag carrying the address of the transition endpoint of the object
+        /// the page shows; the script runs the links of the status menu that point there in the
+        /// background instead of navigating to them. It has to match the name the script reads.
+        /// </summary>
+        public const string TransitionMetaName = "kleenestar.object.transition";
 
         /// <summary>
         /// Initializes a new instance of the class.
@@ -59,6 +68,16 @@ namespace KleeneStar.Core.WebFragment.Object
             if (@object is not null)
             {
                 visualTree?.AddMeta(MetaName, @object.Id.ToString());
+
+                // the endpoint the status menu links to (ObjectWorkflowTargets.TransitionUri),
+                // without the field and the state each entry adds
+                var transition = CoreHub.GetUri<global::KleeneStar.Core.WWW.Api._1_.Transitions._objectkey_.Index>()?
+                    .BindParameters(new ObjectKeyParameter(@object.Key));
+
+                if (transition is not null)
+                {
+                    visualTree?.AddMeta(TransitionMetaName, transition.ToString());
+                }
             }
 
             return null;
