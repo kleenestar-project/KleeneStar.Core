@@ -2891,3 +2891,43 @@ html:not([data-wx-theme="dark"]) body:has(.ks-object-engagement, .wx-kleenestar-
         flex-basis: 100%;
     }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   item links answer on the whole row: a few framework entries are a padded row around an
+   inline link, so the row highlights on hover while only the label takes the click. the
+   ordinary dropdown (li > a.dropdown-item) and the navigation (li > a.nav-link) already put
+   the padding on the link and need nothing
+   --------------------------------------------------------------------------------------------- */
+
+/* split button entries (ControlSplitButtonItemLink, for example the status menu of an object):
+   li.dropdown-item > a.wx-link. the row's padding moves onto the link, so the link is the row */
+.dropdown-menu > li.dropdown-item:has(> .wx-link) {
+    padding: 0;
+}
+
+.dropdown-menu > li.dropdown-item > .wx-link {
+    display: flex;
+    width: 100%;
+    padding: 0.25rem 1rem;
+}
+
+/* sidebar rows and list rows hold buttons beside the link (caret, remove, "...", drag handle,
+   delete, options), so the link is stretched over the row beneath them instead: its ::after
+   covers the padding and the badge, the controls are lifted above it */
+.wx-sidebar .wx-sidebar-link:has(> .wx-link),
+.wx-list-item:has(> .wx-list-item-link-el) {
+    position: relative;
+}
+
+.wx-sidebar .wx-sidebar-link:not(.disabled) > .wx-link::after,
+.wx-list-item > .wx-list-item-link-el:not(.disabled)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.wx-sidebar .wx-sidebar-link:has(> .wx-link) > :is(.btn, .wx-sidebar-options),
+.wx-list-item:has(> .wx-list-item-link-el) > :is(.wx-list-tree, .wx-list-drag-handle, .wx-list-delete, .wx-list-options-placeholder) {
+    position: relative;
+    z-index: 1;
+}
