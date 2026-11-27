@@ -617,6 +617,11 @@ namespace KleeneStar.Core.WebManager
 
             CommitAdded?.Invoke(this, commit);
 
+            // every write of a record ends in a commit - a field edited inline, a transition, a
+            // form saved - so the commit is where the open pages showing the object learn that
+            // it changed, whoever changed it and wherever
+            ObjectChangeNotices.Notify(commit.ObjectId);
+
             return commit;
         }
 

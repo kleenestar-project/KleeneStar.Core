@@ -457,6 +457,45 @@
     overscroll-behavior: contain;
 }
 
+/* the details sheet opens with its tab bar, and a tab link brings its own padding above the
+   label; the section body adds its gap on top of that, which set the tabs apart from the title
+   they belong to. The body gives up its gap here, so the tab link's padding alone separates the
+   two */
+#object-detail-section > .wx-section-wrapper > .wx-section-body {
+    padding-top: 0;
+}
+
+/* an element of an object view that another person's change replaced
+   (kleenestar.core.object.refresh.js) flashes the way a changed table row does: the warning
+   tint of the table's change flash, fading out */
+@keyframes ks-change-flash {
+    0% {
+        background-color: rgba(var(--wx-warning-rgb), 0.4);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.ks-change-flash {
+    animation: ks-change-flash 1s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ks-change-flash {
+        animation: none;
+    }
+}
+
+@media (forced-colors: active) {
+    .ks-change-flash {
+        animation: none;
+        outline: 2px solid currentColor;
+        outline-offset: -2px;
+    }
+}
+
 /* ================================================================ preview */
 
 /* the reduced view is read inside a detail pane, which is narrower than the work zone and

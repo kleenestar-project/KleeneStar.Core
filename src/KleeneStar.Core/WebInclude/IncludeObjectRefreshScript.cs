@@ -4,28 +4,34 @@ using WebExpress.WebCore.WebInclude;
 namespace KleeneStar.Core.WebInclude
 {
     /// <summary>
-    /// The script that brings an object detail page up to date after a dialog or a workflow
-    /// transition has changed the object it shows.
+    /// The script that keeps the view of an object up to date - on its detail page and in the
+    /// preview pane of a master-detail view - after a dialog, a workflow transition or another
+    /// person has changed it.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The detail pages are rendered once by the server and the dialogs that write the record
     /// - the edit mask, the prose editor, the security-level and organize dialogs - only close
     /// when they are done, so without this the page went on showing the record as it was when
     /// it was opened. The script listens for the success event a form dispatches and reloads
     /// the page when the form edited the object the page names in its
-    /// <see cref="WebFragment.Object.ObjectRefreshFragment"/> meta tag; it is scoped to the
-    /// detail pages, because that is the only place a page is about one record.
+    /// <see cref="WebFragment.Object.ObjectRefreshFragment"/> meta tag.
+    /// </para>
+    /// <para>
     /// A workflow transition - an entry of the status menu, or the submit of a transition's
-    /// dialog - does not reload the page: the script runs it in the background, fetches the page
-    /// with the new state and replaces only the elements whose server markup changed.
+    /// dialog - does not reload the page: the script runs it in the background, fetches the view
+    /// with the new state and replaces only the elements whose server markup changed. The same
+    /// happens when the data change channel announces that someone else changed the object; the
+    /// replaced elements then flash.
+    /// </para>
+    /// <para>
+    /// The include is not scoped: a preview pane is embedded into the overviews, the boards, the
+    /// insights and the pages of add-on kinds alike. On a page that names no object and embeds
+    /// no preview the script does nothing, so a list page is not reloaded because a row was
+    /// edited in a dialog - its table refreshes on its own.
+    /// </para>
     /// </remarks>
     [Asset("/assets/js/kleenestar.core.object.refresh.js")]
-    [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
-    [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
-    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
-    [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
-    [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
-    [Scope<global::KleeneStar.Core.WWW.Documents._workspacekey_.Index>]
     public sealed class IncludeObjectRefreshScript : IInclude
     {
     }
