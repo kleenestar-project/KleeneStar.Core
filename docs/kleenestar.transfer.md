@@ -19,7 +19,7 @@ records phase and share. The endpoint `/api/1/workspaces/transfer`:
 
 |Call                                                       |Answer
 |-----------------------------------------------------------|-----------------------------------------------
-|`POST ?action=export&ids=a,b` (no ids: all)                |the job
+|`POST ?action=export&ids=a,b&structureonly=false` (no ids: all)                |the job
 |`POST ?action=import&dryrun=&overwrite=&ids=`, body = zip  |the job (the framework forms post no file, so the page sends the archive as the body)
 |`GET ?job=<id>`                                            |progress (`state`, `progress`, translated `phase`) and, once finished, the translated report
 |`GET ?job=<id>&download=true`                              |the file of a finished export
@@ -54,6 +54,13 @@ Owners and references the database does not declare as foreign keys (`Commit.Obj
 `SecurityLevel.PermittedGroupIds`, …) are listed in the catalog; declared foreign keys are read
 from the EF model. An installation-wide value catalog a field is bound to is exported with the
 field, but it is not the workspace's: an overwrite never deletes it.
+
+The optional export switch *Structure only* defaults to off. With `structureonly=true`,
+the archive keeps classes, fields, templates, workflows, forms, views, boards and workspace
+settings, but contains no objects or data owned by objects. This also omits the workspace
+home page, comments, values, attachments, history, polls and appointments. References to
+objects, including `Workspace.HomeId`, are written as null. Import and overwrite retain
+their existing semantics: overwriting a workspace with this archive removes its objects.
 
 ## File format (`WorkspaceTransferFormat`, version 1)
 

@@ -104,7 +104,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Workspaces
 
             if (string.Equals(action, "export", StringComparison.OrdinalIgnoreCase))
             {
-                return JsonApi.Json(Describe(request, CoreHub.WorkspaceTransferManager.StartExport(ids, ownerId)));
+                return JsonApi.Json(Describe(request, CoreHub.WorkspaceTransferManager.StartExport(ids, ownerId, Flag(request, "structureonly"))));
             }
 
             var content = (request as Request)?.Content;

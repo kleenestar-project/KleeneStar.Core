@@ -37,8 +37,9 @@ namespace KleeneStar.Core.WebManager
         /// <param name="workspaceIds">The workspaces; empty for all of them.</param>
         /// <param name="output">The stream the archive is written to.</param>
         /// <param name="progress">What is told of the progress (share, phase, detail), or <see langword="null"/>.</param>
+        /// <param name="structureOnly">Whether objects and their dependent data are omitted.</param>
         /// <returns>What was written.</returns>
-        WorkspaceTransferReport Export(IEnumerable<Guid> workspaceIds, Stream output, Action<double, string, string> progress = null);
+        WorkspaceTransferReport Export(IEnumerable<Guid> workspaceIds, Stream output, Action<double, string, string> progress = null, bool structureOnly = false);
 
         /// <summary>
         /// Reads a zip archive into the database.
@@ -54,8 +55,9 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceIds">The workspaces; empty for all of them.</param>
         /// <param name="ownerId">The account the job runs for.</param>
+        /// <param name="structureOnly">Whether objects and their dependent data are omitted.</param>
         /// <returns>The job.</returns>
-        WorkspaceTransferJob StartExport(IEnumerable<Guid> workspaceIds, Guid ownerId);
+        WorkspaceTransferJob StartExport(IEnumerable<Guid> workspaceIds, Guid ownerId, bool structureOnly = false);
 
         /// <summary>
         /// Starts an import in the background.

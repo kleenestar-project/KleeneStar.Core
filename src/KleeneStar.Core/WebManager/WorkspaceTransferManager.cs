@@ -85,8 +85,9 @@ namespace KleeneStar.Core.WebManager
         /// <param name="workspaceIds">The workspaces; empty for all of them.</param>
         /// <param name="output">The stream the archive is written to.</param>
         /// <param name="progress">What is told of the progress (share, phase, detail), or <see langword="null"/>.</param>
+        /// <param name="structureOnly">Whether objects and their dependent data are omitted.</param>
         /// <returns>What was written.</returns>
-        public WorkspaceTransferReport Export(IEnumerable<Guid> workspaceIds, Stream output, Action<double, string, string> progress = null)
+        public WorkspaceTransferReport Export(IEnumerable<Guid> workspaceIds, Stream output, Action<double, string, string> progress = null, bool structureOnly = false)
         {
             ArgumentNullException.ThrowIfNull(output);
 
@@ -99,7 +100,7 @@ namespace KleeneStar.Core.WebManager
 
             // the export reads the tables, not through the object manager: it is the whole
             // workspace, classified objects included - which is why only administrators reach it
-            var report = ModelHub.ExportWorkspaces(ids, output, progress);
+            var report = ModelHub.ExportWorkspaces(ids, output, progress, structureOnly);
 
             foreach (var workspace in report.Workspaces)
             {
@@ -157,12 +158,14 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         /// <param name="workspaceIds">The workspaces; empty for all of them.</param>
         /// <param name="ownerId">The account the job runs for.</param>
+        /// <param name="structureOnly">Whether objects and their dependent data are omitted.</param>
         /// <returns>The job.</returns>
-        public WorkspaceTransferJob StartExport(IEnumerable<Guid> workspaceIds, Guid ownerId)
+        public WorkspaceTransferJob StartExport(IEnumerable<Guid> workspaceIds, Guid ownerId, bool structureOnly = false)
         {
             return Enqueue(new WorkspaceTransferJob
             {
                 IsExport = true,
+                StructureOnly = structureOnly,
                 OwnerId = ownerId,
                 WorkspaceIds = [.. (workspaceIds ?? []).Where(x => x != Guid.Empty).Distinct()]
             });
@@ -308,6 +311,7 @@ namespace KleeneStar.Core.WebManager
         /// <summary>
         /// Runs a job on behalf of its owner and records how it ended.
         /// </summary>
+        /// <param name="job">The queued transfer job.</param>
         private void Run(WorkspaceTransferJob job)
         {
             using var identity = job.OwnerId != Guid.Empty ? CoreHub.SessionManager.BeginIdentity(job.OwnerId) : null;
@@ -325,7 +329,7 @@ namespace KleeneStar.Core.WebManager
 
                     using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     {
-                        report = Export(job.WorkspaceIds, file, job.Advance);
+                        report = Export(job.WorkspaceIds, file, job.Advance, job.StructureOnly);
                     }
 
                     job.FilePath = path;

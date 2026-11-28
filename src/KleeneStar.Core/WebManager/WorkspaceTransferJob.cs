@@ -128,6 +128,11 @@ namespace KleeneStar.Core.WebManager
         internal Guid[] WorkspaceIds { get; init; } = [];
 
         /// <summary>
+        /// Returns whether the export omits objects and their dependent data.
+        /// </summary>
+        internal bool StructureOnly { get; init; }
+
+        /// <summary>
         /// Returns whether an export file is ready to download.
         /// </summary>
         public bool HasFile => IsExport && State == WorkspaceTransferJobState.Finished && FilePath is not null && System.IO.File.Exists(FilePath);

@@ -111,11 +111,20 @@ namespace KleeneStar.Core.WebControl
             html.Append("</div>");
             html.Append($"<p class=\"ks-transfer-empty\" hidden>{T("export.nomatch")}</p>");
 
+            // the export scope
+            html.Append("<div class=\"ks-transfer-option\">");
+            html.Append("<div class=\"form-check form-switch\">");
+            html.Append("<input class=\"form-check-input ks-transfer-structureonly\" type=\"checkbox\" role=\"switch\" id=\"ks-transfer-structureonly\">");
+            html.Append($"<label class=\"form-check-label\" for=\"ks-transfer-structureonly\">{T("export.structureonly")}</label>");
+            html.Append("</div>");
+            html.Append($"<div class=\"ks-transfer-option-help\">{T("export.structureonly.help")}</div>");
+            html.Append("</div>");
+
             // what travels and what stays
             html.Append("<div class=\"ks-transfer-scope\">");
             html.Append("<div class=\"ks-transfer-scope-col ks-transfer-scope-in\">");
             html.Append($"<div class=\"ks-transfer-scope-title\"><i class=\"wx-icon-light wx-icon-light-circle-check\" aria-hidden=\"true\"></i>{T("export.included")}</div>");
-            html.Append($"<p>{T("export.included.list")}</p>");
+            html.Append($"<p class=\"ks-transfer-included\" data-full=\"{T("export.included.list")}\" data-structure=\"{T("export.structureonly.included")}\">{T("export.included.list")}</p>");
             html.Append("</div>");
             html.Append("<div class=\"ks-transfer-scope-col ks-transfer-scope-out\">");
             html.Append($"<div class=\"ks-transfer-scope-title\"><i class=\"wx-icon-light wx-icon-light-circle-minus\" aria-hidden=\"true\"></i>{T("export.excluded")}</div>");

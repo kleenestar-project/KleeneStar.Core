@@ -27,6 +27,7 @@ kleenestar.core.WorkspaceTransferExportCtrl = class extends webexpress.webui.Ctr
         this._count = element.querySelector(".ks-transfer-count");
         this._badge = element.querySelector(".ks-transfer-badge");
         this._start = element.querySelector(".ks-transfer-start");
+        this._structureOnly = element.querySelector(".ks-transfer-structureonly");
         this._message = element.querySelector(".ks-transfer-message");
         this._empty = element.querySelector(".ks-transfer-empty");
         this._panel = element.querySelector(".ks-transfer-job");
@@ -34,6 +35,7 @@ kleenestar.core.WorkspaceTransferExportCtrl = class extends webexpress.webui.Ctr
         this._download = element.querySelector(".ks-transfer-download");
         this._running = false;
 
+        this._structureOnly.addEventListener("change", () => this._update());
         this._boxes.forEach((x) => x.addEventListener("change", () => this._update()));
         this._filter?.addEventListener("input", () => this._narrow());
         element.querySelector(".ks-transfer-all")?.addEventListener("click", () => this._choose(true));
@@ -89,6 +91,10 @@ kleenestar.core.WorkspaceTransferExportCtrl = class extends webexpress.webui.Ctr
         this._badge.textContent = String(chosen.length);
         this._message.textContent = "";
         this._start.disabled = this._running || chosen.length === 0;
+        this._structureOnly.disabled = this._running;
+
+        const included = this._element.querySelector(".ks-transfer-included");
+        included.textContent = this._structureOnly.checked ? included.dataset.structure : included.dataset.full;
     }
 
     /**
@@ -121,7 +127,7 @@ kleenestar.core.WorkspaceTransferExportCtrl = class extends webexpress.webui.Ctr
 
         try {
             const all = chosen.length === this._boxes.length;
-            const job = await kleenestar.core.WorkspaceTransferJobs.start(this._uri, { action: "export", ids: all ? "" : chosen.join(",") });
+            const job = await kleenestar.core.WorkspaceTransferJobs.start(this._uri, { action: "export", ids: all ? "" : chosen.join(","), structureonly: this._structureOnly.checked });
 
             await this._follow(job);
         } catch (error) {
