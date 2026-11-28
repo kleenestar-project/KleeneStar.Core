@@ -75,6 +75,15 @@ data Base64. A reference always names the id (`Guid`) of the row; a join table's
 a database id (`WorkspaceCategory`, `WorkspaceTenant`, `ClassAllowedChild`) is translated to the
 id on export and back on import. Database ids (`RawId`) never leave the installation.
 
+The icon transfer includes generated and uploaded pictures stored in the local icon directory.
+`WorkspaceTransferIcons` embeds their bytes as Base64 data addresses in the exported icon
+properties, including those of workspaces, classes and templates in structure-only exports.
+Built-in asset addresses and external image addresses remain references. The import restores
+inline images for accepted rows under content-hashed file names in the target icon directory
+and stores their local addresses in the database. A dry run or skipped workspace writes no
+icons. Existing icon files are never overwritten or removed. A failed database write can leave
+an unreferenced content-hashed image file, but cannot change a previously used picture.
+
 ## Tolerant import
 
 - unknown table or column: left out (note); a column the file lacks: stays empty (a required

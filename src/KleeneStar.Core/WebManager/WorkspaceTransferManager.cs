@@ -100,7 +100,7 @@ namespace KleeneStar.Core.WebManager
 
             // the export reads the tables, not through the object manager: it is the whole
             // workspace, classified objects included - which is why only administrators reach it
-            var report = ModelHub.ExportWorkspaces(ids, output, progress, structureOnly);
+            var report = ModelHub.ExportWorkspaces(ids, output, progress, structureOnly, Icons().Export);
 
             foreach (var workspace in report.Workspaces)
             {
@@ -128,7 +128,7 @@ namespace KleeneStar.Core.WebManager
 
             lock (_importGate)
             {
-                report = ModelHub.ImportWorkspaces(input, options, progress);
+                report = ModelHub.ImportWorkspaces(input, options, progress, Icons().Import);
 
                 if (!report.Succeeded || options?.DryRun == true)
                 {
@@ -151,6 +151,17 @@ namespace KleeneStar.Core.WebManager
             }
 
             return report;
+        }
+
+        /// <summary>
+        /// Creates the icon transfer using the same directory and route as stored avatars.
+        /// </summary>
+        /// <returns>The icon transfer for this installation.</returns>
+        private static WorkspaceTransferIcons Icons()
+        {
+            return new WorkspaceTransferIcons(
+                Path.Combine(AppContext.BaseDirectory, CoreHub.HttpServerContext.DataPath, "icons"),
+                CoreHub.ApplicationContext.Route.Concat("/assets/icons/").ToUri().ToString());
         }
 
         /// <summary>
