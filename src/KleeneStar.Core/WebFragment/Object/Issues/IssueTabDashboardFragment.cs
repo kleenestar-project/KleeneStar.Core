@@ -51,8 +51,8 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
         }
 
         /// <summary>
-        /// Renders the control as an HTML node, first injecting the app widget registration
-        /// script into the page head (see <see cref="DashboardWidgetScript"/>).
+        /// Renders the control as an HTML node. The KleeneStar widget types are registered by
+        /// <see cref="WebInclude.IncludeDashboardWidgetsScript"/>.
         /// </summary>
         /// <param name="renderContext">The context in which the control is rendered.</param>
         /// <param name="visualTree">The visual tree representing the control's structure.</param>
@@ -62,12 +62,6 @@ namespace KleeneStar.Core.WebFragment.Object.Issues
             if (!FragmentContext.Conditions.Check(renderContext?.Request))
             {
                 return null;
-            }
-
-            var script = DashboardWidgetScript.Value;
-            if (!string.IsNullOrEmpty(script))
-            {
-                visualTree.AddHeaderScript(script);
             }
 
             var html = base.Render(renderContext, visualTree);

@@ -51,6 +51,7 @@ namespace KleeneStar.Core
         private static NavigatorLinkManager _navigatorLinkManager;
         private static MaintenanceManager _maintenanceManager;
         private static BrandingManager _brandingManager;
+        private static WorkspaceTransferManager _workspaceTransferManager;
         private static CustomQuickfilterManager _customQuickfilterManager;
         private static PermissionManager _permissionManager;
         private static IdentityManager _identityManager;
@@ -235,6 +236,11 @@ namespace KleeneStar.Core
         /// is presented under.
         /// </summary>
         public static IBrandingManager BrandingManager => _brandingManager ??= ComponentHub.GetComponentManager<BrandingManager>();
+
+        /// <summary>
+        /// Gets the manager that exports workspaces into a zip archive and imports such an archive.
+        /// </summary>
+        public static IWorkspaceTransferManager WorkspaceTransferManager => _workspaceTransferManager ??= ComponentHub.GetComponentManager<WorkspaceTransferManager>();
 
         /// <summary>
         /// Gets the manager of the quickfilters the users defined themselves.

@@ -13,6 +13,7 @@ namespace KleeneStar.Core.WebFragment.Template
     /// </summary>
     [Section<SectionViewFooterPrimary>]
     [Scope<TemplateViewFragment>]
+    [Scope<KleeneStar.Core.WebFragment.TemplateHierarchy.TemplateHierarchyViewFragment>]
     [Cache]
     public sealed class TemplateViewPaginationFragment : FragmentControlViewFooter
     {

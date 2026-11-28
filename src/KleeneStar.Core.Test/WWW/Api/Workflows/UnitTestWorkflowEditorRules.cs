@@ -107,7 +107,7 @@ namespace KleeneStar.Core.Test.WWW.Api.Workflows
         /// Saves the workflow with its one transition carrying the given rule lists, the way
         /// the editor posts them: the key in the entry's type, an id of the editor's own.
         /// </summary>
-        private static void Save(string connectionString, string[] guards = null, string[] validators = null, string[] postFunctions = null)
+        private static void Save(string connectionString, string[] guards = null, string[] validators = null, string[] postFunctions = null, string form = null)
         {
             using var db = CoreHubFixture.CreateDbContext(connectionString);
 
@@ -127,6 +127,7 @@ namespace KleeneStar.Core.Test.WWW.Api.Workflows
                         From = OpenId.ToString(),
                         To = DoneId.ToString(),
                         Label = "close",
+                        Form = form,
                         Guards = guards?.Select((key, i) => new RestApiWorkflowGuard { Id = "guards_" + i, Type = key, Label = "picked" }).ToList(),
                         Validators = validators?.Select((key, i) => new RestApiWorkflowValidator { Id = "validators_" + i, Type = key, Label = "picked" }).ToList(),
                         PostFunctions = postFunctions?.Select((key, i) => new RestApiWorkflowPostFunction { Id = "postfunctions_" + i, Type = key, Label = "picked" }).ToList()
@@ -364,6 +365,93 @@ namespace KleeneStar.Core.Test.WWW.Api.Workflows
             var reopen = verify.Transitions.Single(t => t.WorkflowId == WorkflowId && t.Name == "reopen");
 
             Assert.Equal("screen.note.given", reopen.ValidatorExpression);
+        }
+
+        private static readonly Guid ResolveFormId = Guid.Parse("E0E10000-0000-0000-0000-000000000011");
+        private static readonly Guid ArchivedFormId = Guid.Parse("E0E10000-0000-0000-0000-000000000012");
+        private static readonly Guid EditFormId = Guid.Parse("E0E10000-0000-0000-0000-000000000013");
+        private static readonly Guid ForeignFormId = Guid.Parse("E0E10000-0000-0000-0000-000000000014");
+
+        /// <summary>
+        /// Seeds the workflow and, next to it, an additional form of the class, an archived one,
+        /// the class's edit form and an additional form of another class.
+        /// </summary>
+        private static void SeedForms(string connectionString)
+        {
+            Seed(connectionString);
+
+            using var db = CoreHubFixture.CreateDbContext(connectionString);
+
+            db.Classes.Add(new Class { Id = Guid.Parse("E0E10000-0000-0000-0000-000000000015"), Name = "Other", WorkspaceId = WorkspaceId });
+            db.Forms.AddRange
+            (
+                new Form(ResolveFormId) { Name = "Resolve", ClassId = ClassId, FormType = FormType.Default, State = FormState.Active },
+                new Form(ArchivedFormId) { Name = "Old", ClassId = ClassId, FormType = FormType.Default, State = FormState.Archived },
+                new Form(EditFormId) { Name = "Edit", ClassId = ClassId, FormType = FormType.Edit, State = FormState.Active },
+                new Form(ForeignFormId) { Name = "Foreign", ClassId = Guid.Parse("E0E10000-0000-0000-0000-000000000015"), FormType = FormType.Default, State = FormState.Active }
+            );
+
+            db.SaveChanges();
+        }
+
+        /// <summary>
+        /// The form picker offers what a transition may show: the active additional forms of the
+        /// workflow's class - not the create, edit or view masks, not an archived form and not a
+        /// form of another class.
+        /// </summary>
+        [Fact]
+        public void RetrieveForms_OffersTheActiveAdditionalFormsOfTheClass()
+        {
+            SeedForms(nameof(RetrieveForms_OffersTheActiveAdditionalFormsOfTheClass));
+
+            using var db = CoreHubFixture.CreateDbContext(nameof(RetrieveForms_OffersTheActiveAdditionalFormsOfTheClass));
+            var forms = Invoke<IEnumerable<RestApiWorkflowForm>>("RetrieveForms", WorkflowId.ToString(), db, null).ToList();
+
+            var form = Assert.Single(forms);
+            Assert.Equal(ResolveFormId.ToString(), form.Id);
+            Assert.Equal("Resolve", form.Label);
+        }
+
+        /// <summary>
+        /// The chosen form is stored on the transition and loaded back; a form the picker would
+        /// not offer - a standard mask, another class's form - is not stored, and an empty choice
+        /// clears it.
+        /// </summary>
+        [Fact]
+        public void Update_StoresTheChosenFormOnly()
+        {
+            var name = nameof(Update_StoresTheChosenFormOnly);
+            SeedForms(name);
+
+            Save(name, form: ResolveFormId.ToString());
+            Assert.Equal(ResolveFormId, Stored(name).ScreenFormId);
+            Assert.Equal(ResolveFormId.ToString(), Assert.Single(Transitions(name)).Form);
+
+            Save(name, form: EditFormId.ToString());
+            Assert.Null(Stored(name).ScreenFormId);
+
+            Save(name, form: ForeignFormId.ToString());
+            Assert.Null(Stored(name).ScreenFormId);
+
+            Save(name, form: ResolveFormId.ToString());
+            Save(name, form: "");
+            Assert.Null(Stored(name).ScreenFormId);
+            Assert.Equal(string.Empty, Assert.Single(Transitions(name)).Form);
+        }
+
+        /// <summary>
+        /// A form archived after it was chosen survives the next autosave, so archiving a form does
+        /// not quietly strip it from the transitions that show it.
+        /// </summary>
+        [Fact]
+        public void Update_KeepsAnArchivedForm()
+        {
+            var name = nameof(Update_KeepsAnArchivedForm);
+            SeedForms(name);
+
+            Save(name, form: ArchivedFormId.ToString());
+
+            Assert.Equal(ArchivedFormId, Stored(name).ScreenFormId);
         }
     }
 }

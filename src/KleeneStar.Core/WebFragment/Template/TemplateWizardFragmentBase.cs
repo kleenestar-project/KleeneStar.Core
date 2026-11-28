@@ -185,6 +185,8 @@ namespace KleeneStar.Core.WebFragment.Template
                 Name = _ => TemplatePresetForm.ClassesField,
                 Help = _ => "kleenestar.core:template.classes.help",
                 MultiSelect = _ => true,
+                // a template usually serves a few classes; a click adds or removes one
+                ToggleOnClick = _ => true,
                 Searchable = _ => true,
                 SearchPlaceholder = _ => "kleenestar.core:template.classes.search",
                 EmptyText = _ => "kleenestar.core:template.classes.empty",

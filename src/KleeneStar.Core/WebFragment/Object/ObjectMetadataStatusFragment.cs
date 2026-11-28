@@ -3,6 +3,7 @@ using KleeneStar.Core.WebParameter;
 using KleeneStar.Model.Entities;
 using System.Linq;
 using WebExpress.WebApp.WebSection;
+using WebExpress.WebCore.Internationalization;
 using WebExpress.WebCore.WebAttribute;
 using WebExpress.WebCore.WebFragment;
 using WebExpress.WebCore.WebHtml;
@@ -29,8 +30,9 @@ namespace KleeneStar.Core.WebFragment.Object
     /// attached workflow's statuses by <see cref="IWorkflowManager.ResolveStatus"/>) and
     /// carries the color of the status category, but is rendered as a plain badge without the
     /// split button, dropdown or workflow modal — so the status is displayed but cannot be
-    /// changed from here. Returns <c>null</c> when the class has no workflow field or none has
-    /// a value yet, keeping the metadata line clean.
+    /// changed from here. Beside it a red "blocked by" badge appears while an open object blocks
+    /// this one. Returns <c>null</c> when there is neither a status nor a blocker, keeping the
+    /// metadata line clean.
     /// <para>
     /// A read-only badge is exactly what the reduced view needs, so it renders there unchanged:
     /// the detail pane never receives the property column that holds the interactive control,
@@ -40,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionHeadlineMetadata>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Order(0)]
     [Cache]
@@ -108,11 +111,6 @@ namespace KleeneStar.Core.WebFragment.Object
                     && f.WorkflowId.HasValue)
                 .ToList();
 
-            if (workflowFields.Count == 0)
-            {
-                return null;
-            }
-
             var panel = new ControlFlex("object-metadata-status")
             {
                 Layout = _ => TypeLayoutFlex.Default,
@@ -132,7 +130,51 @@ namespace KleeneStar.Core.WebFragment.Object
                 }
             }
 
+            var blocked = BuildBlockedBadge(@object);
+            if (blocked is not null)
+            {
+                panel.Add(blocked);
+                rendered = true;
+            }
+
             return rendered ? panel.Render(renderContext, visualTree) : null;
+        }
+
+        /// <summary>
+        /// Builds the badge that marks the object as blocked, or <c>null</c> when nothing open
+        /// blocks it.
+        /// </summary>
+        /// <remarks>
+        /// An object is blocked while at least one relation whose type carries the
+        /// <c>BlocksCompletion</c> effect names it as target ("is blocked by") and the blocking
+        /// source has not reached the <i>done</i> status category - the same question the
+        /// workflow asks before it lets the object close
+        /// (<see cref="ObjectRelationWorkflowRules.FindOpenBlockers"/>). The badge shows the
+        /// number of open blockers, capped at "99+"; it names none, so blockers hidden from the
+        /// reader are counted without being revealed.
+        /// </remarks>
+        /// <param name="object">The object whose blockers are checked.</param>
+        /// <returns>The badge control, or <c>null</c>.</returns>
+        private IControl BuildBlockedBadge(Model.Entities.Object @object)
+        {
+            var blockers = ObjectRelationWorkflowRules.FindOpenBlockers(@object.Id);
+
+            if (blockers.Count == 0)
+            {
+                return null;
+            }
+
+            // only the number is shown, so a blocker the reader may not see is counted without
+            // giving anything of it away; beyond 99 the badge stops counting
+            var count = blockers.Count > 99 ? "99+" : blockers.Count.ToString();
+
+            return new ControlBadge("object-metadata-status-blocked")
+            {
+                Value = ctx => I18N.Translate(ctx, "kleenestar.core:object.metadata.blocked.label", count),
+                Pill = _ => TypePillBadge.Pill,
+                BackgroundColor = _ => new PropertyColorBackgroundBadge(TypeColorBackgroundBadge.Danger),
+                Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.None, PropertySpacing.Space.One, PropertySpacing.Space.None, PropertySpacing.Space.None)
+            };
         }
 
         /// <summary>

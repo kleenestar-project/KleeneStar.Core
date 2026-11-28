@@ -10,12 +10,11 @@ using WebExpress.WebUI.WebPage;
 namespace KleeneStar.Core.WebFragment.TemplateHierarchy
 {
     /// <summary>
-    /// The button of the template overview that adds a hierarchy, beside the button that adds a
-    /// template; it opens the hierarchy wizard (<see cref="TemplateHierarchyAddFormFragment"/>).
+    /// The button of the hierarchy overview that adds a hierarchy; it opens the hierarchy wizard (<see cref="TemplateHierarchyAddFormFragment"/>).
     /// </summary>
     [Section<SectionHeadlinePrimary>]
-    [Scope<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>]
-    [Order(2)]
+    [Scope<global::KleeneStar.Core.WWW.Templates._workspacekey_.Hierarchies>]
+    [Order(1)]
     [Cache]
     public sealed class TemplateHierarchyAddButtonFragment : FragmentControlButtonLink
     {
@@ -27,9 +26,9 @@ namespace KleeneStar.Core.WebFragment.TemplateHierarchy
             : base(fragmentContext)
         {
             Text = _ => "kleenestar.core:template.hierarchy.add.label";
-            Icon = _ => new IconSitemap();
+            Icon = _ => new IconPlus();
             Margin = _ => new PropertySpacingMargin(PropertySpacing.Space.Two);
-            BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Secondary);
+            BackgroundColor = _ => new PropertyColorButton(TypeColorButton.Primary);
             PrimaryAction = renderContext => new ActionModal
             (
                 "modal-form",

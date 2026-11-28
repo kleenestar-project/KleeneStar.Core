@@ -15,7 +15,7 @@ It depends on `KleeneStar.Model` for all data entities and converters.
 
 ## Target Framework
 
-- .NET 10
+- .NET 11
 - Class library loaded as a WebExpress plugin
 
 ---

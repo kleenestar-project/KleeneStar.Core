@@ -16,6 +16,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionHeadlinePrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Cache]
     public sealed class ObjectItemEditButtonFragment : FragmentControlButtonLink
     {

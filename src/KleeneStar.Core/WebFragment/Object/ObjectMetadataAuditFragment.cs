@@ -29,6 +29,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionHeadlineMetadata>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
     [Order(1)]
     [Cache]

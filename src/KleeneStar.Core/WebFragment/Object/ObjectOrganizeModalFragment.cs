@@ -24,6 +24,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionBodySecondary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Scope<global::KleeneStar.Core.WWW.Issues._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Assets._workspacekey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Insight._insightid_.Index>]

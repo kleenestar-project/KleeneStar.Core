@@ -61,6 +61,19 @@ namespace KleeneStar.Core.WebControl
         };
 
         /// <summary>
+        /// Determines whether a preset key belongs to an add-on rather than to a field: such a key
+        /// is written as <c>{plugin id}:{name}</c> (<c>kleenestar.calendar:duration</c>). The
+        /// presets step offers no input for it, so it is kept as stored - the add-on that wrote it
+        /// reads and writes it on its own surfaces.
+        /// </summary>
+        /// <param name="key">The preset key.</param>
+        /// <returns><see langword="true"/> for the key of an add-on.</returns>
+        public static bool IsAddOnKey(string key)
+        {
+            return !string.IsNullOrWhiteSpace(key) && key.IndexOf(':') > 0;
+        }
+
+        /// <summary>
         /// Reads a list of class ids: a string separated by semicolons or commas (the tile
         /// selection), a list (a JSON array) or a single id.
         /// </summary>
@@ -302,8 +315,9 @@ namespace KleeneStar.Core.WebControl
         /// <remarks>
         /// Every offered field takes the submitted answer; a blank answer, an unticked checkbox and
         /// an empty editor document preset nothing. A stored preset the step does not ask for is
-        /// kept when it names a field of a served class or is a system key; one that names no
-        /// field of the served classes any more is dropped.
+        /// kept when it names a field of a served class, is a system key or is an add-on's key
+        /// (<see cref="IsAddOnKey"/>); one that names no field of the served classes any more is
+        /// dropped.
         /// </remarks>
         /// <param name="payload">The submitted payload; keys are matched ignoring case.</param>
         /// <param name="classIds">The served classes.</param>
@@ -329,7 +343,7 @@ namespace KleeneStar.Core.WebControl
             {
                 if (string.Equals(key, nameof(ObjectEntity.Summary), StringComparison.OrdinalIgnoreCase)
                     || offered.ContainsKey(key)
-                    || (!known.Contains(key) && !_systemKeys.Contains(key)))
+                    || (!known.Contains(key) && !_systemKeys.Contains(key) && !IsAddOnKey(key)))
                 {
                     continue;
                 }

@@ -34,6 +34,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionPropertyPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Order(10)]
     [Cache]
     public sealed class ObjectPropertySecurityLevelCardFragment : FragmentControlPanel

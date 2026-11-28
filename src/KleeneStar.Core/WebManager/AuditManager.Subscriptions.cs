@@ -142,6 +142,10 @@ namespace KleeneStar.Core.WebManager
 
             CoreHub.BrandingManager.BrandingUpdated += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Updated, x, AuditSeverity.Notice);
             CoreHub.MaintenanceManager.MaintenanceUpdated += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Updated, x, AuditSeverity.Notice);
+
+            // a workspace that left or entered the installation as a file
+            CoreHub.WorkspaceTransferManager.WorkspaceExported += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Exported, x, AuditSeverity.Notice);
+            CoreHub.WorkspaceTransferManager.WorkspaceImported += (_, x) => RecordChange(AuditCategory.Configuration, AuditAction.Imported, x, AuditSeverity.Notice);
         }
 
         /// <summary>

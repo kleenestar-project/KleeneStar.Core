@@ -34,6 +34,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionContentPrimary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Cache]
     public sealed class ObjectItemDetailFragment : FragmentControlPanel
     {
@@ -113,9 +114,14 @@ namespace KleeneStar.Core.WebFragment.Object
                 @object,
                 "detail",
                 renderContext,
+                // the markup is the sheet the server just built (values escaped as text, rich
+                // text through ProseText.ToSafeHtml); untrusted, the framework sanitizes it down
+                // to class and title, which drops the ids, the tab titles and every data
+                // attribute the tab strip and the inline editors are driven by
                 new ControlHtml("object-detail-body-" + @object.Id.ToString("N"))
                 {
-                    Html = _ => body.ToString()
+                    Html = _ => body.ToString(),
+                    Trusted = true
                 }
             ));
 

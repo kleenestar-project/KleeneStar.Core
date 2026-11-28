@@ -12,16 +12,17 @@ using WebExpress.WebUI.WebSection;
 namespace KleeneStar.Core.WebFragment.TemplateHierarchy
 {
     /// <summary>
-    /// The view of the template overview that lists the hierarchies of the workspace, toggled
-    /// beside the template table (<c>/api/1/templatehierarchies/{workspacekey}/table</c>).
+    /// The table of the hierarchy overview that lists the hierarchies of the workspace
+    /// (<c>/api/1/templatehierarchies/{workspacekey}/table</c>).
     /// </summary>
     /// <remarks>
-    /// The search and the filters of the overview narrow it as they narrow the templates. It
-    /// pages on its own: the pagination of the overview counts the templates.
+    /// Search, quick filter and pagination are the shared fragments of the template overview
+    /// (<see cref="TemplateViewSearchFragment"/>, <see cref="TemplateViewQuickfilterFragment"/>,
+    /// <see cref="TemplateViewPaginationFragment"/>); the category of the sidebar narrows the
+    /// rows through the filter binding.
     /// </remarks>
     [Section<SectionViewItemPrimary>]
-    [Scope<TemplateViewFragment>]
-    [Order(1)]
+    [Scope<TemplateHierarchyViewFragment>]
     [Cache]
     public sealed class TemplateHierarchyViewTableFragment : FragmentControlViewItem
     {
@@ -48,7 +49,8 @@ namespace KleeneStar.Core.WebFragment.TemplateHierarchy
             );
             Table.Bind = _ => new Binding()
                 .Add(new BindSearch() { Source = TemplateViewSearchFragment.ContentId })
-                .Add(new BindFilter());
+                .Add(new BindFilter())
+                .Add(new BindPaging() { Source = TemplateViewPaginationFragment.ContentId });
 
             Add(Table);
         }

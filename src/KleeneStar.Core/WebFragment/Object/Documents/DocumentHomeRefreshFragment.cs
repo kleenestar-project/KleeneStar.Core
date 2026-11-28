@@ -9,7 +9,7 @@ namespace KleeneStar.Core.WebFragment.Object.Documents
 {
     /// <summary>
     /// Names the home page in the document overview's head, so the page reloads after the home
-    /// page's editor published (<c>Assets/js/objectrefresh.js</c>).
+    /// page's editor published (<c>Assets/js/kleenestar.core.object.refresh.js</c>).
     /// </summary>
     /// <remarks>
     /// Counterpart of <see cref="ObjectRefreshFragment"/> on the overview. The reading view is

@@ -360,9 +360,11 @@ namespace KleeneStar.Core.WWW.Api._1_.TemplateHierarchies
         ///   takes a template of another workspace into the hierarchy must administer the class
         ///   its object is created in, because the objects are created on the hierarchy's
         ///   authority, not on the filer's.</item>
-        ///   <item>Every row is a sub-object, linked by a relation type of the catalog, or both.</item>
-        ///   <item>An assignee is an active account; a row waits for a sibling, and the waiting
-        ///   does not run in a circle.</item>
+        ///   <item>Every row is a sub-object, linked, or both. A link names a relation type of the
+        ///   catalog in a direction it has, and its targets are the root or other rows of the
+        ///   list.</item>
+        ///   <item>An assignee is an active account; the blocking links do not run in a
+        ///   circle.</item>
         /// </list>
         /// </remarks>
         /// <param name="existingItem">The stored hierarchy, or null.</param>
@@ -428,14 +430,17 @@ namespace KleeneStar.Core.WWW.Api._1_.TemplateHierarchies
                     return Error("kleenestar.core:template.children.workspace", template.Name);
                 }
 
-                var (linkKey, inverse) = TemplateHierarchyNodeList.ParseLink(row.Link);
-
-                if (linkKey is not null && !TemplateHierarchyNodeList.IsLinkable(linkKey, inverse))
+                foreach (var link in row.Links ?? [])
                 {
-                    return Error("kleenestar.core:template.children.link.unknown", template.Name);
+                    var (linkKey, inverse) = TemplateHierarchyNodeList.ParseLink(link?.Link);
+
+                    if (linkKey is not null && !TemplateHierarchyNodeList.IsLinkable(linkKey, inverse))
+                    {
+                        return Error("kleenestar.core:template.children.link.unknown", template.Name);
+                    }
                 }
 
-                if (row.Child == false && linkKey is null)
+                if (row.Child == false && !TemplateHierarchyNodeList.IsLinked(row))
                 {
                     return Error("kleenestar.core:template.children.link.required", template.Name);
                 }
@@ -448,19 +453,24 @@ namespace KleeneStar.Core.WWW.Api._1_.TemplateHierarchies
                 }
             }
 
-            foreach (var row in rows.Where(x => !string.IsNullOrWhiteSpace(x.WaitsFor)))
+            // a target names the root or another row of the list
+            foreach (var row in rows)
             {
-                if (string.Equals(row.WaitsFor, row.Id, StringComparison.OrdinalIgnoreCase)
-                    || !parents.TryGetValue(row.WaitsFor, out var waitedParent)
-                    || !string.Equals(waitedParent, parents[row.Id], StringComparison.OrdinalIgnoreCase))
+                foreach (var target in (row.Links ?? []).SelectMany(l => l?.Targets ?? []))
                 {
-                    return Error("kleenestar.core:template.children.waitsfor", CoreHub.TemplateManager.GetTemplate(row.Template)?.Name);
+                    if (!TemplateHierarchyNodeList.IsRoot(target)
+                        && (string.IsNullOrWhiteSpace(target)
+                            || string.Equals(target.Trim(), row.Id, StringComparison.OrdinalIgnoreCase)
+                            || !parents.ContainsKey(target.Trim())))
+                    {
+                        return Error("kleenestar.core:template.children.link.target", CoreHub.TemplateManager.GetTemplate(row.Template)?.Name);
+                    }
                 }
             }
 
-            if (TemplateHierarchyNodeList.HasWaitingCycle(rows))
+            if (TemplateHierarchyNodeList.HasBlockingCycle(rows, TemplateHierarchyNodeList.IsBlocking))
             {
-                return Error("kleenestar.core:template.children.waitsfor.cycle");
+                return Error("kleenestar.core:template.children.link.cycle");
             }
 
             return null;

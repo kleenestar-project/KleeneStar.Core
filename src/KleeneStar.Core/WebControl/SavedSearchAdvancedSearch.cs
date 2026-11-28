@@ -28,7 +28,7 @@ namespace KleeneStar.Core.WebControl
     /// </para>
     /// <para>
     /// <see cref="CarryAttribute"/> marks a button whose dialog receives the expression on
-    /// screen: <c>Assets/js/savedsearch.js</c> appends it to the dialog address on click,
+    /// screen: <c>Assets/js/kleenestar.core.search.saved.js</c> appends it to the dialog address on click,
     /// because the address is fixed when the page renders.
     /// </para>
     /// </remarks>

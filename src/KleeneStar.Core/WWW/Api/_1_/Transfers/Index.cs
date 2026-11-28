@@ -94,7 +94,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Transfers
 
             return new RestApiCreatedResult
             {
-                // created keeps objectrefresh.js from reloading while the wizard follows the uri
+                // created keeps kleenestar.core.object.refresh.js from reloading while the wizard follows the uri
                 Data = new { created = true, id = moved.Id, key = moved.Key, state = started.Operation.State.ToString().ToLowerInvariant() },
                 Uri = CoreHub.ObjectKindManager.ResolveDetailUri(moved)?.ToString()
             }

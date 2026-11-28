@@ -11,10 +11,12 @@ namespace KleeneStar.Core.WebManager
     /// action, an operation run, an automation).
     /// </summary>
     /// <remarks>
-    /// <see cref="ObjectManager"/> announces every add, update and removal. A burst - the objects
+    /// <see cref="ObjectManager"/> announces every add, update and removal, <see cref="CommitManager"/>
+    /// every commit (the values of a record, its transitions), so an open detail page or preview
+    /// pane brings the object up to date when someone else changed it. A burst - the objects
     /// of a batch move, of a bulk action, of a recursive run - is folded into one announcement by
     /// <see cref="Batch"/>: inside the scope the changes are only marked, and the outermost scope
-    /// announces once when it closes. The client coalesces as well, but every announcement is a
+    /// announces once when it closes, naming the object when the scope touched only one. The client coalesces as well, but every announcement is a
     /// message to every subscribed connection, so the server does not send ten thousand of them.
     /// Without a message queue (the tests) an announcement does nothing.
     /// </remarks>
@@ -36,7 +38,7 @@ namespace KleeneStar.Core.WebManager
         {
             if (_batch.Value is { } scope)
             {
-                scope.Pending = true;
+                scope.Mark(objectId);
 
                 return;
             }
@@ -101,9 +103,27 @@ namespace KleeneStar.Core.WebManager
         /// </summary>
         private sealed class Scope : IDisposable
         {
+            private bool _pending;
+            private bool _several;
+            private Guid? _objectId;
+
             public int Depth { get; set; } = 1;
 
-            public bool Pending { get; set; }
+            /// <summary>
+            /// Marks a change inside the scope. A scope that saw one object only announces that
+            /// object, so the pages showing another one are not asked to look again.
+            /// </summary>
+            /// <param name="objectId">The object, or <see langword="null"/> for "objects changed".</param>
+            public void Mark(Guid? objectId)
+            {
+                if (_pending && (_objectId != objectId || objectId is null))
+                {
+                    _several = true;
+                }
+
+                _pending = true;
+                _objectId = objectId;
+            }
 
             public void Dispose()
             {
@@ -114,9 +134,9 @@ namespace KleeneStar.Core.WebManager
 
                 _batch.Value = null;
 
-                if (Pending)
+                if (_pending)
                 {
-                    Send(null);
+                    Send(_several ? null : _objectId);
                 }
             }
         }

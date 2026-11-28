@@ -42,6 +42,7 @@ namespace KleeneStar.Core.WebFragment.Object
     [Section<SectionContentSecondary>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Asset._objectkey_.Index>]
+    [Scope<global::KleeneStar.Core.WebScope.IScopeObjectKindDetail>]
     [Scope<global::KleeneStar.Core.WWW.Document._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Blog._objectkey_.Index>]
     [Scope<global::KleeneStar.Core.WWW.Issue._objectkey_.Preview>]
@@ -159,7 +160,7 @@ namespace KleeneStar.Core.WebFragment.Object
             var count = _commentManager.GetComments(@object.Id)
                 .Count(x => x.State != Model.Entities.CommentState.Deleted && CommentAudience.Reaches(x, seesInternal));
 
-            // objectcomments.js keeps the badge in step once a comment is added, answered or
+            // kleenestar.core.object.comments.js keeps the badge in step once a comment is added, answered or
             // deleted; it reads the thread from here
             visualTree.AddMeta
             (

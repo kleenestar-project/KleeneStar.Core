@@ -13,8 +13,8 @@ namespace KleeneStar.Core.WWW.TemplateHierarchy._hierarchyid_
 {
     /// <summary>
     /// The page of a template hierarchy. Declaring the hierarchy-id segment here turns the folder
-    /// into a route variable for the dialogs below it; the page itself leads to the template
-    /// overview of the hierarchy's workspace, where hierarchies are listed.
+    /// into a route variable for the dialogs below it; the page itself leads to the hierarchy
+    /// overview of the hierarchy's workspace.
     /// </summary>
     [WebIcon<IconSitemap>]
     [Title("kleenestar.core:template.hierarchy.manage.label")]
@@ -32,7 +32,7 @@ namespace KleeneStar.Core.WWW.TemplateHierarchy._hierarchyid_
         }
 
         /// <summary>
-        /// Leads to the template overview of the hierarchy's workspace.
+        /// Leads to the hierarchy overview of the hierarchy's workspace.
         /// </summary>
         /// <param name="renderContext">The context for rendering the page.</param>
         /// <param name="visualTree">The visual tree of the web application.</param>
@@ -46,7 +46,7 @@ namespace KleeneStar.Core.WWW.TemplateHierarchy._hierarchyid_
             (
                 string.IsNullOrWhiteSpace(key)
                     ? CoreHub.GetUri<global::KleeneStar.Core.WWW.Index>()
-                    : CoreHub.GetUri<global::KleeneStar.Core.WWW.Templates._workspacekey_.Index>()
+                    : CoreHub.GetUri<global::KleeneStar.Core.WWW.Templates._workspacekey_.Hierarchies>()
                         .BindParameters(new WorkspaceKeyParameter(key))
             );
         }

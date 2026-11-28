@@ -317,7 +317,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="objectId">The id of the object whose values to merge.</param>
         /// <param name="classId">The id of the object's class, used to look up the
         /// field definitions for name + filtering.</param>
-        private static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
+        internal static void MergeFieldValues(IRestApiCrudResultRetrieve result, Guid objectId, Guid classId, IRequest request)
         {
             if (result?.Data is not IDictionary<string, object> data)
             {
@@ -598,7 +598,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
 
                 if (ResolveHierarchy(fieldMap) is { } hierarchy)
                 {
-                    CreateNodes(newItem, CoreHub.TemplateHierarchyManager.GetNodes(hierarchy.Id), null, request, run);
+                    CreateStructure(newItem, CoreHub.TemplateHierarchyManager.GetNodes(hierarchy.Id), request, run);
                 }
 
                 RelateToAggregate(fieldMap, newItem, request, currentUser, run);
@@ -1032,7 +1032,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// The answer is a <see cref="RestApiCreatedResult"/>: <c>uri</c> is the detail page of
         /// the new object, which the create and clone wizards follow
         /// (<see cref="WebExpress.WebApp.WebControl.TypeRestFormSuccess.FollowUri"/>); <c>data</c> is
-        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>objectrefresh.js</c> not
+        /// <c>{ created, id, key, uri }</c>, and <c>created</c> tells <c>kleenestar.core.object.refresh.js</c> not
         /// to reload the page the wizard leaves.
         /// </remarks>
         /// <param name="object">The object that was created.</param>
@@ -1295,6 +1295,78 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         }
 
         /// <summary>
+        /// Creates the work structure of a template hierarchy below the object created from its
+        /// root template: one object per node (<see cref="CreateNodes"/>), then the links of the
+        /// nodes between those objects.
+        /// </summary>
+        /// <remarks>
+        /// A link may name any place of the hierarchy, the root included, so the relations are
+        /// drawn once every object exists. A link without inverse runs from the object of its node
+        /// to the objects of its targets, with inverse the other way round; a target whose node
+        /// created no object (an archived template) is left out. The same relation named from both
+        /// ends is drawn once.
+        /// </remarks>
+        /// <param name="root">The object created from the root template.</param>
+        /// <param name="nodes">The nodes of the hierarchy, depth first.</param>
+        /// <param name="request">The request, for resolving the acting identity.</param>
+        /// <param name="run">The creation the objects are part of.</param>
+        private static void CreateStructure(Model.Entities.Object root, IReadOnlyList<TemplateHierarchyNode> nodes, IRequest request, ObjectCreationRun run)
+        {
+            var createdBy = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase)
+            {
+                [TemplateHierarchyNodeLink.RootTarget] = root.Id
+            };
+
+            CreateNodes(root, nodes, null, request, run, createdBy);
+
+            var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
+            var symmetric = TemplateHierarchyNodeList.LinkTypes()
+                .Where(x => x.Symmetric)
+                .Select(x => x.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var drawn = new HashSet<(string, Guid, Guid)>();
+
+            static string Place(string target) => TemplateHierarchyNodeList.IsRoot(target)
+                ? TemplateHierarchyNodeLink.RootTarget
+                : Guid.TryParse(target, out var id) ? id.ToString() : null;
+
+            foreach (var node in nodes)
+            {
+                if (!createdBy.TryGetValue(node.Id.ToString(), out var objectId))
+                {
+                    continue;
+                }
+
+                foreach (var link in (node.Links ?? []).Where(x => !string.IsNullOrWhiteSpace(x?.Type)))
+                {
+                    foreach (var target in link.Targets ?? [])
+                    {
+                        if (Place(target) is not { } place || !createdBy.TryGetValue(place, out var targetId) || targetId == objectId)
+                        {
+                            continue;
+                        }
+
+                        var (source, sink) = link.Inverse ? (targetId, objectId) : (objectId, targetId);
+                        var key = link.Type.Trim().ToLowerInvariant();
+
+                        if (!drawn.Add((key, source, sink)))
+                        {
+                            continue;
+                        }
+
+                        // a symmetric relation is the same one read from either end
+                        if (symmetric.Contains(key) && !drawn.Add((key, sink, source)))
+                        {
+                            continue;
+                        }
+
+                        Relate(link.Type.Trim(), source, sink, currentUser, run);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Creates one object per node of a template hierarchy below the supplied object, depth
         /// first and in the order of the nodes: a work structure.
         /// </summary>
@@ -1312,13 +1384,11 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// creates a sub-object: it is placed below its parent (<c>ParentId</c>) inside the same
         /// workspace where the parent's class allows the child's, and is joined to its parent by
         /// the relation that aggregates progress, so the parent reports the progress of the whole
-        /// structure across workspaces. A node naming a relation type
-        /// (<see cref="TemplateHierarchyNode.RelationTypeKey"/>) links the created object to its
-        /// parent with that type, from the parent to the created object or, with
-        /// <see cref="TemplateHierarchyNode.RelationInverse"/>, the other way round. A node that is
-        /// neither counts as a sub-object. A sub-object the parent's class does not allow in the
-        /// same workspace is created as a link only where the node names one, and skipped
-        /// otherwise.
+        /// structure across workspaces. A node naming links (<see cref="TemplateHierarchyNode.Links"/>)
+        /// is linked; its relations are drawn by <see cref="CreateStructure"/> once every object
+        /// exists. A node that is neither counts as a sub-object. A sub-object the parent's class
+        /// does not allow in the same workspace is created as a linked object only where the node
+        /// names links, and skipped otherwise.
         /// </para>
         /// <para>
         /// <b>An object is filed where its class lives.</b> A hierarchy may name classes of other
@@ -1328,11 +1398,8 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// level of the class.
         /// </para>
         /// <para>
-        /// <b>Who does it and what it waits for.</b> The node's assignee is the object's
-        /// (<see cref="TemplateHierarchyNode.AssigneeId"/>), and the sibling it waits for becomes a
-        /// blocking relation from that sibling's object to this one
-        /// (<see cref="TemplateHierarchyNode.PredecessorId"/>), so the workflow refuses to finish
-        /// it first.
+        /// <b>Who does it.</b> The node's assignee is the object's
+        /// (<see cref="TemplateHierarchyNode.AssigneeId"/>).
         /// </para>
         /// <para>
         /// The objects are created on the hierarchy's authority: the cross-workspace classes were
@@ -1345,13 +1412,12 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="parentNodeId">The node whose children are created, or null for the root.</param>
         /// <param name="request">The request, for resolving the acting identity.</param>
         /// <param name="run">The creation the objects are part of.</param>
-        private static void CreateNodes(Model.Entities.Object parent, IReadOnlyList<TemplateHierarchyNode> nodes, Guid? parentNodeId, IRequest request, ObjectCreationRun run)
+        /// <param name="createdBy">The objects created so far, keyed by node id; filled here.</param>
+        private static void CreateNodes(Model.Entities.Object parent, IReadOnlyList<TemplateHierarchyNode> nodes, Guid? parentNodeId, IRequest request, ObjectCreationRun run, Dictionary<string, Guid> createdBy)
         {
             var parentClass = CoreHub.ClassManager.GetClass(parent.ClassId);
             var currentUser = CoreHub.SessionManager.GetCurrentIdentityId(request);
             var author = ResolveAuthor(request);
-            var createdBy = new Dictionary<Guid, Guid>();
-            var dependencies = new List<(Guid PredecessorNodeId, Guid ObjectId)>();
 
             foreach (var node in nodes.Where(x => x.ParentNodeId == parentNodeId && x.Id != parentNodeId))
             {
@@ -1370,7 +1436,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     continue;
                 }
 
-                var linked = !string.IsNullOrWhiteSpace(node.RelationTypeKey);
+                var linked = (node.Links ?? []).Any(x => !string.IsNullOrWhiteSpace(x?.Type) && (x.Targets?.Count ?? 0) > 0);
                 var asChild = node.AsChild || !linked;
                 var contained = @class.WorkspaceId == parent.WorkspaceId;
 
@@ -1435,29 +1501,9 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
                     Relate(WebExpress.WebApp.WebRelation.RelationEffect.AggregatesProgress, parent.Id, created.Id, currentUser, run);
                 }
 
-                if (linked)
-                {
-                    Relate(node.RelationTypeKey, node.RelationInverse ? created.Id : parent.Id, node.RelationInverse ? parent.Id : created.Id, currentUser, run);
-                }
+                createdBy[node.Id.ToString()] = created.Id;
 
-                createdBy[node.Id] = created.Id;
-
-                if (node.PredecessorId is Guid predecessorId)
-                {
-                    dependencies.Add((predecessorId, created.Id));
-                }
-
-                CreateNodes(created, nodes, node.Id, request, run);
-            }
-
-            // the dependencies are drawn once all siblings exist, so a predecessor ordered after
-            // its successor is found all the same
-            foreach (var (predecessorNodeId, objectId) in dependencies)
-            {
-                if (createdBy.TryGetValue(predecessorNodeId, out var predecessorObjectId) && predecessorObjectId != objectId)
-                {
-                    Relate(WebExpress.WebApp.WebRelation.RelationEffect.BlocksCompletion, predecessorObjectId, objectId, currentUser, run);
-                }
+                CreateNodes(created, nodes, node.Id, request, run, createdBy);
             }
         }
 
@@ -1482,7 +1528,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// <param name="request">The request, for the culture of submitted dates; may be null.</param>
         /// <param name="baseline">The values a submitted date is compared with when the object
         /// has none yet (the original of a clone), keyed by field id; may be null.</param>
-        private static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
+        internal static void UpsertFieldValues(Model.Entities.Object @object, RestApiCrudFormData payload, IRequest request = null, IReadOnlyDictionary<Guid, string> baseline = null)
         {
             if (@object is null || payload is null || payload.Count == 0)
             {
@@ -1670,7 +1716,7 @@ namespace KleeneStar.Core.WWW.Api._1_.Objects
         /// a comma-separated representation that matches the parse logic of
         /// <c>ObjectFieldSheet.CreateInputValue</c>.
         /// </summary>
-        private static string SerializePayloadValue(object value)
+        internal static string SerializePayloadValue(object value)
         {
             return value switch
             {
